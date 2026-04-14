@@ -5,7 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import dagger.hilt.android.AndroidEntryPoint
+import dev.kid.app.permissions.PermissionFlowHandler
 import dev.kid.app.ui.theme.KidTheme
 
 @AndroidEntryPoint
@@ -18,7 +23,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             KidTheme {
-                KidNavHost()
+                var ready by remember { mutableStateOf(false) }
+                PermissionFlowHandler(
+                    context = this,
+                    onAllPermissionsGranted = { ready = true },
+                )
+                if (ready) {
+                    KidNavHost()
+                }
             }
         }
     }

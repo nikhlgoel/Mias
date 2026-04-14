@@ -35,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -45,19 +46,32 @@ import dev.kid.core.ui.components.AnimatedOrb
 import dev.kid.core.ui.components.BubbleType
 import dev.kid.core.ui.components.KidInputBar
 import dev.kid.core.ui.components.MessageBubble
+import dev.kid.core.ui.components.SpeechButton
 import dev.kid.core.ui.components.StatusPill
 import dev.kid.core.ui.components.ThinkingDots
 import dev.kid.core.ui.theme.KidColors
 import dev.kid.core.ui.theme.KidTypography
+import dev.kid.core.speech.SpeechState
+import dev.kid.core.speech.SpeechViewModel
 
 @Composable
 fun ChatScreen(
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ChatViewModel = hiltViewModel(),
+    speechViewModel: SpeechViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val speechState by speechViewModel.isListening.collectAsStateWithLifecycle()
+    val transcription by speechViewModel.transcription.collectAsStateWithLifecycle()
+    val confidence by speechViewModel.confidence.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+
+    LaunchedEffect(transcription) {
+        if (transcription.isNotBlank()) {
+            viewModel.applyTranscription(transcription)
+        }
+    }
 
     // Auto-scroll on new messages
     LaunchedEffect(Unit) {
@@ -105,7 +119,7 @@ fun ChatScreen(
                         items = state.messages,
                         key = { it.id },
                     ) { message ->
-                        AnimatedVisibility(
+                        androidx.compose.animation.AnimatedVisibility(
                             visible = true,
                             enter = slideInVertically(
                                 animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
@@ -144,13 +158,28 @@ fun ChatScreen(
                 .windowInsetsPadding(WindowInsets.ime)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
-            KidInputBar(
-                value = state.inputText,
-                onValueChange = viewModel::onInputChange,
-                onSend = viewModel::onSend,
-                isProcessing = state.isProcessing,
-                enabled = !state.isProcessing,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                Box(modifier = Modifier.weight(1f)) {
+                    KidInputBar(
+                        value = state.inputText,
+                        onValueChange = viewModel::onInputChange,
+                        onSend = viewModel::onSend,
+                        isProcessing = state.isProcessing,
+                        enabled = !state.isProcessing,
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                SpeechButton(
+                    state = if (speechState) SpeechState.LISTENING else SpeechState.IDLE,
+                    confidence = confidence,
+                    transcription = transcription,
+                    onStartListening = { speechViewModel.startListening() },
+                    onStopListening = { speechViewModel.stopListening() },
+                )
+            }
         }
     }
 }

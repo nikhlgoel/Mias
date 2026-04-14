@@ -2,22 +2,18 @@ package dev.kid.core.speech
 
 import android.content.Context
 import android.content.Intent
-import android.media.AudioManager
+import android.content.pm.PackageManager
 import android.os.Bundle
-import androidx.datastore.preferences.core.stringPreferencesKey
-import com.google.mlkit.common.model.DownloadConditions
-import com.google.mlkit.nl.translate.TranslateLanguage
-import com.google.mlkit.nl.translate.Translation
-import com.google.mlkit.nl.translate.Translator
-import com.google.mlkit.nl.translate.TranslatorOptions
-import com.google.mlkit.speech.client.SpeechClient
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import dev.kid.core.common.KidResult
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
-import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -71,10 +67,10 @@ data class SpeechRecognitionResult(
  */
 @Singleton
 class SpeechEngine @Inject constructor(
-    private val context: Context,
+    @ApplicationContext private val context: Context,
 ) {
-    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    
+    private var recognizer: SpeechRecognizer? = null
+
     private val _state = MutableStateFlow<SpeechState>(SpeechState.IDLE)
     val state: Flow<SpeechState> = _state.asStateFlow()
     
@@ -86,9 +82,49 @@ class SpeechEngine @Inject constructor(
     
     private var currentLanguage: SpeechLanguage = SpeechLanguage.ENGLISH_US
     private var allowAutoDetect: Boolean = true
-    
-    init {
-        SpeechClient.setLogger(SpeechClient.LoggerVerbosity.VERBOSE)
+
+    private val listener = object : RecognitionListener {
+        override fun onReadyForSpeech(params: Bundle?) {
+            _state.value = SpeechState.LISTENING
+        }
+
+        override fun onBeginningOfSpeech() = Unit
+
+        override fun onRmsChanged(rmsdB: Float) = Unit
+
+        override fun onBufferReceived(buffer: ByteArray?) = Unit
+
+        override fun onEndOfSpeech() {
+            _state.value = SpeechState.PROCESSING
+        }
+
+        override fun onError(error: Int) {
+            _state.value = SpeechState.ERROR
+            _error.value = "Speech recognition error code: $error"
+        }
+
+        override fun onResults(results: Bundle?) {
+            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            val text = matches?.firstOrNull().orEmpty()
+            val confidence = results
+                ?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
+                ?.firstOrNull()
+                ?.coerceIn(0f, 1f)
+                ?: 0.75f
+
+            updateFinalResult(text, confidence)
+            _state.value = SpeechState.SUCCESS
+        }
+
+        override fun onPartialResults(partialResults: Bundle?) {
+            val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            val text = matches?.firstOrNull().orEmpty()
+            if (text.isNotBlank()) {
+                updatePartialResult(text, 0.70f)
+            }
+        }
+
+        override fun onEvent(eventType: Int, params: Bundle?) = Unit
     }
     
     /**
@@ -111,28 +147,44 @@ class SpeechEngine @Inject constructor(
      */
     suspend fun startListening(): KidResult<Unit> = withContext(Dispatchers.Default) {
         try {
+            if (context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                _state.value = SpeechState.PERMISSION_DENIED
+                return@withContext KidResult.Error("Microphone permission not granted")
+            }
+
+            if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+                _state.value = SpeechState.ERROR
+                return@withContext KidResult.Error("Speech recognition is not available on this device")
+            }
+
+            withContext(Dispatchers.Main) {
+                if (recognizer == null) {
+                    recognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+                        setRecognitionListener(listener)
+                    }
+                }
+            }
+
             _state.value = SpeechState.LISTENING
             _error.value = null
             _result.value = null
-            
-            // Create speech recognition intent
-            val intent = Intent("android.speech.action.RECOGNIZE_SPEECH").apply {
-                putExtra("android.speech.extra.LANGUAGE_MODEL", "free_form")
-                putExtra("android.speech.extra.LANGUAGE", currentLanguage.code)
-                
-                // Enable continuous recognition for longer speech (ChatGPT-like)
-                putExtra("android.speech.extra.PARTIAL_RESULTS", true)
-                putExtra("android.speech.extra.MAX_RESULTS", 3)
-                
-                // High-quality recognition settings
-                putExtra("android.speech.extra.SPEECH_INPUT_COMPLETELY_SPECIFIED", true)
+
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, currentLanguage.code)
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
             }
-            
+
+            withContext(Dispatchers.Main) {
+                recognizer?.startListening(intent)
+            }
+
             KidResult.Success(Unit)
         } catch (e: Exception) {
             _state.value = SpeechState.ERROR
             _error.value = e.message
-            KidResult.Error(e.message ?: "Unknown error")
+            KidResult.Error(e.message ?: "Unknown speech error", e)
         }
     }
     
@@ -142,17 +194,19 @@ class SpeechEngine @Inject constructor(
     suspend fun stopListening(): KidResult<SpeechRecognitionResult> = withContext(Dispatchers.Default) {
         try {
             _state.value = SpeechState.PROCESSING
-            
-            // Simulated high-quality processing
-            // In real implementation, this would finalize ML Kit recognition
+
+            withContext(Dispatchers.Main) {
+                recognizer?.stopListening()
+            }
+
             val result = _result.value ?: SpeechRecognitionResult()
-            
+
             _state.value = SpeechState.SUCCESS
-            return@withContext KidResult.Success(result)
+            KidResult.Success(result)
         } catch (e: Exception) {
             _state.value = SpeechState.ERROR
             _error.value = e.message
-            KidResult.Error(e.message ?: "Recognition failed")
+            KidResult.Error(e.message ?: "Recognition failed", e)
         }
     }
     
@@ -160,6 +214,9 @@ class SpeechEngine @Inject constructor(
      * Cancel ongoing recognition
      */
     suspend fun cancel() = withContext(Dispatchers.Default) {
+        withContext(Dispatchers.Main) {
+            recognizer?.cancel()
+        }
         _state.value = SpeechState.IDLE
         _result.value = null
         _error.value = null
@@ -219,6 +276,11 @@ class SpeechEngine @Inject constructor(
         _state.value = SpeechState.IDLE
         _result.value = null
         _error.value = null
+    }
+
+    fun release() {
+        recognizer?.destroy()
+        recognizer = null
     }
 }
 

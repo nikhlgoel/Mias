@@ -6,7 +6,6 @@ import dev.kid.core.agent.model.AgentTask
 import dev.kid.core.agent.model.AgentTaskResult
 import dev.kid.core.agent.model.ToolDescription
 import dev.kid.core.common.KidResult
-import dev.kid.core.common.runCatchingKid
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -89,7 +88,7 @@ class AgentOrchestrator @Inject constructor(
             tasksCompleted = _status.value.tasksCompleted,
         )
 
-        val result: KidResult<String> = runCatchingKid { capability.execute(input) }
+        val result: KidResult<String> = capability.execute(input)
 
         val duration = System.currentTimeMillis() - startTime
         val taskResult = AgentTaskResult(

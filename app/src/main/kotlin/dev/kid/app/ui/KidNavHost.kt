@@ -1,9 +1,6 @@
 package dev.kid.app.ui
 
 import androidx.compose.animation.AnimatedContentTransitionScope
-package dev.kid.app.ui
-
-import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn

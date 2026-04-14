@@ -30,6 +30,9 @@ android {
 
 dependencies {
     implementation(project(":core:common"))
+    implementation(project(":core:agent"))
+    implementation(project(":core:model-hub"))
+    implementation(project(":core:speech"))
 
     implementation(libs.core.ktx)
     implementation(libs.kotlinx.coroutines.android)

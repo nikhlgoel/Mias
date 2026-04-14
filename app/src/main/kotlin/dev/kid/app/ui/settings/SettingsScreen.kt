@@ -1,7 +1,9 @@
 package dev.kid.app.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,6 +27,7 @@ import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,6 +42,7 @@ import dev.kid.core.ui.glass.GlassCard
 import dev.kid.core.ui.theme.KidColors
 import dev.kid.core.ui.theme.KidShapes
 import dev.kid.core.ui.theme.KidTypography
+import dev.kid.core.speech.SpeechLanguage
 
 @Composable
 fun SettingsScreen(
@@ -133,6 +137,53 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // ── Speech & Transcription ──
+            SectionHeader(title = "Speech & Transcription")
+            Spacer(modifier = Modifier.height(8.dp))
+            GlassCard(accentColor = KidColors.Primary) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Language: ${state.speechLanguage.displayName}",
+                        style = KidTypography.LabelLarge,
+                        color = KidColors.TextPrimary,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = "Auto Detect Language",
+                            style = KidTypography.BodyMedium,
+                            color = KidColors.TextSecondary,
+                        )
+                        Switch(
+                            checked = state.speechAutoDetect,
+                            onCheckedChange = viewModel::setSpeechAutoDetect,
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        SpeechChip(
+                            modifier = Modifier.fillMaxWidth(0.48f),
+                            label = "English (US)",
+                            selected = state.speechLanguage == SpeechLanguage.ENGLISH_US,
+                            onClick = { viewModel.setSpeechLanguage(SpeechLanguage.ENGLISH_US) },
+                        )
+                        SpeechChip(
+                            modifier = Modifier.fillMaxWidth(0.48f),
+                            label = "English (UK)",
+                            selected = state.speechLanguage == SpeechLanguage.ENGLISH_GB,
+                            onClick = { viewModel.setSpeechLanguage(SpeechLanguage.ENGLISH_GB) },
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             // ── Privacy Badge ──
             SectionHeader(title = "Privacy")
             Spacer(modifier = Modifier.height(8.dp))
@@ -162,6 +213,28 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+}
+
+@Composable
+private fun SpeechChip(
+    modifier: Modifier = Modifier,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .clip(KidShapes.Large)
+            .background(if (selected) KidColors.Primary.copy(alpha = 0.22f) else KidColors.SurfaceGlass)
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+            .clickable(onClick = onClick),
+    ) {
+        Text(
+            text = label,
+            style = KidTypography.LabelMedium,
+            color = if (selected) KidColors.TextPrimary else KidColors.TextSecondary,
+        )
     }
 }
 

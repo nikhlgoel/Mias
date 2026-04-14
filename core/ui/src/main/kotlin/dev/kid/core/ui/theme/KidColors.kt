@@ -15,6 +15,7 @@ object KidColors {
     val Background = Color(0xFF0A0A0F)
     val Surface = Color(0xFF12121A)
     val SurfaceElevated = Color(0xFF1A1A26)
+    val Card = SurfaceElevated
     val SurfaceGlass = Color(0x33FFFFFF) // 20% white for glass
     val SurfaceGlassStroke = Color(0x1AFFFFFF) // 10% white border
     val SurfaceDim = Color(0xFF08080C)
@@ -57,9 +58,11 @@ object KidColors {
 
     // ── Functional ──
     val Error = Color(0xFFEF4444)
+    val ErrorRed = Error
     val Warning = Color(0xFFF59E0B)
     val Success = Color(0xFF10B981)
     val Info = Color(0xFF3B82F6)
+    val NeonCyan = CognitionListening
 
     // ── Message Bubbles ──
     val BubbleUser = Color(0xFF1E3A5F)

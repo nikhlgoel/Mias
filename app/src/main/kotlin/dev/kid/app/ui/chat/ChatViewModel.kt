@@ -17,6 +17,7 @@ import dev.kid.core.data.Role
 import dev.kid.core.data.hindsight.HindsightMemory
 import dev.kid.core.inference.orchestrator.InferenceOrchestrator
 import dev.kid.core.inference.react.ReActStep
+import dev.kid.core.language.IntentExtractor
 import dev.kid.core.soul.SoulEngine
 import dev.kid.core.ui.components.BubbleType
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -62,6 +63,7 @@ class ChatViewModel @Inject constructor(
     private val orchestrator: InferenceOrchestrator,
     private val soulEngine: SoulEngine,
     private val hindsightMemory: HindsightMemory,
+    private val intentExtractor: IntentExtractor,
     private val conversationRepository: ConversationRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -106,9 +108,16 @@ class ChatViewModel @Inject constructor(
         _inputText.value = text
     }
 
+    fun applyTranscription(text: String) {
+        _inputText.value = text
+    }
+
     fun onSend() {
         val text = _inputText.value.trim()
         if (text.isBlank() || _isProcessing.value) return
+
+        val structuredIntent = intentExtractor.extract(text)
+        val cleanedText = structuredIntent.cleanedText.ifBlank { text }
 
         _inputText.value = ""
         _isProcessing.value = true
@@ -116,7 +125,7 @@ class ChatViewModel @Inject constructor(
         // Add user message
         val userMsg = ChatMessage(
             id = UUID.randomUUID().toString(),
-            text = text,
+            text = cleanedText,
             type = BubbleType.USER,
             timestamp = formatTime(System.currentTimeMillis()),
         )
@@ -124,17 +133,17 @@ class ChatViewModel @Inject constructor(
         _events.tryEmit(ChatEvent.ScrollToBottom)
 
         // Process with Soul + ReAct
-        soulEngine.processUserMessage(text)
+        soulEngine.processUserMessage(cleanedText)
 
         viewModelScope.launch {
             // Store fact in Hindsight
             hindsightMemory.storeFact(
-                content = "User said: $text",
+                content = "User said: $cleanedText",
                 conversationId = conversationId,
             )
 
             // Get Hindsight context
-            val hindsightContext = hindsightMemory.query(text)
+            val hindsightContext = hindsightMemory.query(structuredIntent)
                 .getOrNull()
                 ?.toPromptString()
                 ?: ""
@@ -143,9 +152,22 @@ class ChatViewModel @Inject constructor(
             val systemPrompt = InferenceOrchestrator.DEFAULT_SYSTEM_PROMPT +
                 "\n\n" + personalityPrompt
 
+            val metadata = buildMap<String, String> {
+                put("intent_type", structuredIntent.intentType.value)
+                put("intent_confidence", structuredIntent.confidence.toString())
+                structuredIntent.actionHint?.let { put("action_hint", it) }
+                structuredIntent.modifiers.forEachIndexed { index, tag ->
+                    put("modifier_${index + 1}", tag)
+                }
+                structuredIntent.entities.forEach { (k, v) ->
+                    put("entity_$k", v)
+                }
+            }
+
             val stimulus = Stimulus(
                 type = StimulusType.USER_MESSAGE,
-                content = text,
+                content = cleanedText,
+                metadata = metadata,
             )
 
             // Collect the ReAct flow

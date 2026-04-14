@@ -130,7 +130,12 @@ class EvolutionEngine @Inject constructor(
             EvolutionTaskType.INDEX_NEW_KNOWLEDGE,
             -> EvolutionResult.Skipped("Task type not yet implemented: ${task.type}")
         }
-    }.getOrElse { EvolutionResult.Failed(it.message ?: "Unknown error") }
+    }.let { result ->
+        when (result) {
+            is dev.kid.core.common.KidResult.Success -> result.data
+            is dev.kid.core.common.KidResult.Error -> EvolutionResult.Failed(result.message)
+        }
+    }
 
     companion object {
         private const val MIN_FACTS_FOR_CONSOLIDATION = 10

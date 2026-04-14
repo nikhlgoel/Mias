@@ -138,12 +138,12 @@ fun ModelCard(
                 ) {
                     Spacer(Modifier.height(12.dp))
                     DownloadProgressBar(
-                        progress = state.progress,
+                        progress = state.progressFraction,
                         status = state.status,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Text(
-                        text = "${(state.progress * 100).toInt()}% · ${formatSize(state.bytesDownloaded)} / ${formatSize(modelCard.sizeBytes)}",
+                        text = "${(state.progressFraction * 100).toInt()}% · ${formatSize(state.bytesDownloaded)} / ${formatSize(modelCard.sizeBytes)}",
                         style = KidTypography.LabelSmall,
                         color = KidColors.TextSecondary,
                         modifier = Modifier.padding(top = 4.dp),

@@ -29,7 +29,6 @@ dependencies {
 
     // On-device inference only — no cloud
     implementation(libs.onnxruntime.android)
-    implementation(libs.mediapipe.tasks.genai)
     implementation(libs.kotlinx.coroutines.android)
 
     // Hilt

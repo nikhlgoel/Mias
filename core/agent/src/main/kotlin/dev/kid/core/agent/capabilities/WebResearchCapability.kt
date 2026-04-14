@@ -51,17 +51,17 @@ class WebResearchCapability @Inject constructor(
     override suspend fun execute(input: Map<String, String>): KidResult<String> =
         runCatchingKid {
             if (!connectivity.isOnline) {
-                return@runCatchingKid KidResult.Failure(Exception("No internet connection"))
+                throw IllegalStateException("No internet connection")
             }
 
             val url = input["url"]?.trim()
-                ?: return@runCatchingKid KidResult.Failure(IllegalArgumentException("Missing: url"))
+                ?: throw IllegalArgumentException("Missing: url")
             val focus = input["focus"]?.trim()
             val maxChars = input["max_chars"]?.toIntOrNull() ?: DEFAULT_MAX_CHARS
 
             // Validate URL scheme
             if (!url.startsWith("http://") && !url.startsWith("https://")) {
-                return@runCatchingKid KidResult.Failure(IllegalArgumentException("URL must start with http:// or https://"))
+                throw IllegalArgumentException("URL must start with http:// or https://")
             }
 
             val response = httpClient.get(url) {
@@ -71,25 +71,21 @@ class WebResearchCapability @Inject constructor(
             }
 
             if (!response.status.isSuccess()) {
-                return@runCatchingKid KidResult.Failure(
-                    Exception("HTTP ${response.status.value}: $url"),
-                )
+                throw IllegalStateException("HTTP ${response.status.value}: $url")
             }
 
             val rawHtml = response.bodyAsText()
             val text = extractReadableText(rawHtml, focus)
             val result = text.take(maxChars)
 
-            KidResult.Success(
-                buildString {
-                    appendLine("--- Web Research: $url ---")
-                    if (focus != null) appendLine("Focus: $focus")
-                    appendLine()
-                    append(result)
-                    if (text.length > maxChars) appendLine("\n[...truncated — ${text.length - maxChars} chars omitted]")
-                },
-            )
-        }.fold({ it }, { KidResult.Failure(it) })
+            buildString {
+                appendLine("--- Web Research: $url ---")
+                if (focus != null) appendLine("Focus: $focus")
+                appendLine()
+                append(result)
+                if (text.length > maxChars) appendLine("\n[...truncated — ${text.length - maxChars} chars omitted]")
+            }
+        }
 
     /**
      * Extract readable text from HTML. Removes scripts, styles, nav, footers.

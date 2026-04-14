@@ -2,11 +2,12 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
     alias(libs.plugins.ktlint)
 }
 
 android {
-    namespace = "dev.kid.core.data"
+    namespace = "dev.kid.core.language"
     compileSdk = 35
 
     defaultConfig {
@@ -25,24 +26,11 @@ android {
 
 dependencies {
     implementation(project(":core:common"))
-    implementation(project(":core:language"))
 
-    // Room (local DB only)
-    implementation(libs.room.runtime)
-    implementation(libs.room.ktx)
-    ksp(libs.room.compiler)
-
-    // DataStore
-    implementation(libs.datastore.preferences)
-
-    // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
     testImplementation(libs.junit5.api)
     testRuntimeOnly(libs.junit5.engine)
-    testImplementation(libs.mockk)
     testImplementation(libs.truth)
-    testImplementation(libs.coroutines.test)
-    testImplementation(libs.turbine)
 }

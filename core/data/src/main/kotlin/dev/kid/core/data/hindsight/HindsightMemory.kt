@@ -8,6 +8,7 @@ import dev.kid.core.data.db.dao.HindsightDao
 import dev.kid.core.data.db.entity.MentalModelEntity
 import dev.kid.core.data.db.entity.ObservationEntity
 import dev.kid.core.data.db.entity.RawFactEntity
+import dev.kid.core.language.StructuredIntent
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -68,6 +69,48 @@ class HindsightMemory @Inject constructor(
                 relevantFacts = (facts + recentFacts).distinctBy { it.id },
                 observations = observations,
                 mentalModels = models,
+            )
+        }
+    }
+
+    /**
+     * Query memory using structured user intent signals.
+     *
+     * The retrieval strategy first uses normalized text, then expands with
+     * extracted entities (file names, formats, URLs, app names) to improve
+     * match quality without requiring embeddings.
+     */
+    suspend fun query(
+        intent: StructuredIntent,
+        trustLevel: TrustLevel = TrustLevel.OWNER,
+    ): KidResult<HindsightContext> = withContext(ioDispatcher) {
+        runCatchingKid {
+            val queryTerms = linkedSetOf<String>()
+            if (intent.cleanedText.isNotBlank()) {
+                queryTerms += intent.cleanedText
+            }
+            queryTerms += intent.intentType.value
+            queryTerms += intent.entities.values
+
+            val factMatches = mutableListOf<RawFactEntity>()
+            val observationMatches = mutableListOf<ObservationEntity>()
+            val modelMatches = mutableListOf<MentalModelEntity>()
+
+            queryTerms
+                .filter { it.isNotBlank() }
+                .take(6)
+                .forEach { term ->
+                    factMatches += dao.searchFacts(term, limit = 4)
+                    observationMatches += dao.searchObservations(term, limit = 3)
+                    modelMatches += dao.searchModels(term, limit = 2)
+                }
+
+            val recentFacts = dao.getRecentFacts(limit = 5)
+
+            HindsightContext(
+                relevantFacts = (factMatches + recentFacts).distinctBy { it.id }.take(12),
+                observations = observationMatches.distinctBy { it.id }.sortedByDescending { it.confidence }.take(8),
+                mentalModels = modelMatches.distinctBy { it.id }.sortedByDescending { it.strength }.take(5),
             )
         }
     }

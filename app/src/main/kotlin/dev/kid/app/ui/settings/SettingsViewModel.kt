@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.kid.core.common.model.BrainState
 import dev.kid.core.inference.orchestrator.InferenceOrchestrator
+import dev.kid.core.speech.SpeechEngine
+import dev.kid.core.speech.SpeechLanguage
 import dev.kid.core.soul.SoulEngine
 import dev.kid.core.soul.model.SoulTrait
 import dev.kid.core.thermal.TawsGovernor
@@ -22,6 +24,8 @@ data class SettingsUiState(
     val showReActSteps: Boolean = false,
     val desktopHostname: String = "desktop-g15",
     val modelInfo: ModelInfo = ModelInfo(),
+    val speechLanguage: SpeechLanguage = SpeechLanguage.ENGLISH_US,
+    val speechAutoDetect: Boolean = true,
 )
 
 data class ModelInfo(
@@ -37,6 +41,7 @@ class SettingsViewModel @Inject constructor(
     private val orchestrator: InferenceOrchestrator,
     private val soulEngine: SoulEngine,
     private val tawsGovernor: TawsGovernor,
+    private val speechEngine: SpeechEngine,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(loadCurrentState())
@@ -44,6 +49,16 @@ class SettingsViewModel @Inject constructor(
 
     fun refreshState() {
         _uiState.update { loadCurrentState() }
+    }
+
+    fun setSpeechLanguage(language: SpeechLanguage) {
+        speechEngine.setLanguage(language)
+        _uiState.update { it.copy(speechLanguage = language) }
+    }
+
+    fun setSpeechAutoDetect(enabled: Boolean) {
+        speechEngine.setAutoDetect(enabled)
+        _uiState.update { it.copy(speechAutoDetect = enabled) }
     }
 
     private fun loadCurrentState(): SettingsUiState {
@@ -54,6 +69,8 @@ class SettingsViewModel @Inject constructor(
             batteryLevel = thermal?.batteryLevel ?: 100,
             isDesktopReachable = orchestrator.desktopEngine != null,
             soulTraits = soulEngine.state.value.blendCoefficients,
+            speechLanguage = speechEngine.getCurrentLanguage(),
+            speechAutoDetect = true,
         )
     }
 }

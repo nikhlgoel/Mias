@@ -1,6 +1,8 @@
 package dev.kid.core.thermal
 
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.PowerManager
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -58,10 +60,12 @@ class ThermalMonitor @Inject constructor(
             BatteryManager.BATTERY_PROPERTY_CAPACITY,
         )
         val isCharging = batteryManager.isCharging
-        // Battery temperature comes in tenths of degrees from BatteryManager
-        val batteryTempRaw = batteryManager.getIntProperty(
-            BatteryManager.BATTERY_PROPERTY_TEMPERATURE,
+        // Battery temperature comes in tenths of degrees via ACTION_BATTERY_CHANGED
+        val batteryStatus = context.registerReceiver(
+            null,
+            IntentFilter(Intent.ACTION_BATTERY_CHANGED),
         )
+        val batteryTempRaw = batteryStatus?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1) ?: -1
         val batteryTemp = if (batteryTempRaw > 0) batteryTempRaw / 10f else 25f
 
         // SoC/skin temps — use PowerManager thermal status as proxy

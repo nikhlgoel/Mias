@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.dp
 object KidShapes {
     val Small = RoundedCornerShape(8.dp)
     val Medium = RoundedCornerShape(16.dp)
+    val Card = Medium
     val Large = RoundedCornerShape(24.dp)
     val ExtraLarge = RoundedCornerShape(32.dp)
     val Full = RoundedCornerShape(50)

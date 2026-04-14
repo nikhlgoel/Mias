@@ -79,7 +79,7 @@ class SpeechViewModel @Inject constructor(
         viewModelScope.launch {
             val result = speechEngine.startListening()
             if (result is KidResult.Error) {
-                _error.value = result.exception
+                _error.value = result.message
             }
         }
     }
@@ -95,7 +95,7 @@ class SpeechViewModel @Inject constructor(
                     // Transcription is already in _transcription via Flow
                 }
                 is KidResult.Error -> {
-                    _error.value = result.exception
+                    _error.value = result.message
                 }
             }
         }
@@ -140,4 +140,9 @@ class SpeechViewModel @Inject constructor(
      * Get transcribed text for sending as message
      */
     fun getTranscribedMessage(): String = _transcription.value
+
+    override fun onCleared() {
+        speechEngine.release()
+        super.onCleared()
+    }
 }

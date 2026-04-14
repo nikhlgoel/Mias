@@ -28,15 +28,23 @@
 git clone https://github.com/nikhlgoel/mias.git
 cd mias
 
+# IMPORTANT: Run all commands from project root (mias/), NOT mias/gradle/
+
+# 1.5 If wrapper error appears (GradleWrapperMain), bootstrap it once:
+# Windows:
+scripts/bootstrap-gradle.bat
+# macOS/Linux:
+./scripts/bootstrap-gradle.sh
+
 # 2. Connect Android device (USB debugging enabled)
 adb devices
 
 # 3. Build & run
-./gradlew assembleDebug
+./gradlew assembleDebug   # Windows can also use: gradlew.bat assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 # 4. Launch app on device
-adb shell am start -n dev.kid/.app.ui.MainActivity
+adb shell am start -n dev.kid.app/.ui.MainActivity
 ```
 
 ### For Desktop (Model Server)
@@ -193,6 +201,8 @@ adb devices
 ```bash
 # Debug build (fastest for development/testing)
 ./gradlew assembleDebug
+# Windows alternative:
+# gradlew.bat assembleDebug
 
 # Alternatively, signed debug APK with biometric support
 ./gradlew assembleDebug -Pandroid.enableOnDemandModules=false
@@ -208,10 +218,27 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ```bash
 # Via ADB
-adb shell am start -n dev.kid/.app.MainActivity
+adb shell am start -n dev.kid.app/.ui.MainActivity
 
 # Or directly from device home screen
 # Tap {Kid} icon (neural eye animation)
+```
+
+### Windows Command Location (Exact)
+
+Run these from your terminal at:
+
+```bash
+cd w:/###
+```
+
+Then run:
+
+```bash
+./scripts/bootstrap-gradle.sh   # if gradle-wrapper.jar missing (Git Bash)
+./gradlew assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell am start -n dev.kid.app/.ui.MainActivity
 ```
 
 ### Step 5: Grant Permissions

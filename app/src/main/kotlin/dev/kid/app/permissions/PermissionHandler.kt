@@ -14,7 +14,6 @@ import androidx.core.content.ContextCompat
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
-import androidx.compose.ui.res.stringResource
 
 /**
  * Represents a single permission with description
@@ -48,22 +47,10 @@ fun getRequiredAppPermissions(): List<PermissionRequest> = listOf(
         isRequired = true,
     ),
     PermissionRequest(
-        permission = Manifest.permission.READ_EXTERNAL_STORAGE,
-        title = "📁 Files & Media",
-        description = "To read and manage files for agent operations",
-        isRequired = true,
-    ),
-    PermissionRequest(
         permission = Manifest.permission.POST_NOTIFICATIONS,
         title = "🔔 Notifications",
         description = "To notify you about background learning and important events",
         isRequired = false,
-    ),
-    PermissionRequest(
-        permission = Manifest.permission.CAMERA,
-        title = "📷 Camera",
-        description = "For biometric authentication (fingerprint/face recognition)",
-        isRequired = true,
     ),
 )
 
@@ -126,7 +113,7 @@ fun PermissionFlowHandler(
     val (currentIndex, setCurrentIndex) = remember { mutableStateOf(0) }
     val (show, setShow) = remember { mutableStateOf(false) }
     
-    LaunchedEffect(Unit) {
+    LaunchedEffect(currentIndex) {
         // Check if first permission needs to be shown
         if (currentIndex < permissions.size) {
             if (!hasPermission(context, permissions[currentIndex].permission)) {

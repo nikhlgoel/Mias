@@ -97,6 +97,10 @@ object KidTypography {
         letterSpacing = 0.1.sp,
     )
 
+    // Compatibility aliases used by existing screens
+    val TitleMedium = HeadlineSmall
+    val TitleSmall = LabelLarge
+
     val LabelMedium = TextStyle(
         fontFamily = DefaultFontFamily,
         fontWeight = FontWeight.Medium,

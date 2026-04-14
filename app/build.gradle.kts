@@ -71,6 +71,7 @@ dependencies {
     implementation(project(":core:resilience"))
     implementation(project(":core:evolution"))
     implementation(project(":core:speech"))
+    implementation(project(":core:language"))
 
     // WorkManager + Hilt-Work (for EvolutionWorker)
     implementation(libs.work.runtime.ktx)

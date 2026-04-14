@@ -20,7 +20,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Kid"
+rootProject.name = "Mias"
 
 include(":app")
 include(":core:common")
@@ -36,3 +36,4 @@ include(":core:agent")
 include(":core:evolution")
 include(":core:resilience")
 include(":core:speech")
+include(":core:language")

@@ -257,7 +257,7 @@ fun EvolutionScreen(
                                 color = KidColors.TextSecondary.copy(alpha = 0.5f),
                             )
                             Text(
-                                "Tap "Evolve Now" to start your first cycle",
+                                "Tap \"Evolve Now\" to start your first cycle",
                                 style = KidTypography.BodySmall,
                                 color = KidColors.TextSecondary.copy(alpha = 0.35f),
                             )

@@ -32,15 +32,13 @@ class AppLaunchCapability @Inject constructor(
     override suspend fun execute(input: Map<String, String>): KidResult<String> =
         runCatchingKid {
             val url = input["url"]?.trim()
-                ?: return@runCatchingKid KidResult.Failure(IllegalArgumentException("Missing: url"))
+                ?: throw IllegalArgumentException("Missing: url")
 
             // Validate scheme — only allow http, https, and common deep-link schemes
             val uri = Uri.parse(url)
             val allowedSchemes = setOf("http", "https", "mailto", "tel", "geo")
             if (uri.scheme !in allowedSchemes) {
-                return@runCatchingKid KidResult.Failure(
-                    SecurityException("Blocked scheme: ${uri.scheme}. Only $allowedSchemes allowed."),
-                )
+                throw SecurityException("Blocked scheme: ${uri.scheme}. Only $allowedSchemes allowed.")
             }
 
             val intent = Intent(Intent.ACTION_VIEW, uri).apply {
@@ -48,6 +46,6 @@ class AppLaunchCapability @Inject constructor(
             }
 
             context.startActivity(intent)
-            KidResult.Success("Opened: $url")
-        }.fold({ it }, { KidResult.Failure(it) })
+            "Opened: $url"
+        }
 }

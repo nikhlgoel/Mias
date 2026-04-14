@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Kid app icon background — deep cosmic dark with subtle neural grid -->
+<!-- Mias app icon background — abyssal dark with ember accents -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -8,40 +8,46 @@
 
     <!-- Base dark background -->
     <path
-        android:fillColor="#0A0E1A"
+        android:fillColor="#09060D"
         android:pathData="M0,0 L108,0 L108,108 L0,108 Z" />
 
-    <!-- Subtle radial gradient overlay — deep purple center -->
+    <!-- Center haze -->
     <path
-        android:fillColor="#12160E24"
+        android:fillColor="#18130D1F"
         android:pathData="M54,54 m-48,0 a48,48 0 1,0 96,0 a48,48 0 1,0 -96,0" />
 
-    <!-- Neural grid lines — very faint -->
-    <!-- Horizontal -->
+    <!-- Faint ring -->
     <path
-        android:strokeColor="#08004466"
+        android:strokeColor="#22FF6A40"
+        android:strokeWidth="1"
+        android:fillColor="#00000000"
+        android:pathData="M54,10 C78.3,10 98,29.7 98,54 C98,78.3 78.3,98 54,98 C29.7,98 10,78.3 10,54 C10,29.7 29.7,10 54,10 Z" />
+
+    <!-- Subtle grid lines -->
+    <path
+        android:strokeColor="#0D5A2A22"
         android:strokeWidth="0.6"
         android:fillColor="#00000000"
         android:pathData="M0,27 L108,27 M0,54 L108,54 M0,81 L108,81" />
-    <!-- Vertical -->
+
     <path
-        android:strokeColor="#08004466"
+        android:strokeColor="#0D5A2A22"
         android:strokeWidth="0.6"
         android:fillColor="#00000000"
         android:pathData="M27,0 L27,108 M54,0 L54,108 M81,0 L81,108" />
 
-    <!-- Corner circuit dots -->
+    <!-- Corner embers -->
     <path
-        android:fillColor="#1500CCAA"
+        android:fillColor="#22FF6A40"
         android:pathData="M8,8 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
     <path
-        android:fillColor="#1500CCAA"
+        android:fillColor="#22FF6A40"
         android:pathData="M100,8 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
     <path
-        android:fillColor="#1500CCAA"
+        android:fillColor="#22FF6A40"
         android:pathData="M8,100 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
     <path
-        android:fillColor="#1500CCAA"
+        android:fillColor="#22FF6A40"
         android:pathData="M100,100 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
 
 </vector>

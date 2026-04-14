@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.RandomAccessFile
@@ -86,7 +87,7 @@ class ModelDownloadManager @Inject constructor(
 
             // Launch the actual download
             coroutineScope {
-                val job = kotlinx.coroutines.launch {
+                val job = launch {
                     performDownload(card, tempFile, startByte)
                 }
                 downloadJobs[card.id] = job

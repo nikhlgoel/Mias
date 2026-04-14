@@ -27,7 +27,8 @@ WORKDIR /app
 # Install Python dependencies (pinned versions, no cloud SDKs)
 COPY desktop/requirements.txt .
 RUN python3 -m venv /app/venv && \
-    /app/venv/bin/pip install --no-cache-dir -r requirements.txt
+    /app/venv/bin/pip install --upgrade pip && \
+    /app/venv/bin/pip install --no-cache-dir --default-timeout=300 --retries=10 -r requirements.txt
 
 COPY desktop/server.py .
 
