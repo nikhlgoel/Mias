@@ -21,6 +21,13 @@ android {
     kotlinOptions {
         jvmTarget = "21"
     }
+
+    externalNativeBuild {
+        cmake {
+            path("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
 }
 
 dependencies {

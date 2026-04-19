@@ -1,20 +1,24 @@
-# Built outputs
+
+# === Build outputs ===
 *.iml
 .gradle/
 build/
+core/**/build/
+app/build/
+!gradle/wrapper/gradle-wrapper.jar
 local.properties
 
-# IDE
+# === IDE ===
 .idea/
 *.iws
 *.ipr
 
-# OS
+# === OS ===
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# Kotlin
+# === Kotlin/Java ===
 *.class
 *.jar
 *.war
@@ -24,20 +28,21 @@ desktop.ini
 *.tar.gz
 *.rar
 
-# Android
+# === Android ===
 /captures
 *.apk
 *.aab
 *.ap_
 *.dex
 
-# Local model files (large binaries)
+# === Local model files (large binaries) ===
 *.onnx
 *.gguf
 *.bin
 *.safetensors
+desktop/models/
 
-# Python
+# === Python ===
 __pycache__/
 *.py[cod]
 *$py.class
@@ -45,9 +50,26 @@ __pycache__/
 venv/
 *.egg-info/
 
-# Docker
-desktop/models/
+# === Docker ===
+# (handled above)
 
-# Environment
+# === Environment ===
 .env
 .env.local
+
+# === Docs (ignore temp/backup files, but not docs themselves) ===
+docs/*.tmp
+docs/*.bak
+docs/*~
+
+# === Node/npm (if used) ===
+node_modules/
+package-lock.json
+
+# === Misc ===
+*.log
+*.swp
+*.swo
+*.tmp
+*.bak
+*~

@@ -143,7 +143,7 @@ class ChatViewModel @Inject constructor(
             )
 
             // Get Hindsight context
-            val hindsightContext = hindsightMemory.query(structuredIntent)
+            val hindsightContext = hindsightMemory.query(structuredIntent.cleanedText)
                 .getOrNull()
                 ?.toPromptString()
                 ?: ""
@@ -172,6 +172,7 @@ class ChatViewModel @Inject constructor(
 
             // Collect the ReAct flow
             var finalResponse = ""
+            var streamingMsgId: String? = null
 
             orchestrator.process(
                 stimulus = stimulus,
@@ -211,13 +212,27 @@ class ChatViewModel @Inject constructor(
 
                     is ReActStep.FinalAnswer -> {
                         finalResponse = step.response
-                        val kidMsg = ChatMessage(
-                            id = UUID.randomUUID().toString(),
-                            text = step.response,
-                            type = BubbleType.KID,
-                            timestamp = formatTime(System.currentTimeMillis()),
-                        )
-                        _messages.update { it + kidMsg }
+                        _messages.update { currentList ->
+                            val existingIndex = currentList.indexOfFirst { it.id == streamingMsgId }
+                            if (existingIndex >= 0) {
+                                val updatedList = currentList.toMutableList()
+                                updatedList[existingIndex] = updatedList[existingIndex].copy(
+                                    text = step.response,
+                                    type = BubbleType.KID,
+                                    isStreaming = false
+                                )
+                                updatedList
+                            } else {
+                                currentList + ChatMessage(
+                                    id = UUID.randomUUID().toString(),
+                                    text = step.response,
+                                    type = BubbleType.KID,
+                                    timestamp = formatTime(System.currentTimeMillis()),
+                                    isStreaming = false
+                                )
+                            }
+                        }
+                        streamingMsgId = null
                         _events.tryEmit(ChatEvent.ScrollToBottom)
                     }
 
@@ -234,7 +249,30 @@ class ChatViewModel @Inject constructor(
                     }
 
                     is ReActStep.TokenChunk -> {
-                        // Progressive token display — update last message
+                        if (streamingMsgId == null) {
+                            streamingMsgId = UUID.randomUUID().toString()
+                            val streamMsg = ChatMessage(
+                                id = streamingMsgId!!,
+                                text = step.text,
+                                type = BubbleType.ACTION,
+                                timestamp = formatTime(System.currentTimeMillis()),
+                                isStreaming = true,
+                            )
+                            _messages.update { it + streamMsg }
+                        } else {
+                            _messages.update { currentList ->
+                                val existingIndex = currentList.indexOfFirst { it.id == streamingMsgId }
+                                if (existingIndex >= 0) {
+                                    val updatedList = currentList.toMutableList()
+                                    val oldMsg = updatedList[existingIndex]
+                                    updatedList[existingIndex] = oldMsg.copy(text = oldMsg.text + step.text)
+                                    updatedList
+                                } else {
+                                    currentList
+                                }
+                            }
+                        }
+                        _events.tryEmit(ChatEvent.ScrollToBottom)
                     }
                 }
             }

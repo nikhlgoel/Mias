@@ -62,7 +62,6 @@ class EvolutionEngine @Inject constructor(
             EvolutionTask(UUID.randomUUID().toString(), EvolutionTaskType.CONSOLIDATE_MEMORIES, 1),
             EvolutionTask(UUID.randomUUID().toString(), EvolutionTaskType.ANALYZE_PATTERNS, 2),
             EvolutionTask(UUID.randomUUID().toString(), EvolutionTaskType.OPTIMIZE_PERSONALITY, 3),
-            EvolutionTask(UUID.randomUUID().toString(), EvolutionTaskType.PRUNE_OLD_FACTS, 8),
         )
 
         for (task in tasks.sortedBy { it.priority }) {

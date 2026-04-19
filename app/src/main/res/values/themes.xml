@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Kid" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+        Base theme: dark background, no action bar.
+        Compose replaces all UI — this just kills the white splash flash
+        and ensures the window background matches KidColors.Background (#080D1A).
+    -->
+    <style name="Theme.Kid" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
 </resources>

@@ -49,34 +49,63 @@ class ReActEngine @Inject constructor(
         while (iterations < maxIterations) {
             iterations++
 
-            val result = engine.generate(
+            val responseBuffer = StringBuilder()
+            var errorResult: String? = null
+
+            engine.generateStream(
                 prompt = conversationBuffer.toString(),
                 maxTokens = 1024,
-            )
-
-            when (result) {
-                is KidResult.Success -> {
-                    val parsed = parseReActOutput(result.data)
-                    if (parsed == null) {
-                        // Model output wasn't valid — treat as final response
-                        emit(ReActStep.FinalAnswer(result.data))
-                        return@flow
+            ).collect { result ->
+                when (result) {
+                    is KidResult.Success -> {
+                        // Extract just the diff text if possible to stream, 
+                        // or just stream the raw token. For simplicity we assume
+                        // the engine emits the cumulative string, so we calculate the diff.
+                        val newStr = result.data
+                        val diff = newStr.removePrefix(responseBuffer.toString())
+                        if (diff.isNotEmpty()) {
+                            responseBuffer.append(diff)
+                            emit(ReActStep.TokenChunk(diff))
+                        }
                     }
-
-                    // Emit the thought
-                    emit(ReActStep.Thought(parsed.thought))
-
-                    // Check if this is a direct response to user
-                    if (parsed.isFinal || parsed.action == "respond_user") {
-                        val response = parsed.actionInput["response"]
-                            ?: parsed.actionInput["text"]
-                            ?: parsed.thought
-                        emit(ReActStep.FinalAnswer(response))
-                        return@flow
+                    is KidResult.Error -> {
+                        errorResult = result.message
                     }
+                }
+            }
 
-                    // Execute the action
-                    emit(ReActStep.Action(parsed.action, parsed.actionInput))
+            if (errorResult != null) {
+                emit(
+                    ReActStep.FinalAnswer(
+                        "I'm having trouble thinking right now. Error: $errorResult"
+                    )
+                )
+                return@flow
+            }
+
+            val finalOutput = responseBuffer.toString()
+            val parsed = parseReActOutput(finalOutput)
+            
+            if (parsed == null) {
+                // Model output wasn't valid — treat as final response
+                emit(ReActStep.FinalAnswer(finalOutput))
+                return@flow
+            }
+
+            // Emit the thought
+            emit(ReActStep.Thought(parsed.thought))
+
+            // Check if this is a direct response to user
+            if (parsed.isFinal || parsed.action == "respond_user") {
+                val response = parsed.actionInput["response"]
+                    ?: parsed.actionInput["text"]
+                    ?: parsed.thought
+                emit(ReActStep.FinalAnswer(response))
+                return@flow
+            }
+
+            // Execute the action
+            emit(ReActStep.Action(parsed.action, parsed.actionInput))
 
                     val observation = executeAction(parsed.action, parsed.actionInput)
                     emit(ReActStep.Observation(observation))
@@ -85,18 +114,6 @@ class ReActEngine @Inject constructor(
                     conversationBuffer.append("\n\nAction: ${parsed.action}")
                     conversationBuffer.append("\nObservation: $observation")
                     conversationBuffer.append("\n\nContinue reasoning. Respond with JSON.")
-                }
-
-                is KidResult.Error -> {
-                    emit(
-                        ReActStep.FinalAnswer(
-                            "I'm having trouble thinking right now. " +
-                                "Error: ${result.message}",
-                        ),
-                    )
-                    return@flow
-                }
-            }
         }
 
         // Max iterations reached

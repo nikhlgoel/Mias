@@ -1,0 +1,7 @@
+[
+{
+  "directory": "W:/###/core/inference/.cxx/RelWithDebInfo/5b6a523r/arm64-v8a",
+  "command": "C:\\Users\\datan\\AppData\\Local\\Android\\Sdk\\ndk\\27.0.12077973\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=aarch64-none-linux-android35 --sysroot=C:/Users/datan/AppData/Local/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot -Dlitert_lm_EXPORTS -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -O2 -g -DNDEBUG -fPIC -std=gnu++17 -o CMakeFiles\\litert_lm.dir\\litert_jni_bridge.cpp.o -c \"W:\\###\\core\\inference\\src\\main\\cpp\\litert_jni_bridge.cpp\"",
+  "file": "W:\\###\\core\\inference\\src\\main\\cpp\\litert_jni_bridge.cpp"
+}
+]

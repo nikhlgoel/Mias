@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
 Project #001 {Kid} — Desktop Model Server
-Serves Qwen3-Coder-Next (or any GGUF model) via llama-cpp-python.
+Serves Qwen3-Coder-Next via llama-cpp-python using the Model Context Protocol (MCP) over HTTP.
 
 Endpoints:
     GET  /health            → Health check
-    POST /v1/completions    → Text completion (OpenAI-compatible format, LOCAL only)
+    POST /rpc               → MCP JSON-RPC endpoint
 
-ZERO-CLOUD: This server runs entirely on local hardware.
+ZERO-CLOUD: This server runs entirely on local hardware and expects Tailscale connectivity.
 """
 
 import argparse
@@ -21,14 +21,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [DesktopServer] %(le
 logger = logging.getLogger(__name__)
 
 try:
-    from fastapi import FastAPI, HTTPException
-    from pydantic import BaseModel, Field
+    from fastapi import FastAPI, HTTPException, Request
+    from fastapi.responses import JSONResponse
     import uvicorn
 except ImportError:
     logger.error("Missing dependencies. Run: pip install -r requirements.txt")
     sys.exit(1)
 
-app = FastAPI(title="Kid Desktop Model Server", version="0.1.0")
+app = FastAPI(title="Kid Desktop Model MCP Server", version="0.1.0")
 
 # ---------------------------------------------------------------------------
 # Model loading
@@ -46,38 +46,87 @@ def get_llm():
         except ImportError:
             raise HTTPException(500, "llama-cpp-python not installed")
 
+        # Fallback empty check to allow startup testing even without a model path
+        if not os.path.exists(MODEL_DIR):
+            logger.warning(f"MODEL_DIR {MODEL_DIR} not found, initializing LLM engine stub only.")
+            return None
+
         model_files = [f for f in os.listdir(MODEL_DIR) if f.endswith(".gguf")]
         if not model_files:
-            raise HTTPException(503, f"No .gguf model found in {MODEL_DIR}")
+            logger.warning(f"No .gguf model found in {MODEL_DIR}. LLM will operate as a stub.")
+            return None
 
         model_path = os.path.join(MODEL_DIR, model_files[0])
         logger.info("Loading model: %s", model_path)
         _llm = Llama(
             model_path=model_path,
             n_ctx=8192,
-            n_gpu_layers=-1,  # Offload all layers to GPU
+            n_gpu_layers=-1,
             verbose=False,
         )
         logger.info("Model loaded successfully")
     return _llm
 
-
 # ---------------------------------------------------------------------------
-# API Models
+# MCP Handlers
 # ---------------------------------------------------------------------------
 
-class CompletionRequest(BaseModel):
-    prompt: str
-    max_tokens: int = Field(default=512, ge=1, le=8192)
-    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
-    top_p: float = Field(default=0.9, ge=0.0, le=1.0)
+async def handle_initialize(params):
+    return {
+        "protocolVersion": "2025-03-26",
+        "serverInfo": {
+            "name": "Kid Desktop Overlord",
+            "version": "0.1.0"
+        },
+        "capabilities": {
+            "tools": {"listChanged": False}
+        }
+    }
 
+async def handle_tools_list(params):
+    return {
+        "tools": [
+            {
+                "name": "generate",
+                "description": "Generate text using the high-parameter desktop model",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "prompt": {"type": "string"},
+                        "max_tokens": {"type": "string"}
+                    },
+                    "required": ["prompt"]
+                }
+            }
+        ]
+    }
 
-class CompletionResponse(BaseModel):
-    text: str
-    tokens_generated: int
-    elapsed_ms: float
-
+async def handle_tools_call(params):
+    name = params.get("name")
+    args = params.get("arguments", {})
+    
+    if name == "generate":
+        prompt = args.get("prompt", "")
+        max_tokens = int(args.get("max_tokens", "2048"))
+        
+        llm = get_llm()
+        if not llm:
+             # Just an echo/stub if model is not loaded for dev loop testing
+             return f"[DESKTOP-STUB] I received your prompt: '{prompt}'. Native LLM mapping is bypassed."
+             
+        start = time.perf_counter()
+        output = llm(
+            prompt,
+            max_tokens=max_tokens,
+            temperature=0.7,
+            top_p=0.9,
+        )
+        elapsed = (time.perf_counter() - start) * 1000
+        text = output["choices"][0]["text"]
+        logger.info(f"Generated {output['usage']['completion_tokens']} tokens in {elapsed:.2f}ms")
+        return text
+        
+    return f"Error: Unknown tool '{name}'"
 
 # ---------------------------------------------------------------------------
 # Routes
@@ -85,37 +134,50 @@ class CompletionResponse(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "kid-desktop-server", "model_dir": MODEL_DIR}
+    return {"status": "ok", "service": "kid-mcp-desktop-server", "model_dir": MODEL_DIR}
 
+@app.post("/rpc")
+async def mcp_rpc(request: Request):
+    data = await request.json()
+    req_id = data.get("id")
+    method = data.get("method")
+    params = data.get("params", {})
+    
+    result = None
+    error = None
+    
+    try:
+        if method == "initialize":
+            result = await handle_initialize(params)
+        elif method == "tools/list":
+            result = await handle_tools_list(params)
+        elif method == "tools/call":
+            result = await handle_tools_call(params)
+        else:
+            error = {"code": -32601, "message": f"Method '{method}' not supported."}
+    except Exception as e:
+        logger.exception("MCP execution failed")
+        error = {"code": -32000, "message": str(e)}
 
-@app.post("/v1/completions", response_model=CompletionResponse)
-def completions(req: CompletionRequest):
-    llm = get_llm()
-    start = time.perf_counter()
-
-    output = llm(
-        req.prompt,
-        max_tokens=req.max_tokens,
-        temperature=req.temperature,
-        top_p=req.top_p,
-    )
-
-    elapsed = (time.perf_counter() - start) * 1000
-    text = output["choices"][0]["text"]
-    tokens = output["usage"]["completion_tokens"]
-
-    return CompletionResponse(text=text, tokens_generated=tokens, elapsed_ms=round(elapsed, 2))
-
+    response = {"jsonrpc": "2.0"}
+    if req_id is not None:
+        response["id"] = req_id
+    if error:
+        response["error"] = error
+    else:
+        response["result"] = result
+        
+    return JSONResponse(content=response)
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Kid Desktop Model Server")
+    parser = argparse.ArgumentParser(description="Kid Desktop MCP Server")
     parser.add_argument("--host", default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=8400)
+    parser.add_argument("--port", type=int, default=8401)
     args = parser.parse_args()
 
-    logger.info("Starting desktop model server on %s:%d", args.host, args.port)
+    logger.info("Starting desktop MCP server on %s:%d", args.host, args.port)
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")

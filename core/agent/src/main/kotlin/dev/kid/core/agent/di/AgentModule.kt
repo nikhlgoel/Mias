@@ -13,6 +13,7 @@ import dev.kid.core.agent.capabilities.DateTimeCapability
 import dev.kid.core.agent.capabilities.FileSystemCapability
 import dev.kid.core.agent.capabilities.WebFetchCapability
 import dev.kid.core.agent.capabilities.WebResearchCapability
+import dev.kid.core.agent.capabilities.MediaStoreFileGenerationCapability
 
 /**
  * AgentModule — wires all AgentCapability implementations into a Hilt Set.
@@ -46,4 +47,7 @@ abstract class AgentModule {
 
     @Binds @IntoSet
     abstract fun bindAppLaunch(impl: AppLaunchCapability): AgentCapability
+
+    @Binds @IntoSet
+    abstract fun bindFileGeneration(impl: MediaStoreFileGenerationCapability): AgentCapability
 }
