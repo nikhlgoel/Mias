@@ -87,3 +87,6 @@ package-lock.json
 *.tmp
 *.bak
 *~
+
+# === Local project tracking (not for GitHub) ===
+PROJECT_STAGES.md
