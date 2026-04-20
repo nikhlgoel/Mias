@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mias — Local AI for Your Phone</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0a0a;
+      --bg2:       #111111;
+      --bg3:       #181818;
+      --border:    #222222;
+      --amber:     #e8913a;
+      --amber-dim: #a85f1e;
+      --text:      #e8e0d5;
+      --muted:     #7a7068;
+      --mono:      'JetBrains Mono', monospace;
+      --sans:      'Sora', sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── GRAIN OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 999;
+      opacity: 0.5;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.2rem 5vw;
+      background: rgba(10,10,10,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      font-family: var(--mono);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--amber);
+      letter-spacing: 0.05em;
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      letter-spacing: 0.04em;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text); }
+
+    .nav-cta {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      padding: 0.5rem 1.2rem;
+      border: 1px solid var(--amber);
+      color: var(--amber);
+      text-decoration: none;
+      border-radius: 3px;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .nav-cta:hover {
+      background: var(--amber);
+      color: var(--bg);
+    }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 10rem 5vw 6rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-glow {
+      position: absolute;
+      top: 30%;
+      right: -10%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(232,145,58,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-tag {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      color: var(--amber);
+      text-transform: uppercase;
+      margin-bottom: 1.5rem;
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.1s;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.8rem, 7vw, 5.5rem);
+      font-weight: 700;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      max-width: 800px;
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.25s;
+    }
+
+    .hero h1 em {
+      font-style: normal;
+      color: var(--amber);
+    }
+
+    .hero-sub {
+      margin-top: 1.5rem;
+      font-size: 1.1rem;
+      color: var(--muted);
+      max-width: 520px;
+      font-weight: 300;
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.4s;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 1rem;
+      margin-top: 2.5rem;
+      flex-wrap: wrap;
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.55s;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--amber);
+      color: #0a0a0a;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 0.8rem 1.8rem;
+      border-radius: 3px;
+      text-decoration: none;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+
+    .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      padding: 0.8rem 1.8rem;
+      border-radius: 3px;
+      text-decoration: none;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .btn-secondary:hover { border-color: var(--muted); color: var(--text); }
+
+    /* terminal hero visual */
+    .hero-terminal {
+      position: absolute;
+      right: 5vw;
+      top: 50%;
+      transform: translateY(-50%);
+      width: min(420px, 40vw);
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 32px 64px rgba(0,0,0,0.6);
+      opacity: 0;
+      animation: fadeLeft 0.7s ease forwards 0.7s;
+    }
+
+    .term-bar {
+      background: var(--bg2);
+      padding: 0.7rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .term-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+    }
+
+    .term-dot:nth-child(1) { background: #ff5f56; }
+    .term-dot:nth-child(2) { background: #ffbd2e; }
+    .term-dot:nth-child(3) { background: #27c93f; }
+
+    .term-title {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-left: 0.5rem;
+    }
+
+    .term-body {
+      padding: 1.2rem 1.4rem;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      line-height: 1.9;
+    }
+
+    .term-prompt { color: var(--amber); }
+    .term-cmd    { color: var(--text); }
+    .term-out    { color: var(--muted); }
+    .term-ok     { color: #27c93f; }
+    .term-cursor {
+      display: inline-block;
+      width: 8px; height: 1em;
+      background: var(--amber);
+      vertical-align: text-bottom;
+      animation: blink 1s step-end infinite;
+    }
+
+    /* ── STATS BAR ── */
+    .stats {
+      display: flex;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat {
+      flex: 1;
+      padding: 2rem 5vw;
+      border-right: 1px solid var(--border);
+    }
+
+    .stat:last-child { border-right: none; }
+
+    .stat-num {
+      font-family: var(--mono);
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--amber);
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.3rem;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── SECTION SHARED ── */
+    section { padding: 6rem 5vw; }
+
+    .section-tag {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.15em;
+      color: var(--amber);
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+
+    h2 {
+      font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+
+    .section-sub {
+      margin-top: 0.8rem;
+      color: var(--muted);
+      font-weight: 300;
+      max-width: 480px;
+    }
+
+    /* ── WHY MIAS ── */
+    .why { background: var(--bg2); }
+
+    .why-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.5px;
+      margin-top: 3.5rem;
+      border: 1.5px solid var(--border);
+    }
+
+    .why-card {
+      background: var(--bg);
+      padding: 2rem;
+      transition: background 0.2s;
+    }
+
+    .why-card:hover { background: var(--bg3); }
+
+    .why-icon {
+      font-size: 1.6rem;
+      margin-bottom: 1rem;
+    }
+
+    .why-card h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 0.6rem;
+    }
+
+    .why-card p {
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    /* ── HOW IT WORKS ── */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 0;
+      margin-top: 3.5rem;
+      position: relative;
+    }
+
+    .steps::before {
+      content: '';
+      position: absolute;
+      top: 2rem;
+      left: 3rem;
+      right: 3rem;
+      height: 1px;
+      background: linear-gradient(to right, var(--border), var(--amber-dim), var(--border));
+    }
+
+    .step {
+      padding: 0 1.5rem;
+      padding-top: 0;
+    }
+
+    .step-num {
+      width: 4rem; height: 4rem;
+      border-radius: 50%;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: var(--amber);
+      margin-bottom: 1.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .step h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .step p {
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    /* ── MODELS TABLE ── */
+    .models { background: var(--bg2); }
+
+    .model-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 3rem;
+      font-size: 0.9rem;
+    }
+
+    .model-table th {
+      text-align: left;
+      padding: 0.9rem 1.2rem;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .model-table td {
+      padding: 1.1rem 1.2rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    .model-table tr:last-child td { border-bottom: none; }
+
+    .model-table tr:hover td { background: var(--bg3); }
+
+    .badge {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 2px;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-phone  { background: rgba(232,145,58,0.15); color: var(--amber); }
+    .badge-pc     { background: rgba(100,180,255,0.12); color: #78b8f0; }
+    .badge-npu    { background: rgba(100,230,150,0.1); color: #6dcc96; }
+    .badge-cpu    { background: rgba(180,180,180,0.1); color: #aaaaaa; }
+
+    .model-name {
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: 0.88rem;
+    }
+
+    /* ── SETUP ── */
+    .setup-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-top: 3rem;
+    }
+
+    @media (max-width: 768px) {
+      .setup-grid { grid-template-columns: 1fr; }
+    }
+
+    .setup-block h3 {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      letter-spacing: 0.1em;
+      color: var(--amber);
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+
+    pre {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1.4rem;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      line-height: 1.8;
+      color: var(--text);
+    }
+
+    .c-comment { color: var(--muted); }
+    .c-cmd     { color: var(--text); }
+    .c-string  { color: #b5d49a; }
+    .c-out     { color: #78b8f0; }
+
+    /* ── PRIVACY ── */
+    .privacy { background: var(--bg2); }
+
+    .privacy-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      margin-top: 3rem;
+    }
+
+    @media (max-width: 768px) {
+      .privacy-split { grid-template-columns: 1fr; }
+    }
+
+    .privacy-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+    }
+
+    .privacy-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.8rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .privacy-list li .icon {
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+      font-size: 0.95rem;
+    }
+
+    /* ── FOOTER / CTA ── */
+    .cta {
+      text-align: center;
+      padding: 7rem 5vw;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-glow {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 600px; height: 400px;
+      background: radial-gradient(ellipse, rgba(232,145,58,0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .cta h2 {
+      font-size: clamp(2rem, 4vw, 3rem);
+      margin-bottom: 1rem;
+    }
+
+    .cta p {
+      color: var(--muted);
+      font-weight: 300;
+      margin-bottom: 2.5rem;
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 1.5rem 5vw;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeLeft {
+      from { opacity: 0; transform: translate(20px, -50%); }
+      to   { opacity: 1; transform: translate(0, -50%); }
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+
+    /* scroll reveal */
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: none;
+    }
+
+    /* ── MOBILE ── */
+    @media (max-width: 900px) {
+      .hero-terminal { display: none; }
+      .steps::before { display: none; }
+      .stats { flex-direction: column; }
+      .stat { border-right: none; border-bottom: 1px solid var(--border); }
+      .stat:last-child { border-bottom: none; }
+    }
+
+    @media (max-width: 600px) {
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">mias</a>
+  <ul class="nav-links">
+    <li><a href="#why">Why</a></li>
+    <li><a href="#models">Models</a></li>
+    <li><a href="#setup">Setup</a></li>
+    <li><a href="#privacy">Privacy</a></li>
+  </ul>
+  <a class="nav-cta" href="https://github.com/nikhlgoel/mias" target="_blank">GitHub →</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-glow"></div>
+
+  <p class="hero-tag">Open Source · Android · 100% Local</p>
+  <h1>AI on your phone.<br/><em>No internet.</em><br/>No cloud.</h1>
+  <p class="hero-sub">
+    Mias runs AI models directly on your Android device. 
+    Ask questions, write code, get help — even when you're offline. 
+    Built for students who live on their phone.
+  </p>
+  <div class="hero-actions">
+    <a class="btn-primary" href="https://github.com/nikhlgoel/mias" target="_blank">
+      ↓ Get Mias
+    </a>
+    <a class="btn-secondary" href="#setup">
+      → Setup Guide
+    </a>
+  </div>
+
+  <!-- terminal visual -->
+  <div class="hero-terminal">
+    <div class="term-bar">
+      <div class="term-dot"></div>
+      <div class="term-dot"></div>
+      <div class="term-dot"></div>
+      <span class="term-title">mias — terminal</span>
+    </div>
+    <div class="term-body">
+      <div><span class="term-prompt">$ </span><span class="term-cmd">./gradlew assembleDebug</span></div>
+      <div class="term-out">Building 221 files...</div>
+      <div class="term-out">Running 87 unit tests...</div>
+      <div><span class="term-ok">✓ BUILD SUCCESSFUL</span></div>
+      <br/>
+      <div><span class="term-prompt">$ </span><span class="term-cmd">adb install app-debug.apk</span></div>
+      <div><span class="term-ok">✓ Installed on device</span></div>
+      <br/>
+      <div><span class="term-prompt">$ </span><span class="term-cmd">curl localhost:8400/health</span></div>
+      <div class="term-out">{"status":"ready","device":"cuda"}</div>
+      <br/>
+      <div><span class="term-prompt">$ </span><span class="term-cursor"></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats reveal">
+  <div class="stat">
+    <div class="stat-num">0</div>
+    <div class="stat-label">Cloud APIs used</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num">100+</div>
+    <div class="stat-label">Models available</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num">14k+</div>
+    <div class="stat-label">Lines of code</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num">87</div>
+    <div class="stat-label">Unit tests</div>
+  </div>
+</div>
+
+<!-- WHY MIAS -->
+<section class="why" id="why">
+  <p class="section-tag reveal">Why Mias</p>
+  <h2 class="reveal">Your AI. Your hardware.<br/>Your data.</h2>
+  <p class="section-sub reveal">No subscription. No login. No data leaving your phone.</p>
+
+  <div class="why-grid reveal">
+    <div class="why-card">
+      <div class="why-icon">📵</div>
+      <h3>Works fully offline</h3>
+      <p>In the library, on the bus, in a dead zone — Mias keeps working. Your assistant isn't tied to Wi-Fi or mobile data.</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">🔒</div>
+      <h3>Nothing leaves your phone</h3>
+      <p>Every conversation is encrypted locally. No OpenAI, no Anthropic, no Firebase. Zero cloud calls — ever.</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">🧠</div>
+      <h3>Picks the right model</h3>
+      <p>Simple question? Runs a 1 GB model to save battery. Complex code? Offloads to your PC's GPU over Wi-Fi.</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">♻️</div>
+      <h3>Remembers you</h3>
+      <p>Mias builds a local memory from your conversations — topics you care about, how you like to be answered.</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">🌡️</div>
+      <h3>Thermal awareness</h3>
+      <p>Phone getting hot? Mias automatically drops to a lighter model. Stays fast without cooking your battery.</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">🛠️</div>
+      <h3>Actually does things</h3>
+      <p>Read files, search the web, set reminders, open apps. Not just a chatbox — it can act on your device.</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <p class="section-tag reveal">How it works</p>
+  <h2 class="reveal">Three things happening<br/>at once, on your phone.</h2>
+
+  <div class="steps reveal">
+    <div class="step">
+      <div class="step-num">01</div>
+      <h3>You send a message</h3>
+      <p>Mias reads your intent and routes it to the best available model — on-device or your desktop if connected.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">02</div>
+      <h3>Model runs locally</h3>
+      <p>ONNX Runtime or llama.cpp processes your query on-device (NPU/CPU) or on your PC's GPU via Tailscale.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <h3>Answer + action</h3>
+      <p>Response streams back in real-time. If a tool was needed — file read, web fetch — you see what ran and why.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">04</div>
+      <h3>Memory updates</h3>
+      <p>Key points are compressed into long-term memory every few hours. Your next session is already smarter.</p>
+    </div>
+  </div>
+</section>
+
+<!-- MODELS -->
+<section class="models" id="models">
+  <p class="section-tag reveal">Models</p>
+  <h2 class="reveal">Start small.<br/>Scale up when you need it.</h2>
+  <p class="section-sub reveal">All models are downloaded directly from HuggingFace. You pick what to install.</p>
+
+  <table class="model-table reveal">
+    <thead>
+      <tr>
+        <th>Model</th>
+        <th>Size</th>
+        <th>Runs on</th>
+        <th>Hardware</th>
+        <th>Best for</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="model-name">MobileLLM-R1.5</span></td>
+        <td>1.1 GB</td>
+        <td><span class="badge badge-phone">Phone</span></td>
+        <td><span class="badge badge-cpu">CPU</span></td>
+        <td>Quick questions, always-on, low battery use</td>
+      </tr>
+      <tr>
+        <td><span class="model-name">Gemma-4 INT4</span></td>
+        <td>3.2 GB</td>
+        <td><span class="badge badge-phone">Phone</span></td>
+        <td><span class="badge badge-npu">NPU</span></td>
+        <td>General chat, faster responses, daily use</td>
+      </tr>
+      <tr>
+        <td><span class="model-name">Qwen3-Coder-Next Q4_K_M</span></td>
+        <td>18.5 GB</td>
+        <td><span class="badge badge-pc">Desktop</span></td>
+        <td><span class="badge badge-npu">GPU</span></td>
+        <td>Code, research, complex reasoning tasks</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- SETUP -->
+<section id="setup">
+  <p class="section-tag reveal">Setup</p>
+  <h2 class="reveal">Running in under<br/>30 minutes.</h2>
+
+  <div class="setup-grid reveal">
+    <div class="setup-block">
+      <h3>1 — Build & install the app</h3>
+      <pre><span class="c-comment"># Clone the repo</span>
+<span class="c-cmd">git clone https://github.com/nikhlgoel/mias.git</span>
+<span class="c-cmd">cd mias</span>
+
+<span class="c-comment"># Build (first time ~5 min)</span>
+<span class="c-cmd">./gradlew assembleDebug</span>
+
+<span class="c-comment"># Install on phone (USB debugging on)</span>
+<span class="c-cmd">adb install -r app/build/outputs/apk/debug/app-debug.apk</span>
+
+<span class="c-out"># Done. Launch the app, register biometric,</span>
+<span class="c-out"># go to Brain Market and download a model.</span></pre>
+    </div>
+
+    <div class="setup-block">
+      <h3>2 — Desktop offload (optional)</h3>
+      <pre><span class="c-comment"># Build the server container</span>
+<span class="c-cmd">cd desktop</span>
+<span class="c-cmd">docker build -t mias-desktop:latest .</span>
+
+<span class="c-comment"># Download Qwen3 model (~18 GB, one-time)</span>
+<span class="c-cmd">pip install huggingface-hub</span>
+<span class="c-cmd">huggingface-cli download Qwen/Qwen3-Coder-Next-GGUF \</span>
+<span class="c-cmd">  Qwen3-Coder-Next-32B-Q4_K_M.gguf</span>
+
+<span class="c-comment"># Run the server</span>
+<span class="c-cmd">docker run --gpus all -p 8400:8400 mias-desktop:latest</span>
+
+<span class="c-comment"># Verify</span>
+<span class="c-cmd">curl localhost:8400/health</span>
+<span class="c-out">→ {"status":"ready","device":"cuda"}</span></pre>
+    </div>
+
+    <div class="setup-block">
+      <h3>3 — Connect phone ↔ desktop</h3>
+      <pre><span class="c-comment"># Install Tailscale on both devices</span>
+<span class="c-out"># Android: Play Store → Tailscale</span>
+<span class="c-comment"># Desktop:</span>
+<span class="c-cmd">tailscale up --accept-routes</span>
+<span class="c-cmd">tailscale status</span>
+<span class="c-out"># Copy your desktop IP from output</span>
+
+<span class="c-comment"># In the app:</span>
+<span class="c-out"># Settings → Networking → enter IP → Test</span>
+<span class="c-out"># You'll see ✓ Connected</span></pre>
+    </div>
+
+    <div class="setup-block">
+      <h3>Prerequisites</h3>
+      <pre><span class="c-comment"># For the Android app:</span>
+<span class="c-out">Java 21+</span>
+<span class="c-out">Android Studio + SDK 35</span>
+<span class="c-out">USB debugging enabled</span>
+<span class="c-out">4 GB RAM phone minimum</span>
+
+<span class="c-comment"># For desktop offload (optional):</span>
+<span class="c-out">Docker</span>
+<span class="c-out">Python 3.11+</span>
+<span class="c-out">CUDA 12.0+ GPU (or CPU, slower)</span>
+<span class="c-out">~20 GB free disk space</span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- PRIVACY -->
+<section class="privacy" id="privacy">
+  <p class="section-tag reveal">Privacy</p>
+  <h2 class="reveal">Hard guarantees.<br/>Not a privacy policy.</h2>
+
+  <div class="privacy-split reveal">
+    <div>
+      <p style="color:var(--muted); margin-bottom:1.5rem; font-size:0.9rem;">What Mias will never do:</p>
+      <ul class="privacy-list">
+        <li><span class="icon">✕</span> Call any cloud AI API (OpenAI, Anthropic, Gemini, etc.)</li>
+        <li><span class="icon">✕</span> Send your conversations anywhere</li>
+        <li><span class="icon">✕</span> Use Firebase, analytics, or crash reporting</li>
+        <li><span class="icon">✕</span> Back up your data automatically</li>
+        <li><span class="icon">✕</span> Require an account or login</li>
+        <li><span class="icon">✕</span> Track usage or collect any telemetry</li>
+      </ul>
+    </div>
+    <div>
+      <p style="color:var(--muted); margin-bottom:1.5rem; font-size:0.9rem;">What Mias enforces by design:</p>
+      <ul class="privacy-list">
+        <li><span class="icon" style="color:var(--amber)">✓</span> All inference runs on-device or LAN only</li>
+        <li><span class="icon" style="color:var(--amber)">✓</span> AES-256-GCM + SQLCipher encryption at rest</li>
+        <li><span class="icon" style="color:var(--amber)">✓</span> Biometric gate before every app session</li>
+        <li><span class="icon" style="color:var(--amber)">✓</span> Android backup blocked at manifest level</li>
+        <li><span class="icon" style="color:var(--amber)">✓</span> Desktop traffic over WireGuard (Tailscale)</li>
+        <li><span class="icon" style="color:var(--amber)">✓</span> Codebase audited — zero hidden network calls</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <div class="cta-glow"></div>
+  <p class="section-tag reveal">Open Source</p>
+  <h2 class="reveal">Build it yourself.<br/>Own it completely.</h2>
+  <p class="reveal">MIT-adjacent stack. Full source on GitHub. No black boxes.</p>
+  <div class="hero-actions" style="justify-content:center;" class="reveal">
+    <a class="btn-primary" href="https://github.com/nikhlgoel/mias" target="_blank">
+      View on GitHub →
+    </a>
+    <a class="btn-secondary" href="https://github.com/nikhlgoel/mias/issues" target="_blank">
+      Report an issue
+    </a>
+  </div>
+</section>
+
+<footer>
+  <span>mias · built by <a href="https://github.com/nikhlgoel" style="color:var(--amber);text-decoration:none;">nikhlgoel</a></span>
+  <span>v4.0.0-beta · April 2026</span>
+</footer>
+
+<script>
+  // scroll reveal
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12 });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
