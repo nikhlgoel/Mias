@@ -5,13 +5,15 @@
 build/
 core/**/build/
 app/build/
-!gradle/wrapper/gradle-wrapper.jar
 local.properties
 
-# === IDE ===
+# === IDE / Editor / Agent configs ===
 .idea/
 *.iws
 *.ipr
+.continue/
+.github/
+.vscode/
 
 # === OS ===
 .DS_Store
@@ -28,12 +30,19 @@ desktop.ini
 *.tar.gz
 *.rar
 
+# Keep gradle wrapper jar (must come AFTER *.jar)
+!gradle/wrapper/gradle-wrapper.jar
+
 # === Android ===
 /captures
 *.apk
 *.aab
 *.ap_
 *.dex
+
+# === Native build cache (CMake) ===
+.cxx/
+**/cxx/
 
 # === Local model files (large binaries) ===
 *.onnx
@@ -56,6 +65,11 @@ venv/
 # === Environment ===
 .env
 .env.local
+
+# === Signing (NEVER push keystores) ===
+*.jks
+*.keystore
+keystore.properties
 
 # === Docs (ignore temp/backup files, but not docs themselves) ===
 docs/*.tmp

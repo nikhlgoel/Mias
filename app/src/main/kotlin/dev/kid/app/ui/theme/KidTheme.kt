@@ -1,14 +1,12 @@
 package dev.kid.app.ui.theme
 
-import android.app.Activity
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
 import dev.kid.core.ui.theme.KidColors
 
 private val KidDarkColorScheme = darkColorScheme(
@@ -39,13 +37,8 @@ fun KidTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as Activity).window
-            window.statusBarColor = KidColors.Background.toArgb()
-            window.navigationBarColor = KidColors.Background.toArgb()
-            WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = false
-                isAppearanceLightNavigationBars = false
-            }
+            val activity = view.context as ComponentActivity
+            activity.enableEdgeToEdge()
         }
     }
 

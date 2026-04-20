@@ -31,25 +31,21 @@ android {
 dependencies {
     api(project(":core:common"))
 
-    // Optional ML Kit translation model
-    implementation("com.google.mlkit:translate:17.0.2")
-    
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.0")
-    
+    implementation(libs.lifecycle.viewmodel.ktx)
+
     // DataStore (for language preferences)
     implementation(libs.datastore.preferences)
-    
+
     // Hilt DI
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-    
+
     // Testing
     testImplementation(libs.junit5.api)
     testRuntimeOnly(libs.junit5.engine)
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
 }
