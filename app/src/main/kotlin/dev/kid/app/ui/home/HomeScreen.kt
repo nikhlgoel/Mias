@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -30,11 +31,14 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material.icons.rounded.WorkspacePremium
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.rounded.Videocam
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -171,13 +175,50 @@ fun HomeScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Tap to start talking",
-                    style = KidTypography.LabelMedium,
-                    color = KidColors.TextTertiary,
-                )
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Multimodal Suggestion Chips
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AssistChip(
+                        onClick = { onNavigateToChat(null) },
+                        label = { Text("Voice") },
+                        leadingIcon = { Icon(Icons.Rounded.Mic, contentDescription = "Voice") },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = KidColors.SurfaceGlassStroke.copy(alpha = 0.2f),
+                            labelColor = KidColors.TextPrimary,
+                            leadingIconContentColor = KidColors.TextSecondary
+                        ),
+                        border = BorderStroke(1.dp, KidColors.GlassBorder)
+                    )
+                    Spacer(modifier = Modifier.size(12.dp))
+                    AssistChip(
+                        onClick = { onNavigateToChat(null) },
+                        label = { Text("Video") },
+                        leadingIcon = { Icon(Icons.Rounded.Videocam, contentDescription = "Video") },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = KidColors.SurfaceGlassStroke.copy(alpha = 0.2f),
+                            labelColor = KidColors.TextPrimary,
+                            leadingIconContentColor = KidColors.TextSecondary
+                        ),
+                        border = BorderStroke(1.dp, KidColors.GlassBorder)
+                    )
+                    Spacer(modifier = Modifier.size(12.dp))
+                    AssistChip(
+                        onClick = { onNavigateToChat(null) },
+                        label = { Text("Chat") },
+                        leadingIcon = { Icon(Icons.Rounded.Keyboard, contentDescription = "Chat") },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = KidColors.SurfaceGlassStroke.copy(alpha = 0.2f),
+                            labelColor = KidColors.TextPrimary,
+                            leadingIconContentColor = KidColors.TextSecondary
+                        ),
+                        border = BorderStroke(1.dp, KidColors.GlassBorder)
+                    )
+                }
             }
 
             // ── Nudges Area ──
@@ -200,26 +241,6 @@ fun HomeScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        // ── FAB: New Chat ──
-        FloatingActionButton(
-            onClick = { onNavigateToChat(null) },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(end = 20.dp, bottom = 20.dp),
-            containerColor = KidColors.Primary,
-            contentColor = KidColors.TextOnPrimary,
-            elevation = FloatingActionButtonDefaults.elevation(
-                defaultElevation = 0.dp,
-            ),
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Rounded.Chat,
-                contentDescription = "New Chat",
-            )
         }
     }
 }

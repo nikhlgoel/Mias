@@ -4,8 +4,7 @@ import dev.kid.core.common.model.BrainState
 import dev.kid.core.common.model.CognitionState
 import dev.kid.core.common.model.Stimulus
 import dev.kid.core.inference.InferenceEngine
-import dev.kid.core.inference.engine.GemmaLiteRtEngine
-import dev.kid.core.inference.engine.OnnxInferenceEngine
+import dev.kid.core.inference.engine.LlamaCppEngine
 import dev.kid.core.inference.react.ReActEngine
 import dev.kid.core.inference.react.ReActStep
 import dev.kid.core.thermal.TawsAction
@@ -17,8 +16,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
+import dev.kid.core.security.GuardrailProcessor
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.flow
 
 /**
  * The "Consciousness Router" — decides which brain fires and routes
@@ -29,10 +31,11 @@ import javax.inject.Singleton
  */
 @Singleton
 class InferenceOrchestrator @Inject constructor(
-    private val gemmaEngine: GemmaLiteRtEngine,
-    private val mobileLlmEngine: OnnxInferenceEngine,
+    @Named("primaryEngine") private val primaryEngine: InferenceEngine,
+    @Named("survivalEngine") private val survivalEngine: InferenceEngine,
     private val reActEngine: ReActEngine,
     private val tawsGovernor: TawsGovernor,
+    private val guardrailProcessor: GuardrailProcessor,
 ) {
     private val _brainState = MutableStateFlow(BrainState.GEMMA_NPU)
     val brainState: StateFlow<BrainState> = _brainState.asStateFlow()
@@ -48,7 +51,14 @@ class InferenceOrchestrator @Inject constructor(
         stimulus: Stimulus,
         systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
         hindsightContext: String = "",
-    ): Flow<ReActStep> {
+    ): Flow<ReActStep> = flow {
+        val evaluation = guardrailProcessor.evaluateInput(stimulus.content)
+        if (!evaluation.isSafe) {
+            emit(ReActStep.Thought("Safety guardrail triggered: ${evaluation.flag}"))
+            emit(ReActStep.FinalAnswer(evaluation.suggestedResponse ?: "Content block: I cannot process this request."))
+            return@flow
+        }
+
         // Determine which engine to use based on TAWS
         val snapshot = tawsGovernor.latestSnapshot
             ?: dev.kid.core.thermal.ThermalSnapshot(
@@ -64,7 +74,7 @@ class InferenceOrchestrator @Inject constructor(
         val (engine, newState) = selectEngine(tawsAction)
         val previousState = _brainState.value
 
-        return reActEngine.execute(
+        reActEngine.execute(
             engine = engine,
             systemPrompt = systemPrompt,
             userPrompt = stimulus.content,
@@ -76,6 +86,7 @@ class InferenceOrchestrator @Inject constructor(
                 emit(ReActStep.ModelSwitch(previousState, newState))
             }
         }.onEach { step ->
+            emit(step) // Pass execution up
             when (step) {
                 is ReActStep.Thought -> _cognitionState.value = CognitionState.THINKING
                 is ReActStep.Action -> _cognitionState.value = CognitionState.ACTING
@@ -85,21 +96,21 @@ class InferenceOrchestrator @Inject constructor(
             }
         }.onCompletion {
             _cognitionState.value = CognitionState.IDLE
-        }
+        }.collect { } // Terminal operator
     }
 
     private fun selectEngine(tawsAction: TawsAction): Pair<InferenceEngine, BrainState> =
         when (tawsAction) {
-            TawsAction.CONTINUE_PRIMARY -> gemmaEngine to BrainState.GEMMA_NPU
-            TawsAction.THROTTLE_PRIMARY -> gemmaEngine to BrainState.GEMMA_NPU
-            TawsAction.SWITCH_SURVIVAL -> mobileLlmEngine to BrainState.MOBILELLM_SURVIVAL
+            TawsAction.CONTINUE_PRIMARY -> primaryEngine to BrainState.GEMMA_NPU
+            TawsAction.THROTTLE_PRIMARY -> primaryEngine to BrainState.GEMMA_NPU
+            TawsAction.SWITCH_SURVIVAL -> survivalEngine to BrainState.MOBILELLM_SURVIVAL
             TawsAction.OFFLOAD_DESKTOP -> {
                 val desktop = desktopEngine
                 if (desktop != null) {
                     desktop to BrainState.QWEN_DESKTOP
                 } else {
-                    // Desktop unavailable — fall back to Gemma
-                    gemmaEngine to BrainState.GEMMA_NPU
+                    // Desktop unavailable — fall back to Primary
+                    primaryEngine to BrainState.GEMMA_NPU
                 }
             }
         }

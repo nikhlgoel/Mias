@@ -62,8 +62,8 @@ data class SpeechRecognitionResult(
 )
 
 /**
- * High-quality speech-to-text engine (ChatGPT-level transcription)
- * Uses Google ML Kit for on-device recognition with multi-language support
+ * On-device speech-to-text engine with multi-language support.
+ * Uses Android SpeechRecognizer for local transcription
  */
 @Singleton
 class SpeechEngine @Inject constructor(
@@ -142,7 +142,7 @@ class SpeechEngine @Inject constructor(
     }
     
     /**
-     * Start listening for speech input (ChatGPT-like quality)
+     * Start listening for speech input.
      * Returns immediately; use [result] Flow to get transcription updates
      */
     suspend fun startListening(): KidResult<Unit> = withContext(Dispatchers.Default) {

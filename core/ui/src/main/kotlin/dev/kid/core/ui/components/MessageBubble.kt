@@ -4,6 +4,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -93,18 +94,23 @@ fun MessageBubble(
         )
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 2.dp),
-        contentAlignment = alignment,
-    ) {
-        Column(
-            modifier = Modifier
-                .widthIn(max = 320.dp)
-                .clip(bubbleShape)
-                .background(bgBrush)
-                .padding(horizontal = 14.dp, vertical = 10.dp)
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            contentAlignment = alignment,
+        ) {
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 340.dp)
+                    .clip(bubbleShape)
+                    .background(bgBrush)
+                    .border(
+                        width = 1.dp,
+                        color = KidColors.GlassBorder.copy(alpha = 0.4f),
+                        shape = bubbleShape
+                    )
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
                 .animateContentSize(
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioLowBouncy,

@@ -54,6 +54,7 @@ object CuratedModelRegistry {
             tags = listOf("qwen", "survival", "tiny"),
             minRamMb = 768,
             npuCompatible = false,
+            isRecommendedDefault = true,
         ),
 
         // ── Reasoning Brain — Deep thinking for complex tasks ───────

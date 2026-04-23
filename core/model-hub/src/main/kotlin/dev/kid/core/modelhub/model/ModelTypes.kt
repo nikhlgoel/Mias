@@ -21,6 +21,7 @@ data class ModelCard(
     val tags: List<String> = emptyList(),
     val minRamMb: Int = 2048,
     val npuCompatible: Boolean = false,
+    val isRecommendedDefault: Boolean = false,
 )
 
 /** Supported model file formats. */

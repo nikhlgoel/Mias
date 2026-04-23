@@ -1,5 +1,7 @@
 package dev.kid.app.ui.theme
 
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +32,12 @@ private val KidDarkColorScheme = darkColorScheme(
     outlineVariant = KidColors.SurfaceGlassStroke,
 )
 
+internal tailrec fun Context.findActivity(): ComponentActivity? = when (this) {
+    is ComponentActivity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
 @Composable
 fun KidTheme(
     content: @Composable () -> Unit,
@@ -37,8 +45,12 @@ fun KidTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val activity = view.context as ComponentActivity
-            activity.enableEdgeToEdge()
+            try {
+                val activity = view.context.findActivity()
+                activity?.enableEdgeToEdge()
+            } catch (_: Exception) {
+                // Some OEM skins throw when edge-to-edge is set during SideEffect
+            }
         }
     }
 

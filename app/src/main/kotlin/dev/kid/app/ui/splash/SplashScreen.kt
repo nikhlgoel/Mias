@@ -135,7 +135,9 @@ fun SplashScreen(
                         .size(160.dp),
                 ) {
                     val center = Offset(size.width / 2f, size.height / 2f)
-                    val scale = orbScale.value * pulseScale
+                    val rawScale = orbScale.value * pulseScale
+                    // radialGradient throws if radius <= 0, guard against animation start
+                    val scale = rawScale.coerceAtLeast(0.001f)
 
                     // Outer glow rings
                     for (i in 3 downTo 1) {

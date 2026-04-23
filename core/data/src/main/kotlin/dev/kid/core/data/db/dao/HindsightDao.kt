@@ -20,6 +20,9 @@ interface HindsightDao {
     @Query("SELECT * FROM raw_facts WHERE isDeprecated = 0 ORDER BY timestamp DESC LIMIT :limit")
     suspend fun getRecentFacts(limit: Int = 20): List<RawFactEntity>
 
+    @Query("SELECT * FROM raw_facts WHERE isDeprecated = 0")
+    suspend fun getAllActiveFacts(): List<RawFactEntity>
+
     @Query(
         "SELECT * FROM raw_facts WHERE isDeprecated = 0 AND content LIKE '%' || :query || '%' " +
             "ORDER BY timestamp DESC LIMIT :limit",
@@ -46,6 +49,9 @@ interface HindsightDao {
     @Query("SELECT * FROM observations ORDER BY updatedAt DESC LIMIT :limit")
     suspend fun getRecentObservations(limit: Int = 10): List<ObservationEntity>
 
+    @Query("SELECT * FROM observations")
+    suspend fun getAllObservations(): List<ObservationEntity>
+
     @Query(
         "SELECT * FROM observations WHERE content LIKE '%' || :query || '%' " +
             "ORDER BY confidence DESC LIMIT :limit",
@@ -62,6 +68,9 @@ interface HindsightDao {
 
     @Query("SELECT * FROM mental_models ORDER BY strength DESC LIMIT :limit")
     suspend fun getStrongestModels(limit: Int = 5): List<MentalModelEntity>
+
+    @Query("SELECT * FROM mental_models")
+    suspend fun getAllMentalModels(): List<MentalModelEntity>
 
     @Query(
         "SELECT * FROM mental_models WHERE content LIKE '%' || :query || '%' " +

@@ -39,20 +39,34 @@ fun hasPermission(context: Context, permission: String): Boolean {
 /**
  * Get all required app permissions
  */
-fun getRequiredAppPermissions(): List<PermissionRequest> = listOf(
-    PermissionRequest(
-        permission = Manifest.permission.RECORD_AUDIO,
-        title = "🎤 Microphone Access",
-        description = "To transcribe your speech into text using ChatGPT-level speech recognition",
-        isRequired = true,
-    ),
-    PermissionRequest(
-        permission = Manifest.permission.POST_NOTIFICATIONS,
-        title = "🔔 Notifications",
-        description = "To notify you about background learning and important events",
-        isRequired = false,
-    ),
-)
+fun getRequiredAppPermissions(): List<PermissionRequest> = buildList {
+    add(
+        PermissionRequest(
+            permission = Manifest.permission.RECORD_AUDIO,
+            title = "🎤 Microphone Access",
+            description = "Enables real-time voice transcription for hands-free interaction",
+            isRequired = true,
+        ),
+    )
+    add(
+        PermissionRequest(
+            permission = Manifest.permission.CAMERA,
+            title = "📷 Camera Access",
+            description = "Enables visual context understanding for richer conversations",
+            isRequired = false,
+        ),
+    )
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        add(
+            PermissionRequest(
+                permission = Manifest.permission.POST_NOTIFICATIONS,
+                title = "🔔 Notifications",
+                description = "Shows progress during background memory consolidation",
+                isRequired = false,
+            ),
+        )
+    }
+}
 
 /**
  * Composable for requesting a single permission with explanation

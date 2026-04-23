@@ -5,8 +5,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dev.kid.core.inference.InferenceEngine
-import dev.kid.core.inference.engine.GemmaLiteRtEngine
-import dev.kid.core.inference.engine.OnnxInferenceEngine
+import dev.kid.core.inference.engine.LlamaCppEngine
 import javax.inject.Named
 import javax.inject.Singleton
 
@@ -16,11 +15,15 @@ object InferenceModule {
 
     @Provides
     @Singleton
-    @Named("gemma")
-    fun provideGemmaEngine(engine: GemmaLiteRtEngine): InferenceEngine = engine
+    @Named("primaryEngine")
+    fun providePrimaryEngine(engine: LlamaCppEngine): InferenceEngine = engine
 
     @Provides
     @Singleton
-    @Named("mobilellm")
-    fun provideMobileLlmEngine(engine: OnnxInferenceEngine): InferenceEngine = engine
+    @Named("survivalEngine")
+    fun provideSurvivalEngine(engine: LlamaCppEngine): InferenceEngine = engine
+
+    @Provides
+    @Singleton
+    fun provideEmbeddingProvider(engine: dev.kid.core.inference.engine.EmbeddingEngine): dev.kid.core.common.model.EmbeddingProvider = engine
 }

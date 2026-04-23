@@ -10,7 +10,15 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        minSdk = 35
+        minSdk = 28
+        ndk {
+            abiFilters.add("arm64-v8a")
+        }
+        externalNativeBuild {
+            cmake {
+                arguments("-DANDROID_STL=c++_shared")
+            }
+        }
     }
 
     compileOptions {
@@ -33,9 +41,9 @@ android {
 dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:thermal"))
+    implementation(project(":core:security"))
 
-    // On-device inference only — no cloud
-    implementation(libs.onnxruntime.android)
+    // On-device inference powered by llama.cpp JNI
     implementation(libs.kotlinx.coroutines.android)
 
     // Hilt

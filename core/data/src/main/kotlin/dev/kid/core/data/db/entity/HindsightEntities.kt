@@ -12,6 +12,7 @@ data class RawFactEntity(
     val conversationId: String?,
     val timestamp: Long,
     val isDeprecated: Boolean = false,
+    val embedding: ByteArray? = null,
 )
 
 /** Hindsight Tier 2: Observations derived from raw facts. */
@@ -24,6 +25,7 @@ data class ObservationEntity(
     val factIds: String,
     val createdAt: Long,
     val updatedAt: Long,
+    val embedding: ByteArray? = null,
 )
 
 /** Hindsight Tier 3: Mental models — highest-level abstractions. */
@@ -37,4 +39,5 @@ data class MentalModelEntity(
     val createdAt: Long,
     val updatedAt: Long,
     val version: Int = 1,
+    val embedding: ByteArray? = null,
 )
