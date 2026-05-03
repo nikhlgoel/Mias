@@ -19,6 +19,7 @@ import dev.kid.app.ui.home.HomeScreen
 import dev.kid.app.ui.modelhub.ModelHubScreen
 import dev.kid.app.ui.settings.SettingsScreen
 import dev.kid.app.ui.splash.SplashScreen
+import dev.kid.app.ui.voice.VoiceChatScreen
 
 object KidRoutes {
     const val SPLASH = "splash"
@@ -28,6 +29,7 @@ object KidRoutes {
     const val MODEL_HUB = "modelhub"
     const val AGENT = "agent"
     const val EVOLUTION = "evolution"
+    const val VOICE = "voice"
 
     fun chatRoute(conversationId: String? = null): String =
         if (conversationId != null) "chat?conversationId=$conversationId" else "chat"
@@ -73,6 +75,7 @@ fun KidNavHost(modifier: Modifier = Modifier) {
                 onNavigateToModelHub = { navController.navigate(KidRoutes.MODEL_HUB) },
                 onNavigateToAgent = { navController.navigate(KidRoutes.AGENT) },
                 onNavigateToEvolution = { navController.navigate(KidRoutes.EVOLUTION) },
+                onNavigateToVoice = { navController.navigate(KidRoutes.VOICE) },
             )
         }
 
@@ -103,6 +106,10 @@ fun KidNavHost(modifier: Modifier = Modifier) {
 
         composable(KidRoutes.EVOLUTION) {
             EvolutionScreen(onNavigateBack = { navController.popBackStack() })
+        }
+
+        composable(KidRoutes.VOICE) {
+            VoiceChatScreen(onBack = { navController.navigateUp() })
         }
     }
 }

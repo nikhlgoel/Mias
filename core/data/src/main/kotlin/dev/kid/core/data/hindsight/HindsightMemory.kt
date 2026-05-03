@@ -32,9 +32,23 @@ class HindsightMemory @Inject constructor(
         runCatchingKid {
             // Retrieve embedding for the fact before saving
             val embeddingResult = embeddingProvider.getEmbedding(content)
-            val embeddingBytes = if (embeddingResult is KidResult.Success) {
-                embeddingResult.data.toByteArray()
+            val embedding = if (embeddingResult is KidResult.Success) {
+                embeddingResult.data
             } else null
+            val embeddingBytes = embedding?.toByteArray()
+
+            // Dedup: skip insert if a near-duplicate already exists (cosine > 0.92)
+            if (embedding != null && isDuplicate(embedding)) {
+                // Return a synthetic entity to signal dedup without inserting
+                return@runCatchingKid RawFactEntity(
+                    id = "dedup-skipped",
+                    content = content,
+                    sourceUserId = sourceUserId,
+                    conversationId = conversationId,
+                    timestamp = System.currentTimeMillis(),
+                    embedding = embeddingBytes,
+                )
+            }
 
             val fact = RawFactEntity(
                 id = UUID.randomUUID().toString(),
@@ -46,6 +60,18 @@ class HindsightMemory @Inject constructor(
             )
             dao.insertFact(fact)
             fact
+        }
+    }
+
+    /**
+     * Check if a new embedding is a near-duplicate of any recent fact.
+     * Uses cosine similarity with a threshold of 0.92 against the last 50 facts.
+     */
+    private suspend fun isDuplicate(newEmbedding: FloatArray): Boolean {
+        val recentFacts = dao.getRecentFactsWithEmbeddings(limit = 50)
+        return recentFacts.any { fact ->
+            val existingEmbedding = fact.embedding?.toFloatArray() ?: return@any false
+            existingEmbedding.cosineSimilarity(newEmbedding) > DEDUP_SIMILARITY_THRESHOLD
         }
     }
 
@@ -153,6 +179,11 @@ class HindsightMemory @Inject constructor(
 
     suspend fun activeFactCount(): Int = withContext(ioDispatcher) {
         dao.activeFactCount()
+    }
+
+    companion object {
+        /** Cosine similarity threshold above which a new fact is considered a duplicate. */
+        private const val DEDUP_SIMILARITY_THRESHOLD = 0.92f
     }
 }
 

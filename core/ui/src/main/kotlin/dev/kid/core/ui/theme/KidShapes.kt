@@ -4,7 +4,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 
 /**
- * {Kid} Shape System — rounded corners that feel organic.
+ * Mias Shape System — rounded corners that feel organic.
  */
 object KidShapes {
     val Small = RoundedCornerShape(8.dp)

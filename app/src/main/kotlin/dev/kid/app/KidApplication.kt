@@ -1,3 +1,4 @@
+/* Release #001 — first public build of Mias. Internal codename: "Kid". */
 package dev.kid.app
 
 import android.app.Application

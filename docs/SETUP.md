@@ -1,7 +1,7 @@
-# {Kid} V4 — Complete Setup Guide
+# Mias — Setup Guide
 
-> **Sovereign Intelligence Everywhere**  
-> Build, Deploy, and Run {Kid} on Android & Desktop Locally
+> **Local AI. No cloud. Your data.**  
+> Build and run Mias on Android and Desktop
 
 ---
 
@@ -221,7 +221,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n dev.kid.app/.ui.MainActivity
 
 # Or directly from device home screen
-# Tap {Kid} icon (neural eye animation)
+# Tap Mias icon (neural eye animation)
 ```
 
 ### Windows Command Location (Exact)
@@ -453,7 +453,7 @@ In {Kid} Android app:
 ### Step 1: Download to Android
 
 **Via App UI (Recommended):**
-1. Open {Kid} → Brain Market (bottom nav)
+1.  Brain Market (bottom nav)
 2. Filter by role: CODE, CHAT, REASONING
 3. Tap model card → Tap "Download"
 4. Observe progress bar (pause/resume supported)
@@ -515,7 +515,7 @@ curl -X POST http://localhost:8400/inference \
 ### Cross-Device Testing
 
 1. Both devices on Tailscale mesh
-2. Open {Kid} on Android
+2.  Android
 3. Settings → Inference → Select "Desktop (Remote)"
 4. Send chat message → Offloads to desktop Qwen3 server via MCP bridge
 5. Response should include `[BRAIN: QWEN_DESKTOP]` tag in UI
@@ -644,4 +644,4 @@ docker logs <container-id>
 
 ---
 
-**Made with 💜 by Team {Kid}** | [Architecture Docs](./V4_ARCHITECTURE.md) | [Privacy Policy](../README.md#-privacy--security)
+**Mias** | [Architecture Docs](./V4_ARCHITECTURE.md) | [Privacy Policy](../README.md#-privacy--security)

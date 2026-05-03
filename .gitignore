@@ -12,7 +12,6 @@ local.properties
 *.iws
 *.ipr
 .continue/
-.github/
 .vscode/
 
 # === OS ===
@@ -59,9 +58,6 @@ __pycache__/
 venv/
 *.egg-info/
 
-# === Docker ===
-# (handled above)
-
 # === Environment ===
 .env
 .env.local
@@ -71,10 +67,11 @@ venv/
 *.keystore
 keystore.properties
 
-# === Docs (ignore temp/backup files, but not docs themselves) ===
-docs/*.tmp
-docs/*.bak
-docs/*~
+# === Internal planning docs (not public) ===
+docs/*.docx
+docs/IMPLEMENTATION_BLUEPRINT.py
+docs/DOC#001.docx
+docs/PRD.docx
 
 # === Node/npm (if used) ===
 node_modules/
@@ -88,5 +85,5 @@ package-lock.json
 *.bak
 *~
 
-# === Local project tracking (not for GitHub) ===
+# === Local project tracking ===
 PROJECT_STAGES.md

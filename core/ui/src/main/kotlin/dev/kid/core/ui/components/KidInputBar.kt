@@ -40,7 +40,7 @@ fun KidInputBar(
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
     modifier: Modifier = Modifier,
-    placeholder: String = "Talk to Kid...",
+    placeholder: String = "Talk to Mias...",
     enabled: Boolean = true,
     isProcessing: Boolean = false,
 ) {

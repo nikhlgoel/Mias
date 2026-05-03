@@ -1,938 +1,1048 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mias — Local AI for Your Phone</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mias — Local AI. No Cloud.</title>
+  <meta name="description" content="An open source AI assistant that runs entirely on your Android device. No internet, no servers, no data leaving your phone."/>
+  <meta property="og:title" content="Mias — Local AI. No Cloud."/>
+  <meta property="og:description" content="Open source AI assistant. Runs on-device. Zero telemetry."/>
+  <meta property="og:type" content="website"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:        #0a0a0a;
-      --bg2:       #111111;
-      --bg3:       #181818;
-      --border:    #222222;
-      --amber:     #e8913a;
-      --amber-dim: #a85f1e;
-      --text:      #e8e0d5;
-      --muted:     #7a7068;
-      --mono:      'JetBrains Mono', monospace;
-      --sans:      'Sora', sans-serif;
-    }
-
-    html { scroll-behavior: smooth; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--sans);
-      font-size: 16px;
-      line-height: 1.6;
-      overflow-x: hidden;
-    }
-
-    /* ── GRAIN OVERLAY ── */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-      pointer-events: none;
-      z-index: 999;
-      opacity: 0.5;
-    }
-
-    /* ── NAV ── */
-    nav {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      z-index: 100;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1.2rem 5vw;
-      background: rgba(10,10,10,0.85);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .nav-logo {
-      font-family: var(--mono);
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: var(--amber);
-      letter-spacing: 0.05em;
-      text-decoration: none;
-    }
-
-    .nav-links {
-      display: flex;
-      gap: 2rem;
-      list-style: none;
-    }
-
-    .nav-links a {
-      color: var(--muted);
-      text-decoration: none;
-      font-size: 0.85rem;
-      letter-spacing: 0.04em;
-      transition: color 0.2s;
-    }
-
-    .nav-links a:hover { color: var(--text); }
-
-    .nav-cta {
-      font-family: var(--mono);
-      font-size: 0.8rem;
-      padding: 0.5rem 1.2rem;
-      border: 1px solid var(--amber);
-      color: var(--amber);
-      text-decoration: none;
-      border-radius: 3px;
-      transition: background 0.2s, color 0.2s;
-    }
-
-    .nav-cta:hover {
-      background: var(--amber);
-      color: var(--bg);
-    }
-
-    /* ── HERO ── */
-    .hero {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      padding: 10rem 5vw 6rem;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .hero-glow {
-      position: absolute;
-      top: 30%;
-      right: -10%;
-      width: 600px;
-      height: 600px;
-      background: radial-gradient(circle, rgba(232,145,58,0.08) 0%, transparent 70%);
-      pointer-events: none;
-    }
-
-    .hero-tag {
-      font-family: var(--mono);
-      font-size: 0.75rem;
-      letter-spacing: 0.15em;
-      color: var(--amber);
-      text-transform: uppercase;
-      margin-bottom: 1.5rem;
-      opacity: 0;
-      animation: fadeUp 0.6s ease forwards 0.1s;
-    }
-
-    .hero h1 {
-      font-size: clamp(2.8rem, 7vw, 5.5rem);
-      font-weight: 700;
-      line-height: 1.05;
-      letter-spacing: -0.03em;
-      max-width: 800px;
-      opacity: 0;
-      animation: fadeUp 0.6s ease forwards 0.25s;
-    }
-
-    .hero h1 em {
-      font-style: normal;
-      color: var(--amber);
-    }
-
-    .hero-sub {
-      margin-top: 1.5rem;
-      font-size: 1.1rem;
-      color: var(--muted);
-      max-width: 520px;
-      font-weight: 300;
-      opacity: 0;
-      animation: fadeUp 0.6s ease forwards 0.4s;
-    }
-
-    .hero-actions {
-      display: flex;
-      gap: 1rem;
-      margin-top: 2.5rem;
-      flex-wrap: wrap;
-      opacity: 0;
-      animation: fadeUp 0.6s ease forwards 0.55s;
-    }
-
-    .btn-primary {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: var(--amber);
-      color: #0a0a0a;
-      font-family: var(--mono);
-      font-size: 0.85rem;
-      font-weight: 700;
-      padding: 0.8rem 1.8rem;
-      border-radius: 3px;
-      text-decoration: none;
-      transition: opacity 0.2s, transform 0.2s;
-    }
-
-    .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
-
-    .btn-secondary {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-family: var(--mono);
-      font-size: 0.85rem;
-      padding: 0.8rem 1.8rem;
-      border-radius: 3px;
-      text-decoration: none;
-      transition: border-color 0.2s, color 0.2s;
-    }
-
-    .btn-secondary:hover { border-color: var(--muted); color: var(--text); }
-
-    /* terminal hero visual */
-    .hero-terminal {
-      position: absolute;
-      right: 5vw;
-      top: 50%;
-      transform: translateY(-50%);
-      width: min(420px, 40vw);
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 32px 64px rgba(0,0,0,0.6);
-      opacity: 0;
-      animation: fadeLeft 0.7s ease forwards 0.7s;
-    }
-
-    .term-bar {
-      background: var(--bg2);
-      padding: 0.7rem 1rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .term-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-    }
-
-    .term-dot:nth-child(1) { background: #ff5f56; }
-    .term-dot:nth-child(2) { background: #ffbd2e; }
-    .term-dot:nth-child(3) { background: #27c93f; }
-
-    .term-title {
-      font-family: var(--mono);
-      font-size: 0.7rem;
-      color: var(--muted);
-      margin-left: 0.5rem;
-    }
-
-    .term-body {
-      padding: 1.2rem 1.4rem;
-      font-family: var(--mono);
-      font-size: 0.78rem;
-      line-height: 1.9;
-    }
-
-    .term-prompt { color: var(--amber); }
-    .term-cmd    { color: var(--text); }
-    .term-out    { color: var(--muted); }
-    .term-ok     { color: #27c93f; }
-    .term-cursor {
-      display: inline-block;
-      width: 8px; height: 1em;
-      background: var(--amber);
-      vertical-align: text-bottom;
-      animation: blink 1s step-end infinite;
-    }
-
-    /* ── STATS BAR ── */
-    .stats {
-      display: flex;
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .stat {
-      flex: 1;
-      padding: 2rem 5vw;
-      border-right: 1px solid var(--border);
-    }
-
-    .stat:last-child { border-right: none; }
-
-    .stat-num {
-      font-family: var(--mono);
-      font-size: 2rem;
-      font-weight: 700;
-      color: var(--amber);
-    }
-
-    .stat-label {
-      font-size: 0.8rem;
-      color: var(--muted);
-      margin-top: 0.3rem;
-      letter-spacing: 0.05em;
-    }
-
-    /* ── SECTION SHARED ── */
-    section { padding: 6rem 5vw; }
-
-    .section-tag {
-      font-family: var(--mono);
-      font-size: 0.72rem;
-      letter-spacing: 0.15em;
-      color: var(--amber);
-      text-transform: uppercase;
-      margin-bottom: 1rem;
-    }
-
-    h2 {
-      font-size: clamp(1.8rem, 3.5vw, 2.8rem);
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      line-height: 1.15;
-    }
-
-    .section-sub {
-      margin-top: 0.8rem;
-      color: var(--muted);
-      font-weight: 300;
-      max-width: 480px;
-    }
-
-    /* ── WHY MIAS ── */
-    .why { background: var(--bg2); }
-
-    .why-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 1.5px;
-      margin-top: 3.5rem;
-      border: 1.5px solid var(--border);
-    }
-
-    .why-card {
-      background: var(--bg);
-      padding: 2rem;
-      transition: background 0.2s;
-    }
-
-    .why-card:hover { background: var(--bg3); }
-
-    .why-icon {
-      font-size: 1.6rem;
-      margin-bottom: 1rem;
-    }
-
-    .why-card h3 {
-      font-size: 1.05rem;
-      font-weight: 600;
-      margin-bottom: 0.6rem;
-    }
-
-    .why-card p {
-      font-size: 0.9rem;
-      color: var(--muted);
-      line-height: 1.7;
-    }
-
-    /* ── HOW IT WORKS ── */
-    .steps {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 0;
-      margin-top: 3.5rem;
-      position: relative;
-    }
-
-    .steps::before {
-      content: '';
-      position: absolute;
-      top: 2rem;
-      left: 3rem;
-      right: 3rem;
-      height: 1px;
-      background: linear-gradient(to right, var(--border), var(--amber-dim), var(--border));
-    }
-
-    .step {
-      padding: 0 1.5rem;
-      padding-top: 0;
-    }
-
-    .step-num {
-      width: 4rem; height: 4rem;
-      border-radius: 50%;
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--mono);
-      font-size: 0.85rem;
-      color: var(--amber);
-      margin-bottom: 1.5rem;
-      position: relative;
-      z-index: 1;
-    }
-
-    .step h3 {
-      font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: 0.5rem;
-    }
-
-    .step p {
-      font-size: 0.85rem;
-      color: var(--muted);
-      line-height: 1.7;
-    }
-
-    /* ── MODELS TABLE ── */
-    .models { background: var(--bg2); }
-
-    .model-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 3rem;
-      font-size: 0.9rem;
-    }
-
-    .model-table th {
-      text-align: left;
-      padding: 0.9rem 1.2rem;
-      font-family: var(--mono);
-      font-size: 0.72rem;
-      letter-spacing: 0.1em;
-      color: var(--muted);
-      text-transform: uppercase;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .model-table td {
-      padding: 1.1rem 1.2rem;
-      border-bottom: 1px solid var(--border);
-      vertical-align: middle;
-    }
-
-    .model-table tr:last-child td { border-bottom: none; }
-
-    .model-table tr:hover td { background: var(--bg3); }
-
-    .badge {
-      display: inline-block;
-      font-family: var(--mono);
-      font-size: 0.7rem;
-      padding: 0.2rem 0.6rem;
-      border-radius: 2px;
-      letter-spacing: 0.05em;
-    }
-
-    .badge-phone  { background: rgba(232,145,58,0.15); color: var(--amber); }
-    .badge-pc     { background: rgba(100,180,255,0.12); color: #78b8f0; }
-    .badge-npu    { background: rgba(100,230,150,0.1); color: #6dcc96; }
-    .badge-cpu    { background: rgba(180,180,180,0.1); color: #aaaaaa; }
-
-    .model-name {
-      font-family: var(--mono);
-      font-weight: 700;
-      font-size: 0.88rem;
-    }
-
-    /* ── SETUP ── */
-    .setup-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
-      margin-top: 3rem;
-    }
-
-    @media (max-width: 768px) {
-      .setup-grid { grid-template-columns: 1fr; }
-    }
-
-    .setup-block h3 {
-      font-family: var(--mono);
-      font-size: 0.8rem;
-      letter-spacing: 0.1em;
-      color: var(--amber);
-      text-transform: uppercase;
-      margin-bottom: 1rem;
-    }
-
-    pre {
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 1.4rem;
-      overflow-x: auto;
-      font-family: var(--mono);
-      font-size: 0.78rem;
-      line-height: 1.8;
-      color: var(--text);
-    }
-
-    .c-comment { color: var(--muted); }
-    .c-cmd     { color: var(--text); }
-    .c-string  { color: #b5d49a; }
-    .c-out     { color: #78b8f0; }
-
-    /* ── PRIVACY ── */
-    .privacy { background: var(--bg2); }
-
-    .privacy-split {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 3rem;
-      margin-top: 3rem;
-    }
-
-    @media (max-width: 768px) {
-      .privacy-split { grid-template-columns: 1fr; }
-    }
-
-    .privacy-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 0.9rem;
-    }
-
-    .privacy-list li {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.8rem;
-      font-size: 0.9rem;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-
-    .privacy-list li .icon {
-      flex-shrink: 0;
-      margin-top: 0.1rem;
-      font-size: 0.95rem;
-    }
-
-    /* ── FOOTER / CTA ── */
-    .cta {
-      text-align: center;
-      padding: 7rem 5vw;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .cta-glow {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      width: 600px; height: 400px;
-      background: radial-gradient(ellipse, rgba(232,145,58,0.06) 0%, transparent 70%);
-      pointer-events: none;
-    }
-
-    .cta h2 {
-      font-size: clamp(2rem, 4vw, 3rem);
-      margin-bottom: 1rem;
-    }
-
-    .cta p {
-      color: var(--muted);
-      font-weight: 300;
-      margin-bottom: 2.5rem;
-    }
-
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 1.5rem 5vw;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-family: var(--mono);
-      font-size: 0.72rem;
-      color: var(--muted);
-    }
-
-    /* ── ANIMATIONS ── */
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    @keyframes fadeLeft {
-      from { opacity: 0; transform: translate(20px, -50%); }
-      to   { opacity: 1; transform: translate(0, -50%); }
-    }
-
-    @keyframes blink {
-      50% { opacity: 0; }
-    }
-
-    /* scroll reveal */
-    .reveal {
-      opacity: 0;
-      transform: translateY(24px);
-      transition: opacity 0.6s ease, transform 0.6s ease;
-    }
-
-    .reveal.visible {
-      opacity: 1;
-      transform: none;
-    }
-
-    /* ── MOBILE ── */
-    @media (max-width: 900px) {
-      .hero-terminal { display: none; }
-      .steps::before { display: none; }
-      .stats { flex-direction: column; }
-      .stat { border-right: none; border-bottom: 1px solid var(--border); }
-      .stat:last-child { border-bottom: none; }
-    }
-
-    @media (max-width: 600px) {
-      .nav-links { display: none; }
-    }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:       #080C14;
+  --bg1:      #0D1220;
+  --bg2:      #111827;
+  --bg3:      #1A2235;
+  --border:   rgba(0,255,255,0.08);
+  --border2:  rgba(0,255,255,0.14);
+  --cyan:     #00FFFF;
+  --cyan-dim: #00CCCC;
+  --cyan-glow:rgba(0,255,255,0.12);
+  --text:     #E2E8F0;
+  --muted:    #64748B;
+  --muted2:   #94A3B8;
+  --mono:     'JetBrains Mono', monospace;
+  --sans:     'Inter', sans-serif;
+  --radius:   8px;
+}
+
+html{scroll-behavior:smooth}
+
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.6;
+  overflow-x:hidden;
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* SELECTION */
+::selection{background:rgba(0,255,255,0.15);color:#fff}
+
+/* ── NAV ── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;justify-content:space-between;align-items:center;
+  padding:1rem 5vw;
+  background:rgba(8,12,20,0.85);
+  backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+  transition:border-color 0.3s;
+}
+.nav-logo{
+  display:flex;align-items:center;gap:0.75rem;
+  font-family:var(--mono);font-size:1rem;font-weight:700;
+  color:var(--text);text-decoration:none;letter-spacing:-0.02em;
+}
+.nav-logo-orb{
+  width:28px;height:28px;
+  border-radius:50%;
+  border:1.5px solid var(--cyan);
+  background:radial-gradient(circle at 40% 40%,rgba(0,255,255,0.3),rgba(0,80,80,0.4));
+  box-shadow:0 0 12px rgba(0,255,255,0.25);
+  position:relative;flex-shrink:0;
+}
+.nav-logo-orb::after{
+  content:'';position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:5px;height:5px;border-radius:50%;
+  background:var(--cyan);box-shadow:0 0 6px var(--cyan);
+}
+.nav-links{display:flex;align-items:center;gap:2rem}
+.nav-links a{
+  font-family:var(--mono);font-size:0.75rem;
+  color:var(--muted2);text-decoration:none;letter-spacing:0.05em;
+  transition:color 0.2s;
+}
+.nav-links a:hover{color:var(--cyan)}
+.nav-links .btn-nav{
+  padding:0.45rem 1.1rem;
+  border:1px solid var(--border2);border-radius:var(--radius);
+  color:var(--cyan);
+  transition:background 0.2s,border-color 0.2s;
+}
+.nav-links .btn-nav:hover{background:var(--cyan-glow)}
+.nav-mobile-hide{display:flex;gap:2rem}
+@media(max-width:640px){
+  .nav-mobile-hide{display:none}
+}
+
+/* ── HERO ── */
+.hero{
+  min-height:100vh;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  align-items:center;
+  gap:4rem;
+  padding:8rem 5vw 6rem;
+  position:relative;overflow:hidden;
+}
+@media(max-width:900px){
+  .hero{grid-template-columns:1fr;padding:7rem 5vw 5rem}
+  .hero-visual{display:none}
+}
+
+.hero-glow-bg{
+  position:absolute;
+  top:-20%;right:-15%;
+  width:700px;height:700px;
+  background:radial-gradient(circle,rgba(0,255,255,0.04) 0%,transparent 70%);
+  pointer-events:none;
+}
+.hero-glow-bg2{
+  position:absolute;
+  bottom:-10%;left:-10%;
+  width:500px;height:500px;
+  background:radial-gradient(circle,rgba(0,100,255,0.03) 0%,transparent 70%);
+  pointer-events:none;
+}
+
+.hero-text{z-index:1}
+.hero-tag{
+  display:inline-flex;align-items:center;gap:0.5rem;
+  font-family:var(--mono);font-size:0.7rem;
+  letter-spacing:0.12em;color:var(--cyan);
+  text-transform:uppercase;margin-bottom:1.5rem;
+  padding:0.3rem 0.8rem;border:1px solid var(--border2);
+  border-radius:20px;background:rgba(0,255,255,0.04);
+  opacity:0;animation:fadeUp 0.5s ease forwards 0.1s;
+}
+.hero-tag::before{
+  content:'';width:6px;height:6px;border-radius:50%;
+  background:var(--cyan);animation:pulse 2s infinite;
+}
+.hero h1{
+  font-size:clamp(2.6rem,5.5vw,4.8rem);
+  font-weight:700;line-height:1.06;
+  letter-spacing:-0.035em;
+  opacity:0;animation:fadeUp 0.5s ease forwards 0.25s;
+}
+.hero h1 .accent{color:var(--cyan)}
+.hero-desc{
+  margin-top:1.5rem;font-size:1.05rem;
+  color:var(--muted2);max-width:480px;font-weight:400;
+  line-height:1.7;
+  opacity:0;animation:fadeUp 0.5s ease forwards 0.4s;
+}
+.hero-stats{
+  display:flex;gap:2rem;margin-top:2rem;
+  opacity:0;animation:fadeUp 0.5s ease forwards 0.5s;
+}
+.hero-stat{display:flex;flex-direction:column;gap:0.15rem}
+.stat-val{
+  font-family:var(--mono);font-size:1.3rem;
+  font-weight:700;color:var(--text);
+}
+.stat-label{font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em}
+.hero-actions{
+  display:flex;gap:0.85rem;margin-top:2.5rem;flex-wrap:wrap;
+  opacity:0;animation:fadeUp 0.5s ease forwards 0.6s;
+}
+.btn-primary{
+  display:inline-flex;align-items:center;gap:0.5rem;
+  background:var(--cyan);color:#080C14;
+  font-family:var(--mono);font-size:0.8rem;font-weight:700;
+  padding:0.75rem 1.6rem;border-radius:var(--radius);
+  text-decoration:none;letter-spacing:0.04em;
+  transition:opacity 0.2s,transform 0.15s,box-shadow 0.2s;
+  box-shadow:0 0 0 0 rgba(0,255,255,0);
+}
+.btn-primary:hover{
+  opacity:0.9;transform:translateY(-1px);
+  box-shadow:0 0 24px rgba(0,255,255,0.25);
+}
+.btn-secondary{
+  display:inline-flex;align-items:center;gap:0.5rem;
+  border:1px solid var(--border2);color:var(--text);
+  font-family:var(--mono);font-size:0.8rem;
+  padding:0.75rem 1.6rem;border-radius:var(--radius);
+  text-decoration:none;
+  transition:border-color 0.2s,background 0.2s;
+}
+.btn-secondary:hover{border-color:rgba(0,255,255,0.3);background:rgba(0,255,255,0.04)}
+
+/* HERO — Neural Orb Canvas */
+.hero-visual{
+  display:flex;justify-content:center;align-items:center;
+  position:relative;z-index:1;
+  opacity:0;animation:fadeIn 1s ease forwards 0.8s;
+}
+#orbCanvas{
+  width:420px;height:420px;
+  border-radius:50%;
+}
+
+/* ── TICKER ── */
+.ticker-bar{
+  background:var(--bg1);
+  border-top:1px solid var(--border);
+  border-bottom:1px solid var(--border);
+  padding:0.6rem 0;overflow:hidden;
+  position:relative;
+}
+.ticker-inner{
+  display:flex;gap:4rem;
+  animation:scroll 28s linear infinite;
+  white-space:nowrap;
+}
+.ticker-item{
+  font-family:var(--mono);font-size:0.7rem;
+  color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;
+  display:flex;align-items:center;gap:0.5rem;
+}
+.ticker-item span{color:var(--cyan)}
+@keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+/* ── SECTIONS ── */
+.section{padding:6rem 5vw}
+.section-label{
+  font-family:var(--mono);font-size:0.7rem;
+  color:var(--cyan);letter-spacing:0.15em;text-transform:uppercase;
+  margin-bottom:1rem;
+}
+.section-title{
+  font-size:clamp(1.8rem,3.5vw,2.8rem);font-weight:700;
+  letter-spacing:-0.025em;line-height:1.2;
+  max-width:560px;
+}
+.section-title .accent{color:var(--cyan)}
+.section-sub{
+  margin-top:0.75rem;font-size:1rem;
+  color:var(--muted2);max-width:500px;line-height:1.7;
+}
+
+/* ── FEATURES GRID ── */
+.features-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+  gap:1.5px;
+  margin-top:4rem;
+  border:1.5px solid var(--border);border-radius:12px;
+  overflow:hidden;
+  background:var(--border);
+}
+.feature-card{
+  background:var(--bg1);
+  padding:2rem;
+  transition:background 0.2s;
+  position:relative;overflow:hidden;
+}
+.feature-card:hover{background:var(--bg2)}
+.feature-card::before{
+  content:'';position:absolute;
+  inset:0;opacity:0;
+  background:radial-gradient(circle at 30% 30%,rgba(0,255,255,0.05),transparent 60%);
+  transition:opacity 0.3s;
+}
+.feature-card:hover::before{opacity:1}
+.feature-icon{
+  width:40px;height:40px;
+  border:1px solid var(--border2);border-radius:var(--radius);
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:1.2rem;font-size:1.1rem;
+  background:rgba(0,255,255,0.04);
+}
+.feature-title{
+  font-size:1rem;font-weight:600;
+  margin-bottom:0.5rem;letter-spacing:-0.01em;
+}
+.feature-desc{font-size:0.875rem;color:var(--muted2);line-height:1.65}
+.feature-tag{
+  display:inline-block;margin-top:1rem;
+  font-family:var(--mono);font-size:0.65rem;
+  color:var(--cyan);background:rgba(0,255,255,0.06);
+  padding:0.2rem 0.6rem;border-radius:3px;letter-spacing:0.06em;
+}
+
+/* ── ARCHITECTURE ── */
+.arch-section{background:var(--bg1)}
+.arch-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:3rem;
+  align-items:start;margin-top:3.5rem;
+}
+@media(max-width:768px){.arch-grid{grid-template-columns:1fr}}
+.module-list{display:flex;flex-direction:column;gap:1px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.module-item{
+  display:flex;align-items:center;gap:1rem;
+  padding:0.85rem 1.2rem;background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  transition:background 0.15s;cursor:default;
+}
+.module-item:last-child{border-bottom:none}
+.module-item:hover{background:var(--bg3)}
+.module-dot{
+  width:8px;height:8px;border-radius:50%;flex-shrink:0;
+}
+.module-name{
+  font-family:var(--mono);font-size:0.78rem;
+  color:var(--text);flex:1;
+}
+.module-status{
+  font-family:var(--mono);font-size:0.65rem;
+  padding:0.15rem 0.5rem;border-radius:3px;
+}
+.status-done{background:rgba(0,255,100,0.1);color:#00FF64}
+.status-partial{background:rgba(255,180,0,0.1);color:#FFB400}
+.status-planned{background:rgba(100,100,100,0.1);color:var(--muted2)}
+
+.lang-stack{display:flex;flex-direction:column;gap:1rem;margin-top:0}
+.lang-item{
+  border:1px solid var(--border);border-radius:var(--radius);
+  padding:1rem 1.2rem;background:var(--bg2);
+  transition:border-color 0.2s;
+}
+.lang-item:hover{border-color:var(--border2)}
+.lang-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:0.3rem;
+}
+.lang-name{font-family:var(--mono);font-size:0.85rem;font-weight:700}
+.lang-badge{
+  font-family:var(--mono);font-size:0.65rem;
+  color:var(--muted);padding:0.15rem 0.5rem;
+  border:1px solid var(--border);border-radius:3px;
+}
+.lang-use{font-size:0.78rem;color:var(--muted2)}
+
+/* ── CHAT DEMO ── */
+.demo-section{background:var(--bg)}
+.demo-frame{
+  max-width:780px;margin:3.5rem auto 0;
+  border:1px solid var(--border2);border-radius:16px;
+  overflow:hidden;
+  box-shadow:0 0 80px rgba(0,255,255,0.05),0 40px 80px rgba(0,0,0,0.4);
+}
+.demo-topbar{
+  display:flex;align-items:center;gap:0.75rem;
+  padding:0.9rem 1.2rem;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+}
+.demo-dot{width:10px;height:10px;border-radius:50%}
+.demo-dot:nth-child(1){background:#FF5F56}
+.demo-dot:nth-child(2){background:#FFBD2E}
+.demo-dot:nth-child(3){background:#27C93F}
+.demo-bar-title{
+  font-family:var(--mono);font-size:0.72rem;
+  color:var(--muted);margin-left:0.5rem;
+}
+.demo-status-pill{
+  margin-left:auto;display:flex;align-items:center;gap:0.4rem;
+  font-family:var(--mono);font-size:0.65rem;color:var(--cyan);
+  background:rgba(0,255,255,0.06);padding:0.2rem 0.6rem;border-radius:20px;
+  border:1px solid rgba(0,255,255,0.12);
+}
+.demo-status-dot{width:5px;height:5px;border-radius:50%;background:var(--cyan);animation:pulse 2s infinite}
+.demo-body{padding:1.5rem;min-height:320px;display:flex;flex-direction:column;gap:1rem}
+.msg{display:flex;gap:0.75rem;align-items:flex-start;opacity:0;transform:translateY(8px);transition:all 0.4s ease}
+.msg.show{opacity:1;transform:translateY(0)}
+.msg-avatar{
+  width:28px;height:28px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:0.75rem;font-weight:700;font-family:var(--mono);
+}
+.msg-mias .msg-avatar{
+  background:rgba(0,255,255,0.1);border:1px solid var(--border2);
+  color:var(--cyan);
+}
+.msg-user .msg-avatar{
+  background:rgba(100,116,139,0.2);border:1px solid rgba(100,116,139,0.3);
+  color:var(--muted2);
+}
+.msg-user{flex-direction:row-reverse}
+.msg-bubble{
+  font-size:0.875rem;line-height:1.65;padding:0.7rem 1rem;
+  border-radius:12px;max-width:480px;
+}
+.msg-mias .msg-bubble{
+  background:var(--bg3);border:1px solid var(--border);
+  color:var(--text);border-top-left-radius:2px;
+}
+.msg-user .msg-bubble{
+  background:rgba(0,255,255,0.07);border:1px solid rgba(0,255,255,0.1);
+  color:var(--text);border-top-right-radius:2px;
+}
+.msg-bubble code{
+  font-family:var(--mono);font-size:0.78rem;
+  background:rgba(0,255,255,0.08);padding:0.1rem 0.35rem;
+  border-radius:3px;color:var(--cyan);
+}
+.typing-indicator{display:flex;gap:4px;align-items:center;padding:0.6rem 1rem}
+.typing-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--muted);animation:typing 1.2s infinite;
+}
+.typing-dot:nth-child(2){animation-delay:0.2s}
+.typing-dot:nth-child(3){animation-delay:0.4s}
+@keyframes typing{0%,80%,100%{opacity:0.3;transform:scale(0.9)}40%{opacity:1;transform:scale(1)}}
+
+/* ── DEMO INPUT ── */
+.demo-input-bar{
+  display:flex;align-items:center;gap:0.75rem;
+  padding:0.9rem 1.2rem;border-top:1px solid var(--border);
+  background:var(--bg2);
+}
+.demo-input{
+  flex:1;background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--radius);padding:0.55rem 1rem;
+  font-family:var(--sans);font-size:0.82rem;color:var(--text);
+  outline:none;
+  transition:border-color 0.2s;
+}
+.demo-input:focus{border-color:var(--border2)}
+.demo-send{
+  width:32px;height:32px;border-radius:var(--radius);
+  background:var(--cyan);border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:opacity 0.2s;
+}
+.demo-send:hover{opacity:0.85}
+.demo-send svg{width:14px;height:14px;fill:#080C14}
+.demo-model-tag{
+  font-family:var(--mono);font-size:0.65rem;color:var(--muted);
+  white-space:nowrap;
+}
+
+/* ── PRIVACY / TRUST ── */
+.trust-section{background:var(--bg1)}
+.trust-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:1rem;margin-top:3rem;
+}
+.trust-card{
+  border:1px solid var(--border);border-radius:var(--radius);
+  padding:1.5rem;text-align:center;background:var(--bg2);
+  transition:border-color 0.2s,transform 0.2s;
+}
+.trust-card:hover{border-color:var(--border2);transform:translateY(-2px)}
+.trust-icon{font-size:1.8rem;margin-bottom:0.75rem}
+.trust-title{font-size:0.9rem;font-weight:600;margin-bottom:0.4rem}
+.trust-desc{font-size:0.8rem;color:var(--muted2)}
+
+/* ── STACK / RELEASE ── */
+.release-section{background:var(--bg)}
+.release-banner{
+  border:1px solid var(--border2);border-radius:var(--radius);
+  padding:2rem 2.5rem;background:var(--bg1);
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:1.5rem;margin-top:2.5rem;
+}
+.release-info{}
+.release-tag{
+  font-family:var(--mono);font-size:0.7rem;
+  color:var(--cyan);letter-spacing:0.1em;text-transform:uppercase;
+  margin-bottom:0.4rem;
+}
+.release-name{
+  font-size:1.4rem;font-weight:700;letter-spacing:-0.02em;
+}
+.release-meta{
+  margin-top:0.3rem;font-family:var(--mono);
+  font-size:0.72rem;color:var(--muted);
+}
+.release-actions{display:flex;gap:0.75rem;flex-wrap:wrap}
+
+/* ── CONTRIBUTE ── */
+.contribute-section{background:var(--bg1)}
+.contribute-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;
+  margin-top:3rem;
+}
+@media(max-width:640px){.contribute-grid{grid-template-columns:1fr}}
+.contribute-card{
+  border:1px solid var(--border);border-radius:var(--radius);
+  padding:1.75rem;background:var(--bg2);
+  transition:border-color 0.2s;
+}
+.contribute-card:hover{border-color:var(--border2)}
+.contribute-number{
+  font-family:var(--mono);font-size:0.7rem;
+  color:var(--cyan);letter-spacing:0.1em;margin-bottom:0.75rem;
+}
+.contribute-title{font-size:1rem;font-weight:600;margin-bottom:0.5rem}
+.contribute-desc{font-size:0.85rem;color:var(--muted2);line-height:1.65}
+.commit-format{
+  margin-top:1rem;padding:0.75rem 1rem;
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--radius);
+  font-family:var(--mono);font-size:0.72rem;color:var(--muted2);line-height:1.7;
+}
+.commit-format .kw{color:var(--cyan)}
+
+/* ── FOOTER ── */
+footer{
+  border-top:1px solid var(--border);
+  padding:2.5rem 5vw;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:1rem;
+}
+.footer-left{
+  font-family:var(--mono);font-size:0.75rem;color:var(--muted);
+}
+.footer-left a{color:var(--muted2);text-decoration:none;transition:color 0.2s}
+.footer-left a:hover{color:var(--cyan)}
+.footer-right{display:flex;gap:1.5rem}
+.footer-right a{
+  font-family:var(--mono);font-size:0.72rem;
+  color:var(--muted);text-decoration:none;transition:color 0.2s;
+}
+.footer-right a:hover{color:var(--text)}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+@keyframes fadeLeft{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:translateX(0)}}
+
+/* ── OBSERVE ANIMATIONS ── */
+.fade-up{opacity:0;transform:translateY(20px);transition:opacity 0.55s ease,transform 0.55s ease}
+.fade-up.visible{opacity:1;transform:translateY(0)}
+
+/* ── MOBILE ── */
+@media(max-width:480px){
+  .hero-stats{gap:1.5rem}
+  .hero-actions{flex-direction:column}
+  .btn-primary,.btn-secondary{text-align:center;justify-content:center}
+  .release-banner{flex-direction:column}
+  footer{flex-direction:column;gap:0.75rem}
+}
   </style>
 </head>
 <body>
 
 <!-- NAV -->
 <nav>
-  <a class="nav-logo" href="#">mias</a>
-  <ul class="nav-links">
-    <li><a href="#why">Why</a></li>
-    <li><a href="#models">Models</a></li>
-    <li><a href="#setup">Setup</a></li>
-    <li><a href="#privacy">Privacy</a></li>
-  </ul>
-  <a class="nav-cta" href="https://github.com/nikhlgoel/mias" target="_blank">GitHub →</a>
+  <a class="nav-logo" href="#">
+    <div class="nav-logo-orb"></div>
+    Mias
+  </a>
+  <div class="nav-links nav-mobile-hide">
+    <a href="#architecture">Architecture</a>
+    <a href="#demo">Demo</a>
+    <a href="#contribute">Contribute</a>
+  </div>
+  <div class="nav-links">
+    <a href="https://github.com/nikhlgoel/Mias" target="_blank" class="btn-nav">GitHub ↗</a>
+  </div>
 </nav>
 
 <!-- HERO -->
 <section class="hero">
-  <div class="hero-glow"></div>
-
-  <p class="hero-tag">Open Source · Android · 100% Local</p>
-  <h1>AI on your phone.<br/><em>No internet.</em><br/>No cloud.</h1>
-  <p class="hero-sub">
-    Mias runs AI models directly on your Android device. 
-    Ask questions, write code, get help — even when you're offline. 
-    Built for students who live on their phone.
-  </p>
-  <div class="hero-actions">
-    <a class="btn-primary" href="https://github.com/nikhlgoel/mias" target="_blank">
-      ↓ Get Mias
-    </a>
-    <a class="btn-secondary" href="#setup">
-      → Setup Guide
-    </a>
+  <div class="hero-glow-bg"></div>
+  <div class="hero-glow-bg2"></div>
+  <div class="hero-text">
+    <div class="hero-tag">Release #001 · Open Source</div>
+    <h1>AI that runs<br><span class="accent">on your phone.</span><br>Not in the cloud.</h1>
+    <p class="hero-desc">Mias is a local AI assistant for Android. No internet required. No data sent anywhere. Your conversations stay on your device — always.</p>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <span class="stat-val" id="stat-modules">12</span>
+        <span class="stat-label">Modules</span>
+      </div>
+      <div class="hero-stat">
+        <span class="stat-val" id="stat-stars">—</span>
+        <span class="stat-label">Stars</span>
+      </div>
+      <div class="hero-stat">
+        <span class="stat-val">0</span>
+        <span class="stat-label">Cloud deps</span>
+      </div>
+    </div>
+    <div class="hero-actions">
+      <a class="btn-primary" href="https://github.com/nikhlgoel/Mias/releases" target="_blank">
+        ↓ Download APK
+      </a>
+      <a class="btn-secondary" href="https://github.com/nikhlgoel/Mias" target="_blank">
+        View Source
+      </a>
+    </div>
   </div>
-
-  <!-- terminal visual -->
-  <div class="hero-terminal">
-    <div class="term-bar">
-      <div class="term-dot"></div>
-      <div class="term-dot"></div>
-      <div class="term-dot"></div>
-      <span class="term-title">mias — terminal</span>
-    </div>
-    <div class="term-body">
-      <div><span class="term-prompt">$ </span><span class="term-cmd">./gradlew assembleDebug</span></div>
-      <div class="term-out">Building 221 files...</div>
-      <div class="term-out">Running 87 unit tests...</div>
-      <div><span class="term-ok">✓ BUILD SUCCESSFUL</span></div>
-      <br/>
-      <div><span class="term-prompt">$ </span><span class="term-cmd">adb install app-debug.apk</span></div>
-      <div><span class="term-ok">✓ Installed on device</span></div>
-      <br/>
-      <div><span class="term-prompt">$ </span><span class="term-cmd">curl localhost:8400/health</span></div>
-      <div class="term-out">{"status":"ready","device":"cuda"}</div>
-      <br/>
-      <div><span class="term-prompt">$ </span><span class="term-cursor"></span></div>
-    </div>
+  <div class="hero-visual">
+    <canvas id="orbCanvas" width="420" height="420"></canvas>
   </div>
 </section>
 
-<!-- STATS -->
-<div class="stats reveal">
-  <div class="stat">
-    <div class="stat-num">0</div>
-    <div class="stat-label">Cloud APIs used</div>
-  </div>
-  <div class="stat">
-    <div class="stat-num">100+</div>
-    <div class="stat-label">Models available</div>
-  </div>
-  <div class="stat">
-    <div class="stat-num">14k+</div>
-    <div class="stat-label">Lines of code</div>
-  </div>
-  <div class="stat">
-    <div class="stat-num">87</div>
-    <div class="stat-label">Unit tests</div>
+<!-- TICKER -->
+<div class="ticker-bar">
+  <div class="ticker-inner" id="tickerInner">
+    <span class="ticker-item">On-device inference <span>llama.cpp</span></span>
+    <span class="ticker-item">Package <span>io.mias.app</span></span>
+    <span class="ticker-item">SQLCipher encrypted storage <span>✓</span></span>
+    <span class="ticker-item">Biometric gate <span>✓</span></span>
+    <span class="ticker-item">Desktop mesh offload <span>Tailscale</span></span>
+    <span class="ticker-item">Thermal governor <span>TawsGovernor</span></span>
+    <span class="ticker-item">Long-term memory <span>HindsightMemory</span></span>
+    <span class="ticker-item">ReAct agent loop <span>✓</span></span>
+    <span class="ticker-item">Release <span>#001</span></span>
+    <span class="ticker-item">Zero telemetry <span>✓</span></span>
+    <span class="ticker-item">On-device inference <span>llama.cpp</span></span>
+    <span class="ticker-item">Package <span>io.mias.app</span></span>
+    <span class="ticker-item">SQLCipher encrypted storage <span>✓</span></span>
+    <span class="ticker-item">Biometric gate <span>✓</span></span>
+    <span class="ticker-item">Desktop mesh offload <span>Tailscale</span></span>
+    <span class="ticker-item">Thermal governor <span>TawsGovernor</span></span>
+    <span class="ticker-item">Long-term memory <span>HindsightMemory</span></span>
+    <span class="ticker-item">ReAct agent loop <span>✓</span></span>
   </div>
 </div>
 
-<!-- WHY MIAS -->
-<section class="why" id="why">
-  <p class="section-tag reveal">Why Mias</p>
-  <h2 class="reveal">Your AI. Your hardware.<br/>Your data.</h2>
-  <p class="section-sub reveal">No subscription. No login. No data leaving your phone.</p>
-
-  <div class="why-grid reveal">
-    <div class="why-card">
-      <div class="why-icon">📵</div>
-      <h3>Works fully offline</h3>
-      <p>In the library, on the bus, in a dead zone — Mias keeps working. Your assistant isn't tied to Wi-Fi or mobile data.</p>
+<!-- FEATURES -->
+<section class="section" id="features">
+  <div class="section-label">What it does</div>
+  <h2 class="section-title fade-up">Built to actually work,<br><span class="accent">not to impress a demo.</span></h2>
+  <p class="section-sub fade-up">Every feature is either working or marked clearly as planned. No vaporware.</p>
+  <div class="features-grid fade-up">
+    <div class="feature-card">
+      <div class="feature-icon">🧠</div>
+      <div class="feature-title">On-Device Inference</div>
+      <div class="feature-desc">LlamaCpp JNI bridge runs quantized models directly on your phone's CPU. No API calls. No connectivity needed. Works on the subway.</div>
+      <span class="feature-tag">llama.cpp · JNI · C++</span>
     </div>
-    <div class="why-card">
-      <div class="why-icon">🔒</div>
-      <h3>Nothing leaves your phone</h3>
-      <p>Every conversation is encrypted locally. No OpenAI, no Anthropic, no Firebase. Zero cloud calls — ever.</p>
+    <div class="feature-card">
+      <div class="feature-icon">🔒</div>
+      <div class="feature-title">Encrypted Storage</div>
+      <div class="feature-desc">All conversations stored in SQLCipher-encrypted database. Biometric gate on app open. Your data is not readable without your fingerprint.</div>
+      <span class="feature-tag">SQLCipher · BiometricGate</span>
     </div>
-    <div class="why-card">
-      <div class="why-icon">🧠</div>
-      <h3>Picks the right model</h3>
-      <p>Simple question? Runs a 1 GB model to save battery. Complex code? Offloads to your PC's GPU over Wi-Fi.</p>
+    <div class="feature-card">
+      <div class="feature-icon">🌡</div>
+      <div class="feature-title">Thermal Awareness</div>
+      <div class="feature-desc">TawsGovernor monitors device temperature and automatically steps down model tier when the phone gets hot. Your battery thanks you.</div>
+      <span class="feature-tag">ThermalMonitor · TawsGovernor</span>
     </div>
-    <div class="why-card">
-      <div class="why-icon">♻️</div>
-      <h3>Remembers you</h3>
-      <p>Mias builds a local memory from your conversations — topics you care about, how you like to be answered.</p>
+    <div class="feature-card">
+      <div class="feature-icon">🔗</div>
+      <div class="feature-title">Desktop Offload</div>
+      <div class="feature-desc">Tailscale mesh networking lets your phone offload heavy inference to your PC over your local network. Control your PC from your phone, see results on mobile.</div>
+      <span class="feature-tag">Tailscale · MCP · Python server</span>
     </div>
-    <div class="why-card">
-      <div class="why-icon">🌡️</div>
-      <h3>Thermal awareness</h3>
-      <p>Phone getting hot? Mias automatically drops to a lighter model. Stays fast without cooking your battery.</p>
+    <div class="feature-card">
+      <div class="feature-icon">🤖</div>
+      <div class="feature-title">ReAct Agent</div>
+      <div class="feature-desc">Thought → Action → Observation loop. Agent capabilities include app launching, web research, file system access, clipboard, datetime, and calculator.</div>
+      <span class="feature-tag">ReActEngine · ToolRegistry</span>
     </div>
-    <div class="why-card">
-      <div class="why-icon">🛠️</div>
-      <h3>Actually does things</h3>
-      <p>Read files, search the web, set reminders, open apps. Not just a chatbox — it can act on your device.</p>
+    <div class="feature-card">
+      <div class="feature-icon">💾</div>
+      <div class="feature-title">Long-Term Memory</div>
+      <div class="feature-desc">HindsightMemory compresses conversations into long-term context. Mias remembers what you've told it across sessions — without sending it to a server.</div>
+      <span class="feature-tag">HindsightMemory · EmbeddingEngine</span>
     </div>
-  </div>
-</section>
-
-<!-- HOW IT WORKS -->
-<section id="how">
-  <p class="section-tag reveal">How it works</p>
-  <h2 class="reveal">Three things happening<br/>at once, on your phone.</h2>
-
-  <div class="steps reveal">
-    <div class="step">
-      <div class="step-num">01</div>
-      <h3>You send a message</h3>
-      <p>Mias reads your intent and routes it to the best available model — on-device or your desktop if connected.</p>
+    <div class="feature-card">
+      <div class="feature-icon">🎙</div>
+      <div class="feature-title">Voice + STT/TTS</div>
+      <div class="feature-desc">Speech-to-text and text-to-speech engines built in. Voice is the primary interaction mode — the chat screen is secondary.</div>
+      <span class="feature-tag">SpeechEngine · TtsEngine</span>
     </div>
-    <div class="step">
-      <div class="step-num">02</div>
-      <h3>Model runs locally</h3>
-      <p>ONNX Runtime or llama.cpp processes your query on-device (NPU/CPU) or on your PC's GPU via Tailscale.</p>
+    <div class="feature-card">
+      <div class="feature-icon">🔄</div>
+      <div class="feature-title">Self-Evolution</div>
+      <div class="feature-desc">Background WorkManager job runs every 6 hours to consolidate conversation knowledge, update personality parameters, and optimize for your usage patterns.</div>
+      <span class="feature-tag">EvolutionWorker · KnowledgeConsolidator</span>
     </div>
-    <div class="step">
-      <div class="step-num">03</div>
-      <h3>Answer + action</h3>
-      <p>Response streams back in real-time. If a tool was needed — file read, web fetch — you see what ran and why.</p>
-    </div>
-    <div class="step">
-      <div class="step-num">04</div>
-      <h3>Memory updates</h3>
-      <p>Key points are compressed into long-term memory every few hours. Your next session is already smarter.</p>
+    <div class="feature-card">
+      <div class="feature-icon">📡</div>
+      <div class="feature-title">Model Hub</div>
+      <div class="feature-desc">Browse and download models directly from HuggingFace. The InferenceOrchestrator routes queries to the right model based on task type and device state.</div>
+      <span class="feature-tag">HuggingFaceRegistry · ModelManager</span>
     </div>
   </div>
 </section>
 
-<!-- MODELS -->
-<section class="models" id="models">
-  <p class="section-tag reveal">Models</p>
-  <h2 class="reveal">Start small.<br/>Scale up when you need it.</h2>
-  <p class="section-sub reveal">All models are downloaded directly from HuggingFace. You pick what to install.</p>
-
-  <table class="model-table reveal">
-    <thead>
-      <tr>
-        <th>Model</th>
-        <th>Size</th>
-        <th>Runs on</th>
-        <th>Hardware</th>
-        <th>Best for</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="model-name">MobileLLM-R1.5</span></td>
-        <td>1.1 GB</td>
-        <td><span class="badge badge-phone">Phone</span></td>
-        <td><span class="badge badge-cpu">CPU</span></td>
-        <td>Quick questions, always-on, low battery use</td>
-      </tr>
-      <tr>
-        <td><span class="model-name">Gemma-4 INT4</span></td>
-        <td>3.2 GB</td>
-        <td><span class="badge badge-phone">Phone</span></td>
-        <td><span class="badge badge-npu">NPU</span></td>
-        <td>General chat, faster responses, daily use</td>
-      </tr>
-      <tr>
-        <td><span class="model-name">Qwen3-Coder-Next Q4_K_M</span></td>
-        <td>18.5 GB</td>
-        <td><span class="badge badge-pc">Desktop</span></td>
-        <td><span class="badge badge-npu">GPU</span></td>
-        <td>Code, research, complex reasoning tasks</td>
-      </tr>
-    </tbody>
-  </table>
-</section>
-
-<!-- SETUP -->
-<section id="setup">
-  <p class="section-tag reveal">Setup</p>
-  <h2 class="reveal">Running in under<br/>30 minutes.</h2>
-
-  <div class="setup-grid reveal">
-    <div class="setup-block">
-      <h3>1 — Build & install the app</h3>
-      <pre><span class="c-comment"># Clone the repo</span>
-<span class="c-cmd">git clone https://github.com/nikhlgoel/mias.git</span>
-<span class="c-cmd">cd mias</span>
-
-<span class="c-comment"># Build (first time ~5 min)</span>
-<span class="c-cmd">./gradlew assembleDebug</span>
-
-<span class="c-comment"># Install on phone (USB debugging on)</span>
-<span class="c-cmd">adb install -r app/build/outputs/apk/debug/app-debug.apk</span>
-
-<span class="c-out"># Done. Launch the app, register biometric,</span>
-<span class="c-out"># go to Brain Market and download a model.</span></pre>
+<!-- ARCHITECTURE -->
+<section class="section arch-section" id="architecture">
+  <div class="section-label">Architecture</div>
+  <h2 class="section-title fade-up">12 modules.<br><span class="accent">Clean separation.</span></h2>
+  <p class="section-sub fade-up">Multi-module Gradle with Hilt DI. Each module owns its domain. Nothing bleeds between layers.</p>
+  <div class="arch-grid">
+    <div class="fade-up">
+      <div style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.75rem">Module status</div>
+      <div class="module-list">
+        <div class="module-item"><div class="module-dot" style="background:#00FF64"></div><span class="module-name">core/inference</span><span class="module-status status-done">Working</span></div>
+        <div class="module-item"><div class="module-dot" style="background:#00FF64"></div><span class="module-name">core/data</span><span class="module-status status-done">Working</span></div>
+        <div class="module-item"><div class="module-dot" style="background:#00FF64"></div><span class="module-name">core/agent</span><span class="module-status status-done">Working</span></div>
+        <div class="module-item"><div class="module-dot" style="background:#00FF64"></div><span class="module-name">core/security</span><span class="module-status status-done">Working</span></div>
+        <div class="module-item"><div class="module-dot" style="background:#00FF64"></div><span class="module-name">core/thermal</span><span class="module-status status-done">Working</span></div>
+        <div class="module-item"><div class="module-dot" style="background:#00FF64"></div><span class="module-name">core/evolution</span><span class="module-status status-done">Working</span></div>
+        <div class="module-item"><div class="module-dot" style="background:#FFB400"></div><span class="module-name">core/speech</span><span class="module-status status-partial">UI missing</span></div>
+        <div class="module-item"><div class="module-dot" style="background:#FFB400"></div><span class="module-name">core/network (MCP)</span><span class="module-status status-partial">Partial spec</span></div>
+        <div class="module-item"><div class="module-dot" style="background:#FFB400"></div><span class="module-name">core/language</span><span class="module-status status-partial">Regex only</span></div>
+        <div class="module-item"><div class="module-dot" style="background:#64748B"></div><span class="module-name">NPU execution</span><span class="module-status status-planned">Planned</span></div>
+        <div class="module-item"><div class="module-dot" style="background:#64748B"></div><span class="module-name">iOS port (Swift)</span><span class="module-status status-planned">Planned</span></div>
+        <div class="module-item"><div class="module-dot" style="background:#64748B"></div><span class="module-name">Rust desktop server</span><span class="module-status status-planned">Planned</span></div>
+      </div>
     </div>
-
-    <div class="setup-block">
-      <h3>2 — Desktop offload (optional)</h3>
-      <pre><span class="c-comment"># Build the server container</span>
-<span class="c-cmd">cd desktop</span>
-<span class="c-cmd">docker build -t mias-desktop:latest .</span>
-
-<span class="c-comment"># Download Qwen3 model (~18 GB, one-time)</span>
-<span class="c-cmd">pip install huggingface-hub</span>
-<span class="c-cmd">huggingface-cli download Qwen/Qwen3-Coder-Next-GGUF \</span>
-<span class="c-cmd">  Qwen3-Coder-Next-32B-Q4_K_M.gguf</span>
-
-<span class="c-comment"># Run the server</span>
-<span class="c-cmd">docker run --gpus all -p 8400:8400 mias-desktop:latest</span>
-
-<span class="c-comment"># Verify</span>
-<span class="c-cmd">curl localhost:8400/health</span>
-<span class="c-out">→ {"status":"ready","device":"cuda"}</span></pre>
-    </div>
-
-    <div class="setup-block">
-      <h3>3 — Connect phone ↔ desktop</h3>
-      <pre><span class="c-comment"># Install Tailscale on both devices</span>
-<span class="c-out"># Android: Play Store → Tailscale</span>
-<span class="c-comment"># Desktop:</span>
-<span class="c-cmd">tailscale up --accept-routes</span>
-<span class="c-cmd">tailscale status</span>
-<span class="c-out"># Copy your desktop IP from output</span>
-
-<span class="c-comment"># In the app:</span>
-<span class="c-out"># Settings → Networking → enter IP → Test</span>
-<span class="c-out"># You'll see ✓ Connected</span></pre>
-    </div>
-
-    <div class="setup-block">
-      <h3>Prerequisites</h3>
-      <pre><span class="c-comment"># For the Android app:</span>
-<span class="c-out">Java 21+</span>
-<span class="c-out">Android Studio + SDK 35</span>
-<span class="c-out">USB debugging enabled</span>
-<span class="c-out">4 GB RAM phone minimum</span>
-
-<span class="c-comment"># For desktop offload (optional):</span>
-<span class="c-out">Docker</span>
-<span class="c-out">Python 3.11+</span>
-<span class="c-out">CUDA 12.0+ GPU (or CPU, slower)</span>
-<span class="c-out">~20 GB free disk space</span></pre>
+    <div class="fade-up">
+      <div style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.75rem">Language stack</div>
+      <div class="lang-stack">
+        <div class="lang-item">
+          <div class="lang-header"><span class="lang-name" style="color:#7C3AED">Kotlin</span><span class="lang-badge">Current</span></div>
+          <div class="lang-use">Android UI (Compose), ViewModels, all 12 core modules</div>
+        </div>
+        <div class="lang-item">
+          <div class="lang-header"><span class="lang-name" style="color:#0EA5E9">C++</span><span class="lang-badge">Current</span></div>
+          <div class="lang-use">JNI inference bridge, llama.cpp integration, future SIMD kernels</div>
+        </div>
+        <div class="lang-item">
+          <div class="lang-header"><span class="lang-name" style="color:#F97316">Python</span><span class="lang-badge">Current</span></div>
+          <div class="lang-use">Desktop server prototype, model scripts, MCP bridge</div>
+        </div>
+        <div class="lang-item">
+          <div class="lang-header"><span class="lang-name" style="color:#CE4A2E">Rust</span><span class="lang-badge">Planned</span></div>
+          <div class="lang-use">Production desktop inference server — replaces Python for performance + safety</div>
+        </div>
+        <div class="lang-item">
+          <div class="lang-header"><span class="lang-name" style="color:#00ACD7">Go</span><span class="lang-badge">Planned</span></div>
+          <div class="lang-use">MCP bridge server — spec-compliant, concurrent, single binary</div>
+        </div>
+        <div class="lang-item">
+          <div class="lang-header"><span class="lang-name" style="color:#A855F7">ARM64 Assembly</span><span class="lang-badge">Planned</span></div>
+          <div class="lang-use">NEON SIMD matrix ops in inference hot path — measurable throughput gain</div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- PRIVACY -->
-<section class="privacy" id="privacy">
-  <p class="section-tag reveal">Privacy</p>
-  <h2 class="reveal">Hard guarantees.<br/>Not a privacy policy.</h2>
-
-  <div class="privacy-split reveal">
-    <div>
-      <p style="color:var(--muted); margin-bottom:1.5rem; font-size:0.9rem;">What Mias will never do:</p>
-      <ul class="privacy-list">
-        <li><span class="icon">✕</span> Call any cloud AI API (OpenAI, Anthropic, Gemini, etc.)</li>
-        <li><span class="icon">✕</span> Send your conversations anywhere</li>
-        <li><span class="icon">✕</span> Use Firebase, analytics, or crash reporting</li>
-        <li><span class="icon">✕</span> Back up your data automatically</li>
-        <li><span class="icon">✕</span> Require an account or login</li>
-        <li><span class="icon">✕</span> Track usage or collect any telemetry</li>
-      </ul>
+<!-- CHAT DEMO -->
+<section class="section demo-section" id="demo">
+  <div class="section-label">How it feels</div>
+  <h2 class="section-title fade-up">Chat, agent, voice.<br><span class="accent">All on-device.</span></h2>
+  <p class="section-sub fade-up">The model is running locally. The response you see is generated on the phone — not fetched from a server.</p>
+  <div class="demo-frame fade-up">
+    <div class="demo-topbar">
+      <div class="demo-dot"></div><div class="demo-dot"></div><div class="demo-dot"></div>
+      <span class="demo-bar-title">Mias · Chat</span>
+      <div class="demo-status-pill"><div class="demo-status-dot"></div>On-device</div>
     </div>
-    <div>
-      <p style="color:var(--muted); margin-bottom:1.5rem; font-size:0.9rem;">What Mias enforces by design:</p>
-      <ul class="privacy-list">
-        <li><span class="icon" style="color:var(--amber)">✓</span> All inference runs on-device or LAN only</li>
-        <li><span class="icon" style="color:var(--amber)">✓</span> AES-256-GCM + SQLCipher encryption at rest</li>
-        <li><span class="icon" style="color:var(--amber)">✓</span> Biometric gate before every app session</li>
-        <li><span class="icon" style="color:var(--amber)">✓</span> Android backup blocked at manifest level</li>
-        <li><span class="icon" style="color:var(--amber)">✓</span> Desktop traffic over WireGuard (Tailscale)</li>
-        <li><span class="icon" style="color:var(--amber)">✓</span> Codebase audited — zero hidden network calls</li>
-      </ul>
+    <div class="demo-body" id="demoBody">
+      <div class="msg msg-mias" id="msg1">
+        <div class="msg-avatar">M</div>
+        <div class="msg-bubble">Hey. What do you need?</div>
+      </div>
+    </div>
+    <div class="demo-input-bar">
+      <span class="demo-model-tag">Gemma-3n · Q4_K_M</span>
+      <input class="demo-input" id="demoInput" type="text" placeholder="Type a message..." autocomplete="off"/>
+      <button class="demo-send" id="demoSendBtn" onclick="demoSend()">
+        <svg viewBox="0 0 16 16"><path d="M14 8L2 2l2 6-2 6z"/></svg>
+      </button>
     </div>
   </div>
 </section>
 
-<!-- CTA -->
-<section class="cta">
-  <div class="cta-glow"></div>
-  <p class="section-tag reveal">Open Source</p>
-  <h2 class="reveal">Build it yourself.<br/>Own it completely.</h2>
-  <p class="reveal">MIT-adjacent stack. Full source on GitHub. No black boxes.</p>
-  <div class="hero-actions" style="justify-content:center;" class="reveal">
-    <a class="btn-primary" href="https://github.com/nikhlgoel/mias" target="_blank">
-      View on GitHub →
-    </a>
-    <a class="btn-secondary" href="https://github.com/nikhlgoel/mias/issues" target="_blank">
-      Report an issue
-    </a>
+<!-- TRUST -->
+<section class="section trust-section">
+  <div class="section-label">Privacy</div>
+  <h2 class="section-title fade-up">Your data is <span class="accent">not our business.</span></h2>
+  <div class="trust-grid fade-up">
+    <div class="trust-card">
+      <div class="trust-icon">📵</div>
+      <div class="trust-title">No internet required</div>
+      <div class="trust-desc">Core functionality works fully offline. The model runs locally.</div>
+    </div>
+    <div class="trust-card">
+      <div class="trust-icon">🔐</div>
+      <div class="trust-title">Encrypted at rest</div>
+      <div class="trust-desc">SQLCipher AES-256 on all stored conversations and memory.</div>
+    </div>
+    <div class="trust-card">
+      <div class="trust-icon">🚫</div>
+      <div class="trust-title">Zero telemetry</div>
+      <div class="trust-desc">No analytics. No crash reporters. No usage data collection.</div>
+    </div>
+    <div class="trust-card">
+      <div class="trust-icon">👁</div>
+      <div class="trust-title">Open source</div>
+      <div class="trust-desc">Read the code. Verify the claims. Fork it. Everything is public.</div>
+    </div>
   </div>
 </section>
 
+<!-- RELEASE -->
+<section class="section release-section">
+  <div class="section-label">Download</div>
+  <h2 class="section-title fade-up">APK direct from GitHub.<br><span class="accent">No Play Store.</span></h2>
+  <div class="release-banner fade-up">
+    <div class="release-info">
+      <div class="release-tag">Release #001</div>
+      <div class="release-name">Mias for Android</div>
+      <div class="release-meta">Android 10+ · API 29+ · ARM64 · ~45MB</div>
+    </div>
+    <div class="release-actions">
+      <a class="btn-primary" href="https://github.com/nikhlgoel/Mias/releases" target="_blank">↓ Download APK</a>
+      <a class="btn-secondary" href="https://github.com/nikhlgoel/Mias/blob/main/QUICK_START.md" target="_blank">Build from source</a>
+    </div>
+  </div>
+</section>
+
+<!-- CONTRIBUTE -->
+<section class="section contribute-section" id="contribute">
+  <div class="section-label">Contributing</div>
+  <h2 class="section-title fade-up">Two types of<br><span class="accent">valid contributions.</span></h2>
+  <p class="section-sub fade-up">Contributions need to be focused. Read the full CONTRIBUTING.md before opening a PR.</p>
+  <div class="contribute-grid fade-up">
+    <div class="contribute-card">
+      <div class="contribute-number">01 / BUG FIX</div>
+      <div class="contribute-title">Fix something broken</div>
+      <div class="contribute-desc">Found a bug? Reproduce it, fix it, commit it. One commit per bug with a clear message describing what broke and what you changed.</div>
+      <div class="commit-format">
+        <span class="kw">fix:</span> ReActEngine infinite loop on unknown tool<br>— added ToolRegistry validation guard
+      </div>
+    </div>
+    <div class="contribute-card">
+      <div class="contribute-number">02 / FEATURE IMPROVEMENT</div>
+      <div class="contribute-title">Make one thing better</div>
+      <div class="contribute-desc">Pick a single feature and improve it meaningfully. Open an issue first. One PR per feature area. No half-finished work.</div>
+      <div class="commit-format">
+        <span class="kw">improvement:</span> VoiceChatScreen — added<br>tap-to-toggle vs hold-to-speak mode selection
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
 <footer>
-  <span>mias · built by <a href="https://github.com/nikhlgoel" style="color:var(--amber);text-decoration:none;">nikhlgoel</a></span>
-  <span>v4.0.0-beta · April 2026</span>
+  <div class="footer-left">
+    Mias · <a href="https://github.com/nikhlgoel/Mias" target="_blank">github.com/nikhlgoel/Mias</a> · 
+    <a href="https://github.com/nikhlgoel/Mias/blob/main/LICENSE" target="_blank">License</a> · 
+    <a href="https://github.com/nikhlgoel/Mias/blob/main/CONTRIBUTING.md" target="_blank">Contributing</a>
+  </div>
+  <div class="footer-right">
+    <a href="https://github.com/nikhlgoel/Mias/blob/main/docs/LANGUAGE_ARCHITECTURE.md" target="_blank">Architecture</a>
+    <a href="https://github.com/nikhlgoel/Mias/blob/main/docs/PROGRESS.md" target="_blank">Progress</a>
+    <a href="https://github.com/nikhlgoel/Mias/releases" target="_blank">Releases</a>
+  </div>
 </footer>
 
 <script>
-  // scroll reveal
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(e => {
-      if (e.isIntersecting) {
-        e.target.classList.add('visible');
-        observer.unobserve(e.target);
-      }
-    });
-  }, { threshold: 0.12 });
+/* ══ Neural Orb Canvas ══ */
+(function(){
+  const canvas = document.getElementById('orbCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = 420, H = 420, cx = W/2, cy = H/2;
+  let t = 0;
 
-  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+  function drawOrb(ts){
+    t = ts * 0.001;
+    ctx.clearRect(0,0,W,H);
+
+    // Outer glow rings
+    for(let i=3;i>0;i--){
+      ctx.beginPath();
+      ctx.arc(cx,cy,140+(i*18)+Math.sin(t*0.5)*4,0,Math.PI*2);
+      ctx.strokeStyle = `rgba(0,255,255,${0.03*i})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // Animated secondary rings
+    const r1 = 110 + Math.sin(t*0.8)*6;
+    ctx.beginPath();
+    ctx.arc(cx,cy,r1,0,Math.PI*2);
+    ctx.strokeStyle = 'rgba(0,255,255,0.12)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Iris ring
+    const irisR = 80;
+    ctx.beginPath();
+    ctx.arc(cx,cy,irisR,0,Math.PI*2);
+    ctx.strokeStyle = 'rgba(0,255,255,0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Hex spokes (6 lines, slowly rotating)
+    ctx.save();
+    ctx.translate(cx,cy);
+    ctx.rotate(t*0.15);
+    for(let i=0;i<6;i++){
+      const angle = (i/6)*Math.PI*2;
+      const x2 = Math.cos(angle)*irisR;
+      const y2 = Math.sin(angle)*irisR;
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.lineTo(x2,y2);
+      ctx.strokeStyle = 'rgba(0,255,255,0.18)';
+      ctx.lineWidth = 0.7;
+      ctx.stroke();
+
+      // Ring-to-ring hex connectors
+      const nx = Math.cos(angle+(Math.PI/6))*irisR;
+      const ny = Math.sin(angle+(Math.PI/6))*irisR;
+      ctx.beginPath();
+      ctx.moveTo(x2,y2);
+      ctx.lineTo(nx,ny);
+      ctx.strokeStyle = 'rgba(0,255,255,0.1)';
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Pupil gradient
+    const pupilGrad = ctx.createRadialGradient(cx,cy,0,cx,cy,36);
+    pupilGrad.addColorStop(0,'rgba(0,200,200,0.9)');
+    pupilGrad.addColorStop(0.5,'rgba(0,120,140,0.7)');
+    pupilGrad.addColorStop(1,'rgba(0,60,80,0.4)');
+    ctx.beginPath();
+    ctx.arc(cx,cy,36,0,Math.PI*2);
+    ctx.fillStyle = pupilGrad;
+    ctx.fill();
+
+    // Inner dark
+    ctx.beginPath();
+    ctx.arc(cx,cy,22,0,Math.PI*2);
+    ctx.fillStyle = 'rgba(8,12,20,0.88)';
+    ctx.fill();
+
+    // Center dot + glow
+    const dotGlow = ctx.createRadialGradient(cx,cy,0,cx,cy,10);
+    dotGlow.addColorStop(0,'rgba(0,255,255,0.9)');
+    dotGlow.addColorStop(1,'rgba(0,255,255,0)');
+    ctx.beginPath();
+    ctx.arc(cx,cy,10,0,Math.PI*2);
+    ctx.fillStyle = dotGlow;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx,cy,3.5,0,Math.PI*2);
+    ctx.fillStyle = '#00FFFF';
+    ctx.fill();
+
+    // Orbit particle
+    const px = cx + Math.cos(t*1.2)*100;
+    const py = cy + Math.sin(t*1.2)*100;
+    ctx.beginPath();
+    ctx.arc(px,py,2.5,0,Math.PI*2);
+    ctx.fillStyle = 'rgba(0,255,255,0.7)';
+    ctx.fill();
+
+    // Second orbit particle (counter)
+    const px2 = cx + Math.cos(-t*0.7+Math.PI)*85;
+    const py2 = cy + Math.sin(-t*0.7+Math.PI)*85;
+    ctx.beginPath();
+    ctx.arc(px2,py2,1.5,0,Math.PI*2);
+    ctx.fillStyle = 'rgba(0,200,255,0.4)';
+    ctx.fill();
+
+    requestAnimationFrame(drawOrb);
+  }
+  requestAnimationFrame(drawOrb);
+})();
+
+/* ══ GitHub Stats ══ */
+fetch('https://api.github.com/repos/nikhlgoel/Mias')
+  .then(r=>r.json())
+  .then(d=>{
+    const el = document.getElementById('stat-stars');
+    if(el && d.stargazers_count !== undefined) el.textContent = d.stargazers_count;
+  }).catch(()=>{});
+
+/* ══ Scroll Animations ══ */
+const observer = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting) e.target.classList.add('visible');
+  });
+},{threshold:0.12});
+document.querySelectorAll('.fade-up').forEach(el=>observer.observe(el));
+
+/* ══ Chat Demo ══ */
+const demoReplies = [
+  {user:"what can you do?", mias:"I can chat, run agentic tasks, search the web, open apps, read files, do math — all on-device. No internet needed for any of it."},
+  {user:"are you sending my data anywhere?", mias:"No. I'm running on your phone. The model lives here. Nothing leaves the device — that's the whole point."},
+  {user:"can you write code?", mias:"Yes. Give me a task. I'll route it to Qwen3-Coder if it's available, otherwise fall back to the default model."},
+  {user:"how does memory work?", mias:"Every 6 hours I consolidate recent conversations into compressed long-term memory. Next time you ask about something we discussed, I'll have context."},
+  {user:"can you search the internet?", mias:"Yes, via the WebResearch agent capability. But I can also operate entirely offline — if there's no connection, I skip network tools and work with local context."},
+  {user:"what model are you running?", mias:"Right now: Gemma-3n Q4_K_M. The InferenceOrchestrator picks the model based on your query type, device thermals, and available RAM."},
+];
+
+let demoReplyIdx = 0;
+let demoTyping = false;
+
+function demoSend(){
+  if(demoTyping) return;
+  const input = document.getElementById('demoInput');
+  const body = document.getElementById('demoBody');
+  const text = input.value.trim();
+  if(!text) return;
+  input.value = '';
+
+  // User message
+  const userMsg = document.createElement('div');
+  userMsg.className = 'msg msg-user';
+  userMsg.innerHTML = `<div class="msg-avatar">Y</div><div class="msg-bubble">${escHtml(text)}</div>`;
+  body.appendChild(userMsg);
+  requestAnimationFrame(()=>userMsg.classList.add('show'));
+
+  // Typing indicator
+  demoTyping = true;
+  const typingEl = document.createElement('div');
+  typingEl.className = 'msg msg-mias';
+  typingEl.innerHTML = `<div class="msg-avatar">M</div><div class="msg-bubble"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>`;
+  body.appendChild(typingEl);
+  requestAnimationFrame(()=>typingEl.classList.add('show'));
+  body.scrollTop = body.scrollHeight;
+
+  const delay = 800 + Math.random()*600;
+  setTimeout(()=>{
+    body.removeChild(typingEl);
+    const reply = demoReplies[demoReplyIdx % demoReplies.length];
+    demoReplyIdx++;
+    const mias = document.createElement('div');
+    mias.className = 'msg msg-mias';
+    mias.innerHTML = `<div class="msg-avatar">M</div><div class="msg-bubble">${escHtml(reply.mias)}</div>`;
+    body.appendChild(mias);
+    requestAnimationFrame(()=>mias.classList.add('show'));
+    body.scrollTop = body.scrollHeight;
+    demoTyping = false;
+  }, delay);
+}
+
+function escHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.getElementById('demoInput')?.addEventListener('keydown',e=>{
+  if(e.key==='Enter') demoSend();
+});
+
+// Auto-run demo on load
+setTimeout(()=>{
+  const input = document.getElementById('demoInput');
+  if(input){
+    input.value = 'what can you do?';
+    setTimeout(demoSend, 600);
+  }
+},1800);
 </script>
-
 </body>
 </html>

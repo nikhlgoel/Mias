@@ -12,7 +12,7 @@ import javax.inject.Singleton
 import kotlin.coroutines.resume
 
 /**
- * Biometric Gate — guards access to {Kid} with the owner's biometrics.
+ * Biometric Gate — guards access to Mias with the owner's biometrics.
  *
  * Uses Class 3 (BIOMETRIC_STRONG) only — fingerprint, face, or iris
  * backed by hardware security module. No screen-lock fallback unless
@@ -40,7 +40,7 @@ class BiometricGate @Inject constructor() {
     suspend fun authenticate(
         activity: FragmentActivity,
         title: String = "Verify Identity",
-        subtitle: String = "Only you can access {Kid}",
+        subtitle: String = "Only you can access Mias",
         negativeButtonText: String = "Cancel",
     ): AuthResult = suspendCancellableCoroutine { continuation ->
         val executor = ContextCompat.getMainExecutor(activity)

@@ -1,11 +1,11 @@
-# {Kid} V4 Architecture — "Sovereign Intelligence"
+# Mias — Architecture Overview
 
 ## What is V4?
 
 - **V1** = Chat (text in, text out)
 - **V2** = Generative AI (creates content)
 - **V3** = AI Agent (takes actions via tools)
-- **V4** = **Sovereign Intelligence** — an AI that:
+- **current release (Release #001) — an AI that:
   - **Chooses its own brain** (downloads & switches models for different roles)
   - **Evolves itself** (learns from every interaction, improves in background)
   - **Survives anything** (network loss, crashes, power cuts — auto-resumes)

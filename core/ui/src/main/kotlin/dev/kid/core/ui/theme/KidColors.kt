@@ -3,7 +3,7 @@ package dev.kid.core.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * {Kid} Color System — dark-first with cognition state accents.
+ * Mias Color System — dark-first with cognition state accents.
  *
  * The palette draws from deep space blacks with blue-shifted accents
  * for the primary "intelligence" color. State colors communicate

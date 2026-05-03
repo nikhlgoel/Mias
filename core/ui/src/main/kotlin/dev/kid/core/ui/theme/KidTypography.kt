@@ -7,7 +7,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 /**
- * {Kid} Typography System.
+ * Mias Typography System.
  *
  * Uses system default (sans-serif) as primary font for performance.
  * The type scale is tight and modern — minimal line height for density,

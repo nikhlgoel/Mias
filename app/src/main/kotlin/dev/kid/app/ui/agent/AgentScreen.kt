@@ -58,7 +58,7 @@ import dev.kid.core.ui.theme.KidShapes
 import dev.kid.core.ui.theme.KidTypography
 
 /**
- * AgentScreen — Kid's autonomous work feed.
+ * AgentScreen — Mias autonomous work feed.
  *
  * Shows live tool activity, lets the user manually trigger tools,
  * and displays a scrolling feed of completed agent tasks.

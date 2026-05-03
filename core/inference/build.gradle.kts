@@ -46,6 +46,9 @@ dependencies {
     // On-device inference powered by llama.cpp JNI
     implementation(libs.kotlinx.coroutines.android)
 
+    // Google AI Edge SDK (MediaPipe GenAI) for NPU-accelerated Gemma inference
+    implementation(libs.mediapipe.tasks.genai)
+
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

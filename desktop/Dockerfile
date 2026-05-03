@@ -1,5 +1,5 @@
 # ============================================================================
-# Project #001 {Kid} — Desktop Model Server
+# Mias — Desktop Model Server
 # Runs Qwen3-Coder-Next via llama.cpp / vLLM (local GPU inference)
 # ============================================================================
 # ZERO-CLOUD: This container never contacts external services.
@@ -7,8 +7,8 @@
 
 FROM nvidia/cuda:12.8.1-runtime-ubuntu24.04
 
-LABEL maintainer="Kid Project"
-LABEL description="Local-only desktop model server for Kid ecosystem"
+LABEL maintainer="Mias Project"
+LABEL description="Local-only desktop model server for Mias ecosystem"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV MODEL_DIR=/models

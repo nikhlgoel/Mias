@@ -75,7 +75,7 @@ class EvolutionService : Service() {
 
     private fun buildNotification(status: String): Notification =
         NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Kid")
+            .setContentTitle("Mias")
             .setContentText(status)
             .setSmallIcon(android.R.drawable.ic_menu_info_details)
             .setPriority(NotificationCompat.PRIORITY_MIN)
@@ -86,10 +86,10 @@ class EvolutionService : Service() {
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Kid Background Thinking",
+            "Mias Background Thinking",
             NotificationManager.IMPORTANCE_MIN,
         ).apply {
-            description = "Shown while Kid evolves in the background"
+            description = "Shown while Mias evolves in the background"
             setShowBadge(false)
         }
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

@@ -140,6 +140,6 @@ class WebResearchCapability @Inject constructor(
     companion object {
         private const val DEFAULT_MAX_CHARS = 6000
         private const val USER_AGENT =
-            "Mozilla/5.0 (Linux; Android 17) AppleWebKit/537.36 Kid/4.0 Research"
+            "Mozilla/5.0 (Linux; Android 17) AppleWebKit/537.36 Mias/1.0 Research"
     }
 }

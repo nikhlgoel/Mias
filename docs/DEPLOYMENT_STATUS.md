@@ -1,4 +1,4 @@
-# 🚀 DEPLOYMENT SUMMARY — {Kid} V4 Ready for Testing
+# 🚀 DEPLOYMENT SUMMARY — Mias Ready for Testing
 
 **Generated:** April 12, 2026  
 **Status:** ✅ **READY FOR TESTING**
@@ -310,7 +310,7 @@ Overall Readiness:    ✅ 90% (ready for testing, blocking: device + models)
 ### What's Next
 1. **Build APK** → `./gradlew assembleDebug`
 2. **Install on Device** → `adb install ...`
-3. **Launch App** → Enjoy {Kid}!
+3. **Launch App** → Enjoy Mias!
 4. **Download Models** → Brain Market
 5. **Test Capabilities** → Chat, agents, thermal, evolution
 6. **(Optional) Desktop Setup** → Tailscale + offload
@@ -327,13 +327,13 @@ Overall Readiness:    ✅ 90% (ready for testing, blocking: device + models)
 
 **🧠 You now have a complete, privacy-first, multi-brain AI ecosystem.**
 
-**Ready to meet {Kid}?**
+**Ready to run Mias?**
 
 [Start Setup](docs/SETUP.md) • [GitHub Repo](https://github.com/nikhlgoel/Mias) • [Architecture](docs/V4_ARCHITECTURE.md)
 
 ---
 
-*Made with 💜 for Sovereign Intelligence  
-v4.0.0-beta | April 12, 2026*
+*Mias — open source, local-first AI  
+Release #001 | April 2026*
 
 </div>

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Project #001 {Kid} — MCP Bridge Server
+Project — Mias MCP Bridge Server
+# Release: #001
 Bridges Android ↔ Desktop model inference over the Tailscale P2P mesh.
 
 This server:

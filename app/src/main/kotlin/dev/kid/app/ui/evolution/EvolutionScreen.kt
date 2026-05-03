@@ -165,7 +165,7 @@ fun EvolutionScreen(
                                 fontWeight = FontWeight.Medium,
                             )
                             Text(
-                                "Kid evolves silently while idle — every 6 hours",
+                                "Mias evolves silently while idle — every 6 hours",
                                 style = KidTypography.LabelSmall,
                                 color = KidColors.TextSecondary,
                             )

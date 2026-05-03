@@ -36,6 +36,12 @@ interface HindsightDao {
     suspend fun activeFactCount(): Int
 
     @Query(
+        "SELECT * FROM raw_facts WHERE isDeprecated = 0 AND embedding IS NOT NULL " +
+            "ORDER BY timestamp DESC LIMIT :limit",
+    )
+    suspend fun getRecentFactsWithEmbeddings(limit: Int = 50): List<RawFactEntity>
+
+    @Query(
         "SELECT * FROM raw_facts WHERE isDeprecated = 0 AND sourceUserId = :userId " +
             "ORDER BY timestamp DESC LIMIT :limit",
     )

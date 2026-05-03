@@ -1,3 +1,9 @@
+/*
+ * Mias — Local AI Assistant
+ * Package: io.mias.app
+ * Release: #001 (first public build — "Kid")
+ * This is the first step of the application. Package name may change on future major platform ports.
+ */
 import java.util.Properties
 
 plugins {
@@ -21,7 +27,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "dev.kid.app"
+        applicationId = "io.mias.app"
         minSdk = 28
         targetSdk = 35
         versionCode = 1

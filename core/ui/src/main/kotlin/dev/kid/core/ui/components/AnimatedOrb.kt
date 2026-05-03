@@ -23,7 +23,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Animated Intelligence Orb — the visual heartbeat of {Kid}.
+ * Animated Intelligence Orb — the visual heartbeat of Mias.
  *
  * A pulsing, glowing orb that breathes and shifts color based on
  * Kid's cognitive state. The orb has 3 concentric layers:

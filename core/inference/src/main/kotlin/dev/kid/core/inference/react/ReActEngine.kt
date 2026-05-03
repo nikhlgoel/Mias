@@ -107,7 +107,13 @@ class ReActEngine @Inject constructor(
             // Execute the action
             emit(ReActStep.Action(parsed.action, parsed.actionInput))
 
-                    val observation = executeAction(parsed.action, parsed.actionInput)
+                    val rawObservation = executeAction(parsed.action, parsed.actionInput)
+                    val observation = if (rawObservation.length > MAX_TOOL_OUTPUT_LENGTH) {
+                        rawObservation.take(MAX_TOOL_OUTPUT_LENGTH) +
+                            "\n... [output truncated at $MAX_TOOL_OUTPUT_LENGTH chars]"
+                    } else {
+                        rawObservation
+                    }
                     emit(ReActStep.Observation(observation))
 
                     // Feed observation back into the conversation
@@ -215,5 +221,6 @@ class ReActEngine @Inject constructor(
 
     companion object {
         const val MAX_ITERATIONS = 7
+        const val MAX_TOOL_OUTPUT_LENGTH = 2000
     }
 }

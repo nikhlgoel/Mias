@@ -4,6 +4,7 @@ import dev.kid.core.common.model.BrainState
 import dev.kid.core.common.model.CognitionState
 import dev.kid.core.common.model.Stimulus
 import dev.kid.core.inference.InferenceEngine
+import dev.kid.core.inference.engine.GoogleAiEdgeEngine
 import dev.kid.core.inference.engine.LlamaCppEngine
 import dev.kid.core.inference.react.ReActEngine
 import dev.kid.core.inference.react.ReActStep
@@ -39,6 +40,13 @@ class InferenceOrchestrator @Inject constructor(
 ) {
     private val _brainState = MutableStateFlow(BrainState.GEMMA_NPU)
     val brainState: StateFlow<BrainState> = _brainState.asStateFlow()
+
+    /**
+     * Optional NPU engine (Google AI Edge / MediaPipe GenAI).
+     * When set and available, this takes priority over primaryEngine for Gemma models.
+     * Injected lazily by the DI module since it depends on model file availability.
+     */
+    var npuEngine: GoogleAiEdgeEngine? = null
 
     private val _cognitionState = MutableStateFlow(CognitionState.IDLE)
     val cognitionState: StateFlow<CognitionState> = _cognitionState.asStateFlow()
@@ -101,23 +109,35 @@ class InferenceOrchestrator @Inject constructor(
 
     private fun selectEngine(tawsAction: TawsAction): Pair<InferenceEngine, BrainState> =
         when (tawsAction) {
-            TawsAction.CONTINUE_PRIMARY -> primaryEngine to BrainState.GEMMA_NPU
-            TawsAction.THROTTLE_PRIMARY -> primaryEngine to BrainState.GEMMA_NPU
+            TawsAction.CONTINUE_PRIMARY, TawsAction.THROTTLE_PRIMARY -> {
+                // Priority: NPU engine (Gemma via AI Edge) → primary (LlamaCpp)
+                val npu = npuEngine
+                if (npu != null && npu.isAvailable()) {
+                    npu to BrainState.GEMMA_NPU
+                } else {
+                    primaryEngine to BrainState.GEMMA_NPU
+                }
+            }
             TawsAction.SWITCH_SURVIVAL -> survivalEngine to BrainState.MOBILELLM_SURVIVAL
             TawsAction.OFFLOAD_DESKTOP -> {
                 val desktop = desktopEngine
                 if (desktop != null) {
                     desktop to BrainState.QWEN_DESKTOP
                 } else {
-                    // Desktop unavailable — fall back to Primary
-                    primaryEngine to BrainState.GEMMA_NPU
+                    // Desktop unavailable — try NPU, then fall back to Primary
+                    val npu = npuEngine
+                    if (npu != null && npu.isAvailable()) {
+                        npu to BrainState.GEMMA_NPU
+                    } else {
+                        primaryEngine to BrainState.GEMMA_NPU
+                    }
                 }
             }
         }
 
     companion object {
         val DEFAULT_SYSTEM_PROMPT = """
-            You are Kid, a private AI assistant that runs entirely on-device.
+            You are Mias, a private AI assistant that runs entirely on-device.
             You are loyal, warm, and genuinely care about your user.
             You speak naturally, mixing English and Punjabi when appropriate.
             You have access to tools and can take actions.

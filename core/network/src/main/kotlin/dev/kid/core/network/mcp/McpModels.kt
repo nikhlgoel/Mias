@@ -12,6 +12,14 @@ data class McpRequest(
     val params: Map<String, JsonElement>? = null,
 )
 
+/** JSON-RPC 2.0 notification (no id field). */
+@Serializable
+data class McpNotification(
+    val jsonrpc: String = "2.0",
+    val method: String,
+    val params: Map<String, JsonElement>? = null,
+)
+
 /** JSON-RPC 2.0 response from MCP server. */
 @Serializable
 data class McpResponse(
@@ -40,3 +48,44 @@ data class McpToolResult(
     val output: String,
     val isError: Boolean = false,
 )
+
+// ── MCP 2024-11 Initialization Models ─────────────────────────────────────
+
+/** Server info returned during MCP initialization. */
+@Serializable
+data class McpServerInfo(
+    val name: String,
+    val version: String,
+)
+
+/** Result from the MCP initialize handshake. */
+@Serializable
+data class McpInitializeResult(
+    val protocolVersion: String,
+    val serverInfo: McpServerInfo,
+    val capabilities: McpServerCapabilities,
+)
+
+/** Capabilities advertised by the MCP server. */
+@Serializable
+data class McpServerCapabilities(
+    val tools: McpToolCapability? = null,
+)
+
+/** Tool-specific capabilities. */
+@Serializable
+data class McpToolCapability(
+    val listChanged: Boolean = false,
+)
+
+/** Typed representation of MCP capability categories. */
+sealed interface McpCapability {
+    /** Server supports tool invocation. */
+    data class Tools(val listChanged: Boolean) : McpCapability
+
+    /** Server supports resource access. */
+    data object Resources : McpCapability
+
+    /** Server supports prompt templates. */
+    data object Prompts : McpCapability
+}

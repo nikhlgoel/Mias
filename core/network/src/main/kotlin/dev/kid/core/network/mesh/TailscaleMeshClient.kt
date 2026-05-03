@@ -1,5 +1,8 @@
 package dev.kid.core.network.mesh
 
+import android.content.Context
+import android.content.pm.PackageManager
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.kid.core.common.KidResult
 import dev.kid.core.common.di.IoDispatcher
 import dev.kid.core.common.runCatchingKid
@@ -29,6 +32,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class TailscaleMeshClient @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val httpClient: HttpClient,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : MeshClient {
@@ -36,8 +40,25 @@ class TailscaleMeshClient @Inject constructor(
     @Volatile
     private var connected = false
 
+    /** Check if the Tailscale VPN app is installed on the device. */
+    private fun isTailscaleInstalled(): Boolean {
+        return try {
+            @Suppress("DEPRECATION")
+            context.packageManager.getPackageInfo(TAILSCALE_PACKAGE, 0)
+            true
+        } catch (_: PackageManager.NameNotFoundException) {
+            false
+        }
+    }
+
     override suspend fun discoverPeers(): KidResult<List<PeerNode>> =
         withContext(ioDispatcher) {
+            if (!isTailscaleInstalled()) {
+                return@withContext KidResult.Error(
+                    "Tailscale not installed — desktop offload unavailable"
+                )
+            }
+
             runCatchingKid {
                 val response: String = httpClient.get("$TAILSCALE_API/localapi/v0/status")
                     .body()
@@ -100,5 +121,6 @@ class TailscaleMeshClient @Inject constructor(
 
     companion object {
         private const val TAILSCALE_API = "http://127.0.0.1:41112"
+        private const val TAILSCALE_PACKAGE = "com.tailscale.ipn"
     }
 }

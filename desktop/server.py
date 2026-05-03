@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-Project #001 {Kid} — Desktop Model Server
+Project — Mias Desktop Model Server
+# Release: #001 (first working build)
+# package: io.mias.app
 Serves Qwen3-Coder-Next via llama-cpp-python using the Model Context Protocol (MCP) over HTTP.
 
 Endpoints:
@@ -21,14 +23,29 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [DesktopServer] %(le
 logger = logging.getLogger(__name__)
 
 try:
-    from fastapi import FastAPI, HTTPException, Request
+    from fastapi import FastAPI, HTTPException, Request, Depends
     from fastapi.responses import JSONResponse
+    from fastapi.security import APIKeyHeader
     import uvicorn
 except ImportError:
     logger.error("Missing dependencies. Run: pip install -r requirements.txt")
     sys.exit(1)
 
-app = FastAPI(title="Kid Desktop Model MCP Server", version="0.1.0")
+app = FastAPI(title="Mias Desktop Model Server", version="release-001")
+
+# ---------------------------------------------------------------------------
+# Authentication (shared secret for non-Tailscale environments)
+# ---------------------------------------------------------------------------
+
+API_TOKEN = os.environ.get("MIAS_TOKEN", "")
+api_key_header = APIKeyHeader(name="X-Mias-Token", auto_error=False)
+
+
+async def verify_token(api_key: str = Depends(api_key_header)):
+    """Verify shared secret if MIAS_TOKEN is configured."""
+    if API_TOKEN and api_key != API_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid or missing X-Mias-Token")
+    return api_key
 
 # ---------------------------------------------------------------------------
 # Model loading
@@ -75,8 +92,8 @@ async def handle_initialize(params):
     return {
         "protocolVersion": "2025-03-26",
         "serverInfo": {
-            "name": "Kid Desktop Overlord",
-            "version": "0.1.0"
+            "name": "Mias Desktop Server",
+            "version": "release-001"
         },
         "capabilities": {
             "tools": {"listChanged": False}
@@ -134,9 +151,19 @@ async def handle_tools_call(params):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "kid-mcp-desktop-server", "model_dir": MODEL_DIR}
+    model_loaded = _llm is not None
+    model_files = []
+    if os.path.exists(MODEL_DIR):
+        model_files = [f for f in os.listdir(MODEL_DIR) if f.endswith(".gguf")]
+    return {
+        "status": "ready" if model_loaded else "loading",
+        "model": model_files[0] if model_files else "none",
+        "version": "release-001",
+        "service": "mias-desktop-server",
+        "model_dir": MODEL_DIR,
+    }
 
-@app.post("/rpc")
+@app.post("/rpc", dependencies=[Depends(verify_token)])
 async def mcp_rpc(request: Request):
     data = await request.json()
     req_id = data.get("id")
@@ -149,6 +176,9 @@ async def mcp_rpc(request: Request):
     try:
         if method == "initialize":
             result = await handle_initialize(params)
+        elif method == "notifications/initialized":
+            # Client acknowledgment — no response needed for notifications
+            result = {}
         elif method == "tools/list":
             result = await handle_tools_list(params)
         elif method == "tools/call":
@@ -174,7 +204,7 @@ async def mcp_rpc(request: Request):
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Kid Desktop MCP Server")
+    parser = argparse.ArgumentParser(description="Mias Desktop MCP Server")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8401)
     args = parser.parse_args()

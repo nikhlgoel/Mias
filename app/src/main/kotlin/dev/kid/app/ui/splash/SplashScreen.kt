@@ -249,7 +249,7 @@ fun SplashScreen(
 
             // ── App name ─────────────────────────────────────────────────
             Text(
-                text = "{Kid}",
+                text = "{Mias}",
                 style = KidTypography.DisplayMedium.copy(
                     fontSize = 48.sp,
                     fontWeight = FontWeight.Light,
@@ -264,7 +264,7 @@ fun SplashScreen(
 
             // ── Tagline ───────────────────────────────────────────────────
             Text(
-                text = "Sovereign Intelligence · v4.0",
+                text = "Local AI. No cloud. Your data.",
                 style = KidTypography.LabelMedium,
                 color = KidColors.NeonCyan.copy(alpha = 0.7f),
                 modifier = Modifier.alpha(taglineAlpha.value),

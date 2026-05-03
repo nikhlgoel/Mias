@@ -15,6 +15,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
@@ -23,6 +26,11 @@ import javax.inject.Singleton
 /**
  * MCP (Model Context Protocol) client for communicating with the desktop
  * Qwen3-Coder-Next server over Tailscale WireGuard tunnel.
+ *
+ * Implements the full MCP 2024-11 initialization handshake:
+ * 1. Client → Server: initialize { protocolVersion, capabilities, clientInfo }
+ * 2. Server → Client: { result: { protocolVersion, capabilities, serverInfo } }
+ * 3. Client → Server: notifications/initialized
  *
  * All communication is local P2P — no cloud endpoints.
  */
@@ -38,51 +46,117 @@ class McpClient @Inject constructor(
     var serverUrl: String = ""
         private set
 
+    /** Server info received during initialization. */
+    @Volatile
+    var serverInfo: McpServerInfo? = null
+        private set
+
+    /** Server capabilities received during initialization. */
+    @Volatile
+    var serverCapabilities: McpServerCapabilities? = null
+        private set
+
+    /** Whether the MCP handshake has been completed. */
+    @Volatile
+    var isInitialized: Boolean = false
+        private set
+
     fun configure(desktopIp: String, port: Int = DEFAULT_PORT) {
         serverUrl = "http://$desktopIp:$port/rpc"
+        // Reset initialization state when reconfigured
+        isInitialized = false
+        serverInfo = null
+        serverCapabilities = null
     }
 
     val isConfigured: Boolean get() = serverUrl.isNotBlank()
 
-    /** Initialize MCP session with the desktop server. */
-    suspend fun initialize(): KidResult<String> = withContext(ioDispatcher) {
+    /**
+     * Full MCP 2024-11 initialization handshake.
+     *
+     * Sends `initialize` request, parses server capabilities, then
+     * sends `notifications/initialized` notification to complete the handshake.
+     */
+    suspend fun initialize(): KidResult<McpInitializeResult> = withContext(ioDispatcher) {
         runCatchingKid {
+            // Step 1: Send initialize request
             val request = McpRequest(
                 id = requestId.incrementAndGet(),
                 method = "initialize",
                 params = mapOf(
-                    "protocolVersion" to JsonPrimitive("2025-03-26"),
+                    "protocolVersion" to JsonPrimitive(PROTOCOL_VERSION),
+                    "capabilities" to buildJsonObject {
+                        // Client capabilities — we support tool usage
+                    },
                     "clientInfo" to buildJsonObject {
-                        put("name", "Kid Android")
-                        put("version", "0.1.0")
+                        put("name", "Mias Android")
+                        put("version", CLIENT_VERSION)
                     },
                 ),
             )
             val responseStr = sendRequest(request)
-            responseStr
+
+            // Step 2: Parse server response
+            val response = json.decodeFromString<McpResponse>(responseStr)
+            if (response.error != null) {
+                throw RuntimeException("MCP initialization failed: ${response.error.message}")
+            }
+
+            val resultJson = response.result
+                ?: throw RuntimeException("MCP initialization returned null result")
+
+            val initResult = json.decodeFromJsonElement(
+                McpInitializeResult.serializer(),
+                resultJson,
+            )
+
+            serverInfo = initResult.serverInfo
+            serverCapabilities = initResult.capabilities
+
+            // Step 3: Send notifications/initialized to complete handshake
+            val notification = McpNotification(
+                method = "notifications/initialized",
+            )
+            val notifBody = json.encodeToString(McpNotification.serializer(), notification)
+            httpClient.post(serverUrl) {
+                contentType(ContentType.Application.Json)
+                setBody(notifBody)
+            }
+
+            isInitialized = true
+            initResult
         }
     }
 
-    /** List available tools on the desktop server. */
+    /**
+     * List available tools on the desktop server.
+     * Parses the actual tools/list response instead of returning hardcoded values.
+     */
     suspend fun listTools(): KidResult<List<McpTool>> = withContext(ioDispatcher) {
         runCatchingKid {
+            ensureInitialized()
+
             val request = McpRequest(
                 id = requestId.incrementAndGet(),
                 method = "tools/list",
             )
             val responseStr = sendRequest(request)
-            // Parse tools from response
             val response = json.decodeFromString<McpResponse>(responseStr)
             if (response.error != null) {
                 throw RuntimeException("MCP error: ${response.error.message}")
             }
-            // For now, return known tools
-            listOf(
-                McpTool("generate", "Generate text with Qwen3-Coder-Next"),
-                McpTool("execute_code", "Run Python code on desktop"),
-                McpTool("git_operation", "Execute git commands"),
-                McpTool("file_read", "Read a file from desktop"),
-            )
+
+            // Parse tools from the actual server response
+            val resultObj = response.result?.jsonObject
+            val toolsArray = resultObj?.get("tools")?.jsonArray ?: emptyList()
+
+            toolsArray.map { toolElement ->
+                val toolObj = toolElement.jsonObject
+                McpTool(
+                    name = toolObj["name"]?.jsonPrimitive?.content ?: "unknown",
+                    description = toolObj["description"]?.jsonPrimitive?.content ?: "",
+                )
+            }
         }
     }
 
@@ -90,6 +164,8 @@ class McpClient @Inject constructor(
     suspend fun callTool(name: String, arguments: Map<String, String>): KidResult<McpToolResult> =
         withContext(ioDispatcher) {
             runCatchingKid {
+                ensureInitialized()
+
                 val jsonArgs: Map<String, JsonElement> = arguments.mapValues {
                     JsonPrimitive(it.value)
                 }
@@ -132,6 +208,19 @@ class McpClient @Inject constructor(
             }
         }
 
+    /**
+     * Ensure the MCP handshake has been completed before making tool calls.
+     * Auto-initializes if not yet done.
+     */
+    private suspend fun ensureInitialized() {
+        if (!isInitialized) {
+            val result = initialize()
+            if (result is KidResult.Error) {
+                throw RuntimeException("MCP auto-initialization failed: ${result.message}")
+            }
+        }
+    }
+
     private suspend fun sendRequest(request: McpRequest): String {
         check(isConfigured) { "MCP client not configured. Call configure() first." }
         val body = json.encodeToString(McpRequest.serializer(), request)
@@ -144,5 +233,7 @@ class McpClient @Inject constructor(
 
     companion object {
         const val DEFAULT_PORT = 8401
+        private const val PROTOCOL_VERSION = "2025-03-26"
+        private const val CLIENT_VERSION = "0.1.0"
     }
 }

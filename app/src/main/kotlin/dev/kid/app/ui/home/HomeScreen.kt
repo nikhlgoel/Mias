@@ -62,6 +62,7 @@ fun HomeScreen(
     onNavigateToModelHub: () -> Unit = {},
     onNavigateToAgent: () -> Unit = {},
     onNavigateToEvolution: () -> Unit = {},
+    onNavigateToVoice: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
@@ -184,7 +185,7 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     AssistChip(
-                        onClick = { onNavigateToChat(null) },
+                        onClick = onNavigateToVoice,
                         label = { Text("Voice") },
                         leadingIcon = { Icon(Icons.Rounded.Mic, contentDescription = "Voice") },
                         colors = AssistChipDefaults.assistChipColors(
