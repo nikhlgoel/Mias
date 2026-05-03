@@ -47,4 +47,67 @@ class RegexIntentExtractorTest {
         assertThat(intent.intentType).isEqualTo(IntentType.CHAT)
         assertThat(intent.actionHint).isNull()
     }
+
+    @Test
+    fun `classifies app launch intent for known app`() {
+        val intent = extractor.extract("open Spotify")
+
+        assertThat(intent.intentType).isEqualTo(IntentType.APP_LAUNCH)
+        assertThat(intent.actionHint).isEqualTo("app_launch")
+        assertThat(intent.entities["app"]).isEqualTo("Spotify")
+    }
+
+    @Test
+    fun `classifies app launch with launch keyword`() {
+        val intent = extractor.extract("launch YouTube app")
+
+        assertThat(intent.intentType).isEqualTo(IntentType.APP_LAUNCH)
+        assertThat(intent.entities["app"]).isNotNull()
+    }
+
+    @Test
+    fun `classifies calculator intent from keyword`() {
+        val intent = extractor.extract("calculate 500 divided by 25")
+
+        assertThat(intent.intentType).isEqualTo(IntentType.CALCULATOR)
+        assertThat(intent.actionHint).isEqualTo("calculator")
+    }
+
+    @Test
+    fun `classifies filesystem intent from read file keyword`() {
+        val intent = extractor.extract("read file notes.txt from downloads")
+
+        assertThat(intent.intentType).isEqualTo(IntentType.FILESYSTEM)
+        assertThat(intent.actionHint).isEqualTo("filesystem")
+    }
+
+    @Test
+    fun `extracts URL entity from web fetch request`() {
+        val intent = extractor.extract("fetch https://example.com/api/data")
+
+        assertThat(intent.intentType).isEqualTo(IntentType.WEB_FETCH)
+        assertThat(intent.entities["url_1"]).isEqualTo("https://example.com/api/data")
+    }
+
+    @Test
+    fun `detects urgent modifier`() {
+        val intent = extractor.extract("I need this done right now urgently")
+
+        assertThat(intent.modifiers).contains("urgent")
+    }
+
+    @Test
+    fun `detects privacy modifier`() {
+        val intent = extractor.extract("this is confidential information about my salary")
+
+        assertThat(intent.modifiers).contains("private")
+    }
+
+    @Test
+    fun `empty input returns chat intent`() {
+        val intent = extractor.extract("")
+
+        assertThat(intent.intentType).isEqualTo(IntentType.CHAT)
+        assertThat(intent.cleanedText).isEmpty()
+    }
 }

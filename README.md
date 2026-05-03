@@ -121,11 +121,12 @@ You can browse and download more models from the **Brain Market** tab inside the
 mias/
 ├── app/                    # Android app (Kotlin + Jetpack Compose)
 ├── core/
-│   ├── inference/          # ONNX runtime, model loading
+│   ├── inference/          # llama.cpp JNI + Google AI Edge (NPU)
 │   ├── agent/              # Tool use (files, web, clipboard, etc.)
 │   ├── data/               # Room DB, conversation memory
 │   ├── security/           # Biometric gate, AES-256 encryption
-│   ├── network/            # Ktor client, Tailscale, desktop bridge
+│   ├── network/            # Ktor client, Tailscale, MCP desktop bridge
+│   ├── evolution/          # Background self-improvement daemon
 │   └── soul/               # Personality/tone adaptation
 ├── desktop/                # Python FastAPI + llama.cpp server
 │   ├── server.py
@@ -135,7 +136,10 @@ mias/
 │   └── init.sh             # Setup, lint, test checks
 ├── docs/
 │   ├── SETUP.md
-│   └── V4_ARCHITECTURE.md
+│   ├── V4_ARCHITECTURE.md
+│   ├── PROGRESS.md         # Detailed development progress
+│   └── LANGUAGE_ARCHITECTURE.md
+├── CONTRIBUTING.md
 └── README.md
 ```
 
@@ -184,13 +188,29 @@ cd desktop && python -m pytest tests/
 
 ---
 
+## What Doesn't Work Yet
+
+- **VisionChatScreen** — camera button leads nowhere (VisionWorker exists, UI does not)
+- **LoRA runtime merge** — soul sliders exist in UI but don't affect model output at runtime
+- **Semantic intent router** — `RegexIntentExtractor` is regex-based, not semantic; wrong model can be selected for task type
+- **Thermal ML training data** — TawsGovernor uses heuristics, not a trained model
+
+For detailed status of every module, see [docs/PROGRESS.md](docs/PROGRESS.md).
+
+---
+
 ## Status
 
-- Android app: complete, all features implemented
-- Desktop server: complete, needs model download to run
-- Mesh networking: complete
+- Android app: core features working — chat, voice, agent tools, background evolution
+- Desktop server: complete with auth + health monitoring, needs model download to run
+- Mesh networking: complete with Tailscale dependency checking
+- NPU inference: Google AI Edge SDK integrated for Gemma models on supported devices
+- MCP protocol: 2024-11 spec compliant with full handshake
+- VoiceChatScreen: implemented with AnimatedOrb and live transcript
+- ReAct agent: hardened with max-step guard, tool validation, output truncation
+- Memory dedup: cosine similarity prevents redundant facts in HindsightMemory
 - LoRA fine-tuning pipeline: planned
-- Thermal ML training data: planned
+- VisionChatScreen: planned
 
 ---
 
