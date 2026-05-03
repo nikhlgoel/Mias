@@ -1,0 +1,89 @@
+
+# === Build outputs ===
+*.iml
+.gradle/
+build/
+core/**/build/
+app/build/
+local.properties
+
+# === IDE / Editor / Agent configs ===
+.idea/
+*.iws
+*.ipr
+.continue/
+.vscode/
+
+# === OS ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Kotlin/Java ===
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Keep gradle wrapper jar (must come AFTER *.jar)
+!gradle/wrapper/gradle-wrapper.jar
+
+# === Android ===
+/captures
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# === Native build cache (CMake) ===
+.cxx/
+**/cxx/
+
+# === Local model files (large binaries) ===
+*.onnx
+*.gguf
+*.bin
+*.safetensors
+desktop/models/
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+
+# === Environment ===
+.env
+.env.local
+
+# === Signing (NEVER push keystores) ===
+*.jks
+*.keystore
+keystore.properties
+
+# === Internal planning docs (not public) ===
+docs/*.docx
+docs/IMPLEMENTATION_BLUEPRINT.py
+docs/DOC#001.docx
+docs/PRD.docx
+
+# === Node/npm (if used) ===
+node_modules/
+package-lock.json
+
+# === Misc ===
+*.log
+*.swp
+*.swo
+*.tmp
+*.bak
+*~
+
+# === Local project tracking ===
+PROJECT_STAGES.md
