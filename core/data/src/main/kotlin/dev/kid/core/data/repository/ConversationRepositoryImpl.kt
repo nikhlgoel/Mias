@@ -29,8 +29,14 @@ class ConversationRepositoryImpl @Inject constructor(
         dao.observeAll()
             .map { entities ->
                 entities.map { entity ->
-                    val messages = dao.getMessages(entity.id).map { it.toDomain() }
-                    entity.toDomain(messages)
+                    try {
+                        val messages = dao.getMessages(entity.id).map { it.toDomain() }
+                        entity.toDomain(messages)
+                    } catch (e: Exception) {
+                        // Log error and return conversation without messages
+                        android.util.Log.e("ConversationRepo", "Error loading messages for ${entity.id}", e)
+                        entity.toDomain(emptyList())
+                    }
                 }
             }
             .flowOn(ioDispatcher)

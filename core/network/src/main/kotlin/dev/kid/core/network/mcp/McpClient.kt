@@ -233,7 +233,7 @@ class McpClient @Inject constructor(
 
     companion object {
         const val DEFAULT_PORT = 8401
-        private const val PROTOCOL_VERSION = "2025-03-26"
+        private const val PROTOCOL_VERSION = "2024-11-26" // Correct MCP protocol version
         private const val CLIENT_VERSION = "0.1.0"
     }
 }

@@ -38,8 +38,10 @@ class CalculatorCapability @Inject constructor() : AgentCapability {
     }
 
     private fun evaluate(expr: String): Double {
-        val cleaned = expr.replace(" ", "")
-        return parseExpression(cleaned, 0).first
+        val cleaned = expr.replace(" ", "")        // Basic validation to prevent code injection
+        if (!cleaned.matches(Regex("^[0-9+\\-*/^().a-zA-Z]*$"))) {
+            throw IllegalArgumentException("Invalid characters in expression")
+        }        return parseExpression(cleaned, 0).first
     }
 
     private fun parseExpression(expr: String, pos: Int): Pair<Double, Int> {

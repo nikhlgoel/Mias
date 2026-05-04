@@ -38,6 +38,10 @@ Java_dev_kid_core_inference_engine_LlamaCppEngine_nativeLoadModel(JNIEnv *env, j
     }
 
     const char *path = env->GetStringUTFChars(jpath, nullptr);
+    if (path == nullptr) {
+        LOGE("Failed to get path string");
+        return JNI_FALSE;
+    }
     
     llama_model_params mparams = llama_model_default_params();
     model = llama_load_model_from_file(path, mparams);
@@ -87,6 +91,10 @@ Java_dev_kid_core_inference_engine_LlamaCppEngine_nativeGenerate(JNIEnv *env, jo
 
     const struct llama_vocab * vocab = llama_model_get_vocab(model);
     const char *prompt = env->GetStringUTFChars(jprompt, nullptr);
+    if (prompt == nullptr) {
+        LOGE("Failed to get prompt string");
+        return env->NewStringUTF("");
+    }
     std::string response = "";
 
     // Very basic generation loop for Phase 1 verification
@@ -148,8 +156,20 @@ Java_dev_kid_core_inference_engine_LlamaCppEngine_nativeGenerateStream(JNIEnv *e
 
     const struct llama_vocab * vocab = llama_model_get_vocab(model);
     const char *prompt = env->GetStringUTFChars(jprompt, nullptr);
+    if (prompt == nullptr) {
+        LOGE("Failed to get prompt string");
+        return;
+    }
+    
     jclass callbackClass = env->GetObjectClass(jcallback);
+    if (callbackClass == nullptr) {
+        LOGE("Failed to get callback class");
+        env->ReleaseStringUTFChars(jprompt, prompt);
+        return;
+    }
+    
     jmethodID invokeMethod = env->GetMethodID(callbackClass, "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;");
+    env->DeleteLocalRef(callbackClass); // Release local reference
 
     if (invokeMethod == nullptr) {
         LOGE("Cannot find callback invoke method");
@@ -232,13 +252,18 @@ Java_dev_kid_core_inference_engine_EmbeddingEngine_nativeLoadEmbeddingModel(JNIE
     }
 
     const char *path = env->GetStringUTFChars(jpath, nullptr);
+    if (path == nullptr) {
+        LOGE("Failed to get path string");
+        return JNI_FALSE;
+    }
     
     llama_model_params mparams = llama_model_default_params();
     emb_model = llama_load_model_from_file(path, mparams);
     
+    env->ReleaseStringUTFChars(jpath, path);
+    
     if (emb_model == nullptr) {
         LOGE("Failed to load embedding model from %s", path);
-        env->ReleaseStringUTFChars(jpath, path);
         return JNI_FALSE;
     }
 
@@ -254,12 +279,10 @@ Java_dev_kid_core_inference_engine_EmbeddingEngine_nativeLoadEmbeddingModel(JNIE
         LOGE("Failed to create embedding context");
         llama_model_free(emb_model);
         emb_model = nullptr;
-        env->ReleaseStringUTFChars(jpath, path);
         return JNI_FALSE;
     }
 
-    LOGI("Embedding model loaded successfully from %s", path);
-    env->ReleaseStringUTFChars(jpath, path);
+    LOGI("Embedding model loaded successfully");
     return JNI_TRUE;
 }
 
@@ -274,6 +297,10 @@ Java_dev_kid_core_inference_engine_EmbeddingEngine_nativeGetEmbedding(JNIEnv *en
 
     const struct llama_vocab * vocab = llama_model_get_vocab(emb_model);
     const char *text = env->GetStringUTFChars(jtext, nullptr);
+    if (text == nullptr) {
+        LOGE("Failed to get text string");
+        return nullptr;
+    }
 
     // 1. Tokenize (prepend BOS, specific to Nomic usually, true true here)
     const int n_tokens_max = strlen(text) + 2; 
@@ -296,27 +323,24 @@ Java_dev_kid_core_inference_engine_EmbeddingEngine_nativeGetEmbedding(JNIEnv *en
     }
 
     // 3. Extract embedding
-    // For n_tokens, the embedding is usually associated with the sequence or the last token.
-    // Llama.cpp stores embeddings for tokens if cparams.embeddings = true.
-    const int idx = n_tokens - 1; // Last token has the pooled embedding in many models, wait, Nomic might require sequence-level pooling.
-    // Llama_get_embeddings gives sequence embeddings if requested, or we just grab the token embeddings.
-    const float * embd = llama_get_embeddings_seq(emb_ctx, 0); 
+    const int idx = n_tokens - 1; // Last token has the pooled embedding in many models
+    const float * embd = llama_get_embeddings_ith(emb_ctx, idx);
     if (embd == nullptr) {
-        embd = llama_get_embeddings_ith(emb_ctx, idx);
-        if (embd == nullptr) {
-            LOGE("Failed to get embeddings pointer");
-            env->ReleaseStringUTFChars(jtext, text);
-            return nullptr;
-        }
+        LOGE("Failed to get embeddings pointer");
+        env->ReleaseStringUTFChars(jtext, text);
+        return nullptr;
     }
 
     const int n_embd = llama_model_n_embd(emb_model);
     jfloatArray result = env->NewFloatArray(n_embd);
+    if (result == nullptr) {
+        LOGE("Failed to create float array");
+        env->ReleaseStringUTFChars(jtext, text);
+        return nullptr;
+    }
     env->SetFloatArrayRegion(result, 0, n_embd, embd);
 
     env->ReleaseStringUTFChars(jtext, text);
-
-    // (KV cache clears automatically if positions overlap or can be done manually if API is present)
 
     return result;
 }

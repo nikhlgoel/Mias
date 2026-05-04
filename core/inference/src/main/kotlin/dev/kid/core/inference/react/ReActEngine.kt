@@ -120,6 +120,19 @@ class ReActEngine @Inject constructor(
                     conversationBuffer.append("\n\nAction: ${parsed.action}")
                     conversationBuffer.append("\nObservation: $observation")
                     conversationBuffer.append("\n\nContinue reasoning. Respond with JSON.")
+                }
+
+                // Execute the action
+                emit(ReActStep.Action(parsed.action, parsed.actionInput))
+
+                val rawObservation = executeAction(parsed.action, parsed.actionInput)
+                val observation = if (rawObservation.length > MAX_TOOL_OUTPUT_LENGTH) {
+                    rawObservation.take(MAX_TOOL_OUTPUT_LENGTH) +
+                        "\n... [output truncated at $MAX_TOOL_OUTPUT_LENGTH chars]"
+                } else {
+                    rawObservation
+                }
+                emit(ReActStep.Observation(observation))
         }
 
         // Max iterations reached

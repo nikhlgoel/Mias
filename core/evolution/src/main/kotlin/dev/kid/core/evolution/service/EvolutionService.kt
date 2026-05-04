@@ -60,8 +60,9 @@ class EvolutionService : Service() {
                     updateNotification("Analyzing patterns…")
                     evolutionEngine.analyzeOnly()
                     updateNotification("Thinking in the background…")
-                } catch (_: Exception) {
-                    // Individual failures are non-fatal
+                } catch (e: Exception) {
+                    // Individual failures are non-fatal, but log them
+                    android.util.Log.e("EvolutionService", "Error in evolution loop", e)
                 }
                 delay(EVOLUTION_INTERVAL_MS)
             }

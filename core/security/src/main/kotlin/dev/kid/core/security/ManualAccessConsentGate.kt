@@ -58,6 +58,16 @@ class ManualAccessConsentGate @Inject constructor() {
         approvals.clear()
     }
 
+    /**
+     * Clean up expired approvals to prevent memory leak.
+     * Should be called periodically.
+     */
+    fun cleanupExpired() {
+        val now = System.currentTimeMillis()
+        val expiredTokens = approvals.filter { it.value.expiresAtMs < now }.keys
+        expiredTokens.forEach { approvals.remove(it) }
+    }
+
     private fun randomToken(): String {
         val bytes = ByteArray(TOKEN_BYTES)
         secureRandom.nextBytes(bytes)

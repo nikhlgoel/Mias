@@ -39,7 +39,7 @@ class ZkVault @Inject constructor(
 
     /** Store a secret string. */
     fun putSecret(key: String, value: String) {
-        prefs.edit().putString(key, value).apply()
+        prefs.edit().putString(key, value).commit() // Use commit() for immediate persistence
     }
 
     /** Retrieve a secret string, or null if not present. */
@@ -47,7 +47,7 @@ class ZkVault @Inject constructor(
 
     /** Remove a secret. */
     fun removeSecret(key: String) {
-        prefs.edit().remove(key).apply()
+        prefs.edit().remove(key).commit() // Use commit() for immediate persistence
     }
 
     /** Check if a secret exists. */
@@ -74,7 +74,7 @@ class ZkVault @Inject constructor(
 
     /** Wipe all vault contents. Irreversible. */
     fun wipeAll() {
-        prefs.edit().clear().apply()
+        prefs.edit().clear().commit() // Use commit() for immediate persistence
     }
 
     private fun constantTimeEquals(a: String, b: String): Boolean {

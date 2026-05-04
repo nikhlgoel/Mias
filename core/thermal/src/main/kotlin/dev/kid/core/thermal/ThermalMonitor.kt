@@ -24,11 +24,11 @@ class ThermalMonitor @Inject constructor(
     @ApplicationContext private val context: Context,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
-    private val batteryManager by lazy {
-        context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+    private val batteryManager: BatteryManager? by lazy {
+        context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
     }
-    private val powerManager by lazy {
-        context.getSystemService(Context.POWER_SERVICE) as PowerManager
+    private val powerManager: PowerManager? by lazy {
+        context.getSystemService(Context.POWER_SERVICE) as? PowerManager
     }
 
     @Volatile
@@ -39,11 +39,11 @@ class ThermalMonitor @Inject constructor(
     }
 
     fun startMonitoring() {
-        powerManager.addThermalStatusListener(thermalListener)
+        powerManager?.addThermalStatusListener(thermalListener)
     }
 
     fun stopMonitoring() {
-        powerManager.removeThermalStatusListener(thermalListener)
+        powerManager?.removeThermalStatusListener(thermalListener)
     }
 
     /** Observe thermal snapshots every [intervalMs]. */
@@ -56,10 +56,12 @@ class ThermalMonitor @Inject constructor(
 
     /** Take a single snapshot right now. */
     fun snapshot(): ThermalSnapshot {
-        val batteryLevel = batteryManager.getIntProperty(
+        val batteryLevel = batteryManager?.getIntProperty(
             BatteryManager.BATTERY_PROPERTY_CAPACITY,
-        )
-        val isCharging = batteryManager.isCharging
+        ) ?: 50 // Default to 50% if unavailable
+        
+        val isCharging = batteryManager?.isCharging ?: false
+        
         // Battery temperature comes in tenths of degrees via ACTION_BATTERY_CHANGED
         val batteryStatus = context.registerReceiver(
             null,

@@ -35,14 +35,20 @@ class FileSystemCapability @Inject constructor(
     )
 
     override suspend fun execute(input: Map<String, String>): KidResult<String> {
-        val operation = input["operation"]
+        val operation = input["operation"]?.lowercase()
             ?: return KidResult.Error("Missing parameter: operation")
         val path = input["path"] ?: ""
+
+        // Validate operation is allowed
+        val allowedOperations = setOf("read", "write", "list", "delete", "exists")
+        if (operation !in allowedOperations) {
+            return KidResult.Error("Unknown or blocked operation: $operation")
+        }
 
         return runCatchingKid {
             val target = resolveSecure(path)
 
-            when (operation.lowercase()) {
+            when (operation) {
                 "read" -> {
                     if (!target.exists()) throw IllegalStateException("File not found: $path")
                     if (target.length() > MAX_READ_SIZE) {
