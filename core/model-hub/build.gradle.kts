@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "dev.kid.core.modelhub"
+    namespace = "dev.mias.core.modelhub"
     compileSdk = 35
 
     defaultConfig {

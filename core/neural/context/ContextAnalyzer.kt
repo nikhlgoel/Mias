@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Context Analyzer - REAL PRODUCTION IMPLEMENTATION
  * 
  * ACTUAL WORKING CODE - No simulations, no stubs, no "would" comments.
@@ -12,10 +12,10 @@
  * - Real pattern matching with edit distance
  */
 
-package dev.kid.core.neural.context
+package dev.mias.core.neural.context
 
 import android.util.Log
-import dev.kid.core.neural.assembly.*
+import dev.mias.core.neural.assembly.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.concurrent.*

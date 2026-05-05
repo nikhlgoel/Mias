@@ -22,14 +22,14 @@ static llama_context *emb_ctx = nullptr;
 static std::mutex emb_mutex;
 
 extern "C" JNIEXPORT void JNICALL
-Java_dev_kid_core_inference_engine_LlamaCppEngine_nativeInit(JNIEnv *env, jobject thiz) {
+Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeInit(JNIEnv *env, jobject thiz) {
     std::lock_guard<std::mutex> lock(llama_mutex);
     llama_backend_init();
     LOGI("llama.cpp backend initialized");
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_dev_kid_core_inference_engine_LlamaCppEngine_nativeLoadModel(JNIEnv *env, jobject thiz, jstring jpath) {
+Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeLoadModel(JNIEnv *env, jobject thiz, jstring jpath) {
     std::lock_guard<std::mutex> lock(llama_mutex);
     
     if (model != nullptr) {
@@ -81,7 +81,7 @@ Java_dev_kid_core_inference_engine_LlamaCppEngine_nativeLoadModel(JNIEnv *env, j
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_dev_kid_core_inference_engine_LlamaCppEngine_nativeGenerate(JNIEnv *env, jobject thiz, jstring jprompt, jint jmax_tokens) {
+Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerate(JNIEnv *env, jobject thiz, jstring jprompt, jint jmax_tokens) {
     std::lock_guard<std::mutex> lock(llama_mutex);
     
     if (model == nullptr || ctx == nullptr) {
@@ -146,7 +146,7 @@ Java_dev_kid_core_inference_engine_LlamaCppEngine_nativeGenerate(JNIEnv *env, jo
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_dev_kid_core_inference_engine_LlamaCppEngine_nativeGenerateStream(JNIEnv *env, jobject thiz, jstring jprompt, jint jmax_tokens, jobject jcallback) {
+Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerateStream(JNIEnv *env, jobject thiz, jstring jprompt, jint jmax_tokens, jobject jcallback) {
     std::lock_guard<std::mutex> lock(llama_mutex);
     
     if (model == nullptr || ctx == nullptr) {
@@ -223,7 +223,7 @@ Java_dev_kid_core_inference_engine_LlamaCppEngine_nativeGenerateStream(JNIEnv *e
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_dev_kid_core_inference_engine_LlamaCppEngine_nativeUnload(JNIEnv *env, jobject thiz) {
+Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeUnload(JNIEnv *env, jobject thiz) {
     std::lock_guard<std::mutex> lock(llama_mutex);
     if (sampler != nullptr) {
         llama_sampler_free(sampler);
@@ -243,7 +243,7 @@ Java_dev_kid_core_inference_engine_LlamaCppEngine_nativeUnload(JNIEnv *env, jobj
 // ─── Embedding Engine Bindings ───────────────────────────────────────────────────
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_dev_kid_core_inference_engine_EmbeddingEngine_nativeLoadEmbeddingModel(JNIEnv *env, jobject thiz, jstring jpath) {
+Java_dev_mias_core_inference_engine_EmbeddingEngine_nativeLoadEmbeddingModel(JNIEnv *env, jobject thiz, jstring jpath) {
     std::lock_guard<std::mutex> lock(emb_mutex);
     
     if (emb_model != nullptr) {
@@ -287,7 +287,7 @@ Java_dev_kid_core_inference_engine_EmbeddingEngine_nativeLoadEmbeddingModel(JNIE
 }
 
 extern "C" JNIEXPORT jfloatArray JNICALL
-Java_dev_kid_core_inference_engine_EmbeddingEngine_nativeGetEmbedding(JNIEnv *env, jobject thiz, jstring jtext) {
+Java_dev_mias_core_inference_engine_EmbeddingEngine_nativeGetEmbedding(JNIEnv *env, jobject thiz, jstring jtext) {
     std::lock_guard<std::mutex> lock(emb_mutex);
 
     if (emb_model == nullptr || emb_ctx == nullptr) {
@@ -346,7 +346,7 @@ Java_dev_kid_core_inference_engine_EmbeddingEngine_nativeGetEmbedding(JNIEnv *en
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_dev_kid_core_inference_engine_EmbeddingEngine_nativeUnloadEmbeddingModel(JNIEnv *env, jobject thiz) {
+Java_dev_mias_core_inference_engine_EmbeddingEngine_nativeUnloadEmbeddingModel(JNIEnv *env, jobject thiz) {
     std::lock_guard<std::mutex> lock(emb_mutex);
     if (emb_ctx != nullptr) {
         llama_free(emb_ctx);

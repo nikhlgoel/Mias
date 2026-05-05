@@ -1,4 +1,4 @@
-# 🎉 FINAL DEPLOYMENT SUMMARY
+﻿# 🎉 FINAL DEPLOYMENT SUMMARY
 
 **Mias — Local AI Assistant**  
 **Status:** ✅ **95% COMPLETE** | Ready for Testing
@@ -86,7 +86,7 @@ chmod +x scripts/bootstrap-gradle.sh
 ```
 core/speech/
 ├── build.gradle.kts                 (Google ML Kit + dependencies)
-├── src/main/kotlin/dev/kid/core/speech/
+├── src/main/kotlin/dev/mias/core/speech/
 │   ├── SpeechEngine.kt              (ML Kit integration, 13 languages)
 │   ├── SpeechViewModel.kt           (UI state management)
 │   └── SpeechViewModel.kt
@@ -96,13 +96,13 @@ core/speech/
 
 ### App:Permissions
 ```
-app/src/main/kotlin/dev/kid/app/permissions/
+app/src/main/kotlin/dev/mias/app/permissions/
 └── PermissionHandler.kt             (Request flow: 4 permissions on startup)
 ```
 
 ### UI Components
 ```
-core/ui/src/main/kotlin/dev/kid/core/ui/components/
+core/ui/src/main/kotlin/dev/mias/core/ui/components/
 ├── SpeechButton.kt (NEW)            (Pulsing mic button with animations)
 └── SpeechFAB.kt (NEW)               (Floating action button variant)
 ```
@@ -181,7 +181,7 @@ chmod +x scripts/bootstrap-gradle.sh
 cd w:\###
 gradlew.bat assembleDebug
 adb install -r app\build\outputs\apk\debug\app-debug.apk
-adb shell am start -n dev.kid.app/.app.ui.MainActivity
+adb shell am start -n dev.mias.app/.app.ui.MainActivity
 ```
 
 **macOS/Linux:**
@@ -189,7 +189,7 @@ adb shell am start -n dev.kid.app/.app.ui.MainActivity
 cd /path/to/mias
 ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n dev.kid.app/.app.ui.MainActivity
+adb shell am start -n dev.mias.app/.app.ui.MainActivity
 ```
 
 ---
@@ -344,7 +344,7 @@ During first launch:
 1. Run: scripts\bootstrap-gradle.bat (Windows) OR ./scripts/bootstrap-gradle.sh (Unix)
 2. Run: gradlew assembleDebug
 3. Run: adb install -r app/build/outputs/apk/debug/app-debug.apk
-4. Run: adb shell am start -n dev.kid.app/.app.ui.MainActivity
+4. Run: adb shell am start -n dev.mias.app/.app.ui.MainActivity
 5. Grant permissions (one dialog at a time)
 6. Tap 🎤 microphone button
 7. Speak and see your words transcribed!

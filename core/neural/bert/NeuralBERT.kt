@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural BERT - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -14,13 +14,13 @@
  * - Actual BERT variants (BERT-base, BERT-large, etc.)
  */
 
-package dev.kid.core.neural.bert
+package dev.mias.core.neural.bert
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
-import dev.kid.core.neural.attention.MultiHeadAttention
-import dev.kid.core.neural.embedding.EmbeddingLayer
-import dev.kid.core.neural.layer.LayerNorm
+import dev.mias.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.attention.MultiHeadAttention
+import dev.mias.core.neural.embedding.EmbeddingLayer
+import dev.mias.core.neural.layer.LayerNorm
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.*

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural AutoML - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -14,11 +14,11 @@
  * - Actual performance tracking and visualization
  */
 
-package dev.kid.core.neural.automl
+package dev.mias.core.neural.automl
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
-import dev.kid.core.neural.layer.*
+import dev.mias.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.layer.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.*

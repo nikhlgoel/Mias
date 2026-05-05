@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "dev.kid.core.ui"
+    namespace = "dev.mias.core.ui"
     compileSdk = 35
 
     defaultConfig {

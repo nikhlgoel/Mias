@@ -1,4 +1,4 @@
-# Mias — Development Progress
+﻿# Mias — Development Progress
 
 This file tracks meaningful milestones, setbacks, and decisions over time. Updated manually when something real changes.
 
@@ -43,7 +43,7 @@ This file tracks meaningful milestones, setbacks, and decisions over time. Updat
 
 ---
 
-## Release #001 — "Kid" (April 2026)
+## Release #001 — "Mias" (April 2026)
 
 **What worked:**
 - Full Compose UI — dark theme, neural eye orb, splash → home → chat/agent/evolution navigation
@@ -70,7 +70,7 @@ This file tracks meaningful milestones, setbacks, and decisions over time. Updat
 
 **Setbacks:**
 - Initial icon design (maroon aggressive eyeball) replaced with teal neural orb matching splash canvas
-- "Kid" release name removed from all user-visible text — was only ever an internal release label
+- "Mias" release name removed from all user-visible text — was only ever an internal release label
 
 ---
 
@@ -79,7 +79,7 @@ This file tracks meaningful milestones, setbacks, and decisions over time. Updat
 | Decision | Rationale |
 |---|---|
 | Package: `io.mias.app` | Cross-platform forward-compatible. Not tied to Android Play Store conventions. |
-| Keep `dev.kid` namespace internally | Changing 150+ files for cosmetic rename adds no user value. Namespace is not user-visible. |
+| Keep `dev.Mias` namespace internally | Changing 150+ files for cosmetic rename adds no user value. Namespace is not user-visible. |
 | Release tags as `#001`, `#002` | Simple, sequential. Not semantic versioning — this isn't a library. |
 | Multi-language architecture | C++ for inference kernel, Rust planned for desktop server, Go for MCP bridge. See `LANGUAGE_ARCHITECTURE.md`. |
 | No Play Store | APK direct release via GitHub. Avoids Play Store review friction during early development. |

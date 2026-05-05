@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural GAN - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -14,12 +14,12 @@
  * - Actual style transfer (StyleGAN-inspired)
  */
 
-package dev.kid.core.neural.gan
+package dev.mias.core.neural.gan
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
-import dev.kid.core.neural.layer.*
-import dev.kid.core.neural.activation.Activation
+import dev.mias.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.layer.*
+import dev.mias.core.neural.activation.Activation
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.*

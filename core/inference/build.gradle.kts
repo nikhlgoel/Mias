@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "dev.kid.core.inference"
+    namespace = "dev.mias.core.inference"
     compileSdk = 35
 
     defaultConfig {
@@ -42,6 +42,7 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:thermal"))
     implementation(project(":core:security"))
+    implementation(project(":core:model-hub"))
 
     // On-device inference powered by llama.cpp JNI
     implementation(libs.kotlinx.coroutines.android)

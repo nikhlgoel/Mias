@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural Trainer - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -12,11 +12,11 @@
  * - Actual model checkpointing and resumption
  */
 
-package dev.kid.core.neural.training
+package dev.mias.core.neural.training
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
-import dev.kid.core.neural.PlatformType
+import dev.mias.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.PlatformType
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.*

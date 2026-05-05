@@ -1,4 +1,4 @@
-# Contributing to Mias
+﻿# Contributing to Mias
 
 Mias is open source. Contributions are welcome — but they need to be focused and clean.
 
@@ -73,7 +73,7 @@ If you want to contribute to a language area that isn't Kotlin, make sure you're
 
 Releases are tagged `#001`, `#002`, etc. — not semantic version strings. Each tag represents a meaningful working state of the project.
 
-The first release (#001, internal codename "Kid") established the base architecture. Tags are created by the maintainer.
+The first release (#001, internal codename "Mias") established the base architecture. Tags are created by the maintainer.
 
 ---
 

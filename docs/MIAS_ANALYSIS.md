@@ -1,4 +1,4 @@
-# Mias — Full Project Analysis
+﻿# Mias — Full Project Analysis
 *Generated May 2026 · Based on source zip + screenshots + deployed page*
 
 ---
@@ -11,7 +11,7 @@
 ```
 app/                    ← Nav host, screens, ViewModels
 core/agent/             ← Tool calling, ReAct loop, capabilities
-core/common/            ← Shared models, KidResult, dispatchers
+core/common/            ← Shared models, MiasResult, dispatchers
 core/data/              ← SQLCipher DB, conversation repo, Hindsight memory
 core/evolution/         ← Background self-improvement engine
 core/inference/         ← LlamaCpp JNI, EmbeddingEngine, InferenceOrchestrator
@@ -62,14 +62,14 @@ This is a legitimately well-structured project. Multi-module Gradle with DI is t
 
 ### A. Immediate Fixes
 
-**"Kid" removal from all visible text** (see Section 5 for exact file map):
-- SplashScreen: `{Kid}` → `{Mias}`
-- KidInputBar placeholder: `"Talk to Kid..."` → `"Talk to Mias..."`
-- EvolutionScreen: `"Kid evolves silently"` → `"Mias evolves silently"`
-- EvolutionService notification: `"Kid"` → `"Mias"` (shows in Android notification shade)
-- InferenceOrchestrator system prompt: `"You are Kid"` → `"You are Mias"`
-- McpClient: `"Kid Android"` → `"Mias Android"`
-- WebResearchCapability user-agent: `"Kid/4.0"` → `"Mias/4.0"`
+**"Mias" removal from all visible text** (see Section 5 for exact file map):
+- SplashScreen: `{Mias}` → `{Mias}`
+- MiasInputBar placeholder: `"Talk to Mias..."` → `"Talk to Mias..."`
+- EvolutionScreen: `"Mias evolves silently"` → `"Mias evolves silently"`
+- EvolutionService notification: `"Mias"` → `"Mias"` (shows in Android notification shade)
+- InferenceOrchestrator system prompt: `"You are Mias"` → `"You are Mias"`
+- McpClient: `"Mias Android"` → `"Mias Android"`
+- WebResearchCapability user-agent: `"Mias/4.0"` → `"Mias/4.0"`
 
 **App icon — critical fix:**
 - `ic_kid_background.xml` and `ic_kid_foreground.xml` need renaming to `ic_mias_*`
@@ -79,7 +79,7 @@ This is a legitimately well-structured project. Multi-module Gradle with DI is t
 
 **Icon design analysis (Images 1 vs 2/6):**
 - Image 1 has a maroon-red "threat" aesthetic. The background.xml even has a comment `<!-- Outer threat ring -->` and `<!-- Razor-like spikes -->`. This was the "Mias" icon from the previous iteration.
-- Images 2 and 6 show the `{Kid}` splash — which ironically has the BETTER icon: teal concentric rings with center dot, no aggression, pure tech aesthetic.
+- Images 2 and 6 show the `{Mias}` splash — which ironically has the BETTER icon: teal concentric rings with center dot, no aggression, pure tech aesthetic.
 - **Recommendation:** The SplashScreen.kt Canvas code is the definitive icon spec. Export this exact design as adaptive icon layers. The current `ic_kid_foreground.xml` needs to be redrawn to match the SplashScreen orb (teal concentric rings, hex grid iris, center dot). The maroon eyeball in ic_kid_background.xml should be replaced with the dark navy radial gradient from the splash.
 
 ### B. Missing Screens (Must Build)
@@ -139,7 +139,7 @@ Option C: ONNX Runtime + NNAPI delegate (MobileLLM path)
 **Recommendation:** Keep llama.cpp for CPU/Qwen3 path. Add Google AI Edge SDK as a second engine for Gemma. Two engines, one InferenceOrchestrator interface.
 
 **Module structure is correct — don't change it.**
-The `dev.kid.*` package name is fine to keep internally. Changing 150+ files for a cosmetic rename adds zero user value at this stage.
+The `dev.mias.*` package name is fine to keep internally. Changing 150+ files for a cosmetic rename adds zero user value at this stage.
 
 **Language module is weak.** `RegexIntentExtractor` is fine for MVP but "Picks the right model" is a strong claim. At minimum, add a keyword-weighted router:
 - Code keywords → Qwen3 if available
@@ -159,7 +159,7 @@ The McpClient is a basic HTTP wrapper. The official MCP spec (2024-11 version) r
 | MCP spec compliance | Medium | 2 days |
 | RegexIntentExtractor → semantic router | Medium | 1 day |
 | LoRA blend runtime implementation | Low | Complex, 1 week |
-| Package rename dev.kid → dev.mias | Low | Mechanical, 2 hours |
+| Package rename dev.Mias → dev.mias | Low | Mechanical, 2 hours |
 
 ---
 
@@ -231,21 +231,21 @@ And remove:
 .github/
 ```
 
-### B. "Kid" Removal — Exact File + Line Map
+### B. "Mias" Removal — Exact File + Line Map
 
 **User-visible text to change NOW:**
 
 | File | Line | Change |
 |---|---|---|
-| `app/.../splash/SplashScreen.kt` | 252 | `"{Kid}"` → `"{Mias}"` |
-| `core/ui/.../components/KidInputBar.kt` | 43 | `"Talk to Kid..."` → `"Talk to Mias..."` |
-| `app/.../evolution/EvolutionScreen.kt` | 168 | `"Kid evolves silently"` → `"Mias evolves silently"` |
-| `core/evolution/.../service/EvolutionService.kt` | 78 | `.setContentTitle("Kid")` → `"Mias"` |
-| `core/evolution/.../service/EvolutionService.kt` | 89 | `"Kid Background Thinking"` → `"Mias Background Thinking"` |
-| `core/evolution/.../service/EvolutionService.kt` | 92 | `"Kid evolves"` → `"Mias evolves"` |
-| `core/inference/.../orchestrator/InferenceOrchestrator.kt` | 120 | `"You are Kid"` → `"You are Mias"` |
-| `core/network/.../mcp/McpClient.kt` | 56 | `"Kid Android"` → `"Mias Android"` |
-| `core/agent/.../capabilities/WebResearchCapability.kt` | 143 | `"Kid/4.0"` → `"Mias/4.0"` |
+| `app/.../splash/SplashScreen.kt` | 252 | `"{Mias}"` → `"{Mias}"` |
+| `core/ui/.../components/MiasInputBar.kt` | 43 | `"Talk to Mias..."` → `"Talk to Mias..."` |
+| `app/.../evolution/EvolutionScreen.kt` | 168 | `"Mias evolves silently"` → `"Mias evolves silently"` |
+| `core/evolution/.../service/EvolutionService.kt` | 78 | `.setContentTitle("Mias")` → `"Mias"` |
+| `core/evolution/.../service/EvolutionService.kt` | 89 | `"Mias Background Thinking"` → `"Mias Background Thinking"` |
+| `core/evolution/.../service/EvolutionService.kt` | 92 | `"Mias evolves"` → `"Mias evolves"` |
+| `core/inference/.../orchestrator/InferenceOrchestrator.kt` | 120 | `"You are Mias"` → `"You are Mias"` |
+| `core/network/.../mcp/McpClient.kt` | 56 | `"Mias Android"` → `"Mias Android"` |
+| `core/agent/.../capabilities/WebResearchCapability.kt` | 143 | `"Mias/4.0"` → `"Mias/4.0"` |
 
 **App icon rename:**
 ```
@@ -255,7 +255,7 @@ app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml → update references inside
 ```
 
 **Class/package names** (don't touch yet — no user impact, creates noise):
-`KidApplication`, `KidNavHost`, `KidTheme`, `KidColors`, etc. → schedule for v5.0 when package is stable. The `dev.kid` package ID, once on Play Store, can never change anyway.
+`MiasApplication`, `MiasNavHost`, `MiasTheme`, `MiasColors`, etc. → schedule for v5.0 when package is stable. The `dev.Mias` package ID, once on Play Store, can never change anyway.
 
 ### C. App Icon Design Spec (What to Build)
 
@@ -284,7 +284,7 @@ The adaptive icon (foreground + background) will look correct on both circular a
 ## 6. Priority Action List
 
 **This week:**
-1. Apply all "Kid" → "Mias" text replacements (30 min, see table above)
+1. Apply all "Mias" → "Mias" text replacements (30 min, see table above)
 2. Fix .gitignore (remove `.github/`, add doc ignores)
 3. Rename icon drawables, redraw foreground to match splash aesthetic
 

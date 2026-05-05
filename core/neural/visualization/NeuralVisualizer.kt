@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural Visualizer - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -12,12 +12,12 @@
  * - Actual interactive visualization support
  */
 
-package dev.kid.core.neural.visualization
+package dev.mias.core.neural.visualization
 
 import android.util.Log
 import android.graphics.*
 import android.graphics.Bitmap.Config
-import dev.kid.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.NeuralArchitectureFramework
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.*

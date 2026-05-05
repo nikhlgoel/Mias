@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Universal Neural Bus - REAL PRODUCTION IMPLEMENTATION
  * 
  * ACTUAL WORKING CODE - No simulations, no stubs, no "would" comments.
@@ -12,7 +12,7 @@
  * - Real backpressure handling
  */
 
-package dev.kid.core.neural
+package dev.mias.core.neural
 
 import android.util.Log
 import kotlinx.coroutines.*

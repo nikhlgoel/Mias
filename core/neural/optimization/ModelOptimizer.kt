@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Model Optimizer - REAL PRODUCTION IMPLEMENTATION
  * 
  * ACTUAL WORKING CODE - No simulations, no stubs, no "would" comments.
@@ -12,10 +12,10 @@
  * - Real graph optimization passes
  */
 
-package dev.kid.core.neural.optimization
+package dev.mias.core.neural.optimization
 
 import android.util.Log
-import dev.kid.core.neural.integration.*
+import dev.mias.core.neural.integration.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.*

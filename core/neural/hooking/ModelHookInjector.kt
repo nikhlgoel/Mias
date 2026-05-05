@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Model Hook Injector - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -12,11 +12,11 @@
  * - Actual disassembly and reassembly of hooked functions
  */
 
-package dev.kid.core.neural.hooking
+package dev.mias.core.neural.hooking
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
-import dev.kid.core.neural.PlatformType
+import dev.mias.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.PlatformType
 import java.lang.reflect.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder

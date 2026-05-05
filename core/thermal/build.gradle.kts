@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "dev.kid.core.thermal"
+    namespace = "dev.mias.core.thermal"
     compileSdk = 35
 
     defaultConfig {

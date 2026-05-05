@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural Audio - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -12,10 +12,10 @@
  * - Actual audio classification and tagging
  */
 
-package dev.kid.core.neural.audio
+package dev.mias.core.neural.audio
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.NeuralArchitectureFramework
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.*

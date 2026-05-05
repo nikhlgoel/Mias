@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural YOLO - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -13,13 +13,13 @@
  * - Real inference pipeline with preprocessing/postprocessing
  */
 
-package dev.kid.core.neural.yolo
+package dev.mias.core.neural.yolo
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
-import dev.kid.core.neural.layer.Conv2D
-import dev.kid.core.neural.layer.BatchNorm2D
-import dev.kid.core.neural.activation.Activation
+import dev.mias.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.layer.Conv2D
+import dev.mias.core.neural.layer.BatchNorm2D
+import dev.mias.core.neural.activation.Activation
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.*

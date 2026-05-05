@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.hilt)
@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "dev.kid.core.evolution"
+    namespace = "dev.mias.core.evolution"
     compileSdk = 35
 
     defaultConfig {

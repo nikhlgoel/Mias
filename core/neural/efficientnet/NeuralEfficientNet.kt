@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural EfficientNet - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -13,11 +13,11 @@
  * - Real transfer learning and fine-tuning support
  */
 
-package dev.kid.core.neural.efficientnet
+package dev.mias.core.neural.efficientnet
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
-import dev.kid.core.neural.layer.*
+import dev.mias.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.layer.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.*

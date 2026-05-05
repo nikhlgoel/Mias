@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural Deployer - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -12,11 +12,11 @@
  * - Actual health checks and readiness probes
  */
 
-package dev.kid.core.neural.deployment
+package dev.mias.core.neural.deployment
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
-import dev.kid.core.neural.PlatformType
+import dev.mias.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.PlatformType
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.*

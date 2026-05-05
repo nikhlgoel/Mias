@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Persistence Manager - REAL PRODUCTION IMPLEMENTATION
  * 
  * ACTUAL WORKING CODE - No simulations, no stubs, no "would" comments.
@@ -13,7 +13,7 @@
  * - Actual concurrent read/write with file locks
  */
 
-package dev.kid.core.neural.persistence
+package dev.mias.core.neural.persistence
 
 import android.content.Context
 import android.util.Log

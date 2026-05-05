@@ -1,7 +1,7 @@
-/*
+﻿/*
  * Mias — Local AI Assistant
  * Package: io.mias.app
- * Release: #001 (first public build — "Kid")
+ * Release: #001 (first public build)
  * This is the first step of the application. Package name may change on future major platform ports.
  */
 import java.util.Properties
@@ -23,7 +23,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "dev.kid.app"
+    namespace = "dev.mias.app"
     compileSdk = 35
 
     defaultConfig {

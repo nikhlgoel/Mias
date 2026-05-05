@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural Regularization - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -14,10 +14,10 @@
  * - Actual Data Augmentation pipelines
  */
 
-package dev.kid.core.neural.regularization
+package dev.mias.core.neural.regularization
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.NeuralArchitectureFramework
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.*

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural Embedding - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -12,10 +12,10 @@
  * - Actual embedding visualization and analysis
  */
 
-package dev.kid.core.neural.embedding
+package dev.mias.core.neural.embedding
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.NeuralArchitectureFramework
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.nio.ByteBuffer

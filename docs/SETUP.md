@@ -1,4 +1,4 @@
-# Mias — Setup Guide
+﻿# Mias — Setup Guide
 
 > **Local AI. No cloud. Your data.**  
 > Build and run Mias on Android and Desktop
@@ -44,17 +44,17 @@ adb devices
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 # 4. Launch app on device
-adb shell am start -n dev.kid.app/.ui.MainActivity
+adb shell am start -n dev.mias.app/.ui.MainActivity
 ```
 
 ### For Desktop (Model Server)
 ```bash
 # 1. Build container
 cd desktop
-docker build -t kid-desktop-server .
+docker build -t Mias-desktop-server .
 
 # 2. Run with GPU support
-docker run --gpus all -p 8400:8400 kid-desktop-server
+docker run --gpus all -p 8400:8400 Mias-desktop-server
 
 # 3. Verify health
 curl http://localhost:8400/health
@@ -218,7 +218,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ```bash
 # Via ADB
-adb shell am start -n dev.kid.app/.ui.MainActivity
+adb shell am start -n dev.mias.app/.ui.MainActivity
 
 # Or directly from device home screen
 # Tap Mias icon (neural eye animation)
@@ -238,7 +238,7 @@ Then run:
 ./scripts/bootstrap-gradle.sh   # if gradle-wrapper.jar missing (Git Bash)
 ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n dev.kid.app/.ui.MainActivity
+adb shell am start -n dev.mias.app/.ui.MainActivity
 ```
 
 ### Step 5: Grant Permissions
@@ -316,10 +316,10 @@ cd desktop
 docker build \
   --build-arg CUDA_VERSION=12.4 \
   --build-arg PYTHON_VERSION=3.11 \
-  -t kid-desktop-server:latest \
+  -t Mias-desktop-server:latest \
   .
 
-# Expected: Successfully tagged kid-desktop-server:latest
+# Expected: Successfully tagged Mias-desktop-server:latest
 ```
 
 ### Step 4: Download Model Weights
@@ -342,7 +342,7 @@ huggingface-cli download \
 Alternatively, using `curl`:
 ```bash
 # 1. Download from HuggingFace directly
-curl -L -o ~/.cache/kid-models/qwen3-coder-next.gguf \
+curl -L -o ~/.cache/Mias-models/qwen3-coder-next.gguf \
   https://huggingface.co/Qwen/Qwen3-Coder-Next-GGUF/resolve/main/Qwen3-Coder-Next-32B-Q4_K_M.gguf
 
 # 2. Mount in Docker container (see next step)
@@ -355,19 +355,19 @@ curl -L -o ~/.cache/kid-models/qwen3-coder-next.gguf \
 docker run \
   --gpus all \
   -p 8400:8400 \
-  -v ~/.cache/kid-models:/models:ro \
+  -v ~/.cache/Mias-models:/models:ro \
   -e MODEL_PATH=/models/qwen3-coder-next.gguf \
   -e DEVICE=cuda \
-  kid-desktop-server:latest
+  Mias-desktop-server:latest
 
 # Option B: CPU-only (slower, but works everywhere)
 docker run \
   -p 8400:8400 \
-  -v ~/.cache/kid-models:/models:ro \
+  -v ~/.cache/Mias-models:/models:ro \
   -e MODEL_PATH=/models/qwen3-coder-next.gguf \
   -e DEVICE=cpu \
   -e NUM_THREADS=12  # Adjust to your CPU core count
-  kid-desktop-server:latest
+  Mias-desktop-server:latest
 
 # Expected output:
 # Uvicorn running on http://0.0.0.0:8400
@@ -432,7 +432,7 @@ sudo tailscale up --accept-routes
 
 ### Step 4: Configure Android to Connect
 
-In {Kid} Android app:
+In {Mias} Android app:
 1. Settings → Networking → Tailscale
 2. Toggle "Enable Tailscale Bridge" ☑️
 3. Input Desktop MCP API: 100.x.x.x:9090 (Tailscale IP of desktop)
@@ -457,12 +457,12 @@ In {Kid} Android app:
 2. Filter by role: CODE, CHAT, REASONING
 3. Tap model card → Tap "Download"
 4. Observe progress bar (pause/resume supported)
-5. Model auto-installs in `{Kid}-models` directory
+5. Model auto-installs in `{Mias}-models` directory
 
 **Via ADB (CLI):**
 ```bash
 # Download Gemma INT4 directly
-adb shell am startservice dev.kid/.app.services/ModelDownloadService \
+adb shell am startservice dev.Mias/.app.services/ModelDownloadService \
   --es model_url "https://huggingface.co/.../gemma-4-e4b-int4.onnx" \
   --es model_name "gemma-4-e4b"
 ```
@@ -471,10 +471,10 @@ adb shell am startservice dev.kid/.app.services/ModelDownloadService \
 
 ```bash
 # Android (via ADB)
-adb shell ls /data/data/dev.kid/files/models/
+adb shell ls /data/data/dev.Mias/files/models/
 
 # Desktop (check Docker mounted path)
-ls ~/.cache/kid-models/
+ls ~/.cache/Mias-models/
 ```
 
 ---
@@ -487,7 +487,7 @@ ls ~/.cache/kid-models/
 2. **Privacy Consent** → Review data isolation policy
 3. **Biometric Setup** → Register fingerprint or face
 4. **Home Screen** → Central breathingOrb, nudges panel, 6 nav buttons
-5. **Try First Chat** → "Hi Kid, tell me a joke" → Response from available model
+5. **Try First Chat** → "Hi Mias, tell me a joke" → Response from available model
 
 ### Desktop Model Server First Run
 
@@ -544,7 +544,7 @@ rm -rf .gradle
 adb shell df /data
 
 # Uninstall previous build
-adb uninstall dev.kid
+adb uninstall dev.Mias
 
 # Re-install
 adb install -r app/build/outputs/apk/debug/app-debug.apk
@@ -565,7 +565,7 @@ adb shell getprop ro.hardware.nfc
 adb shell ping 8.8.8.8
 
 # Check storage space
-adb shell du -sh /data/data/dev.kid/
+adb shell du -sh /data/data/dev.Mias/
 
 # Manually trigger download
 adb logcat | grep ModelDownloadManager
@@ -620,7 +620,7 @@ After successful setup:
 1. **Explore Brain Market** → Download 2-3 models for different roles
 2. **Configure Preferences** → Settings → Persona (empathy, humor, tech-level)
 3. **Enable Evolution** → Settings → Evolution → Toggle "Learn from Interactions"
-4. **Test Agent Capabilities** → Ask Kid to: read file, fetch webpage, run calculation
+4. **Test Agent Capabilities** → Ask Mias to: read file, fetch webpage, run calculation
 5. **Deploy on Tailscale** → Connect desktop + mobile for seamless offloading
 6. **Monitor Thermal** → Settings → Thermal Status → Watch model switching on thermal throttle
 7. **Review Hindsight Memory** → Settings → Memory → See consolidation progress
@@ -631,7 +631,7 @@ After successful setup:
 
 ```bash
 # View detailed logs
-adb logcat | grep "kid"  # Android
+adb logcat | grep "Mias"  # Android
 
 # Desktop container logs
 docker logs <container-id>

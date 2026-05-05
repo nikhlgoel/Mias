@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "dev.kid.core.resilience"
+    namespace = "dev.mias.core.resilience"
     compileSdk = 35
 
     defaultConfig {

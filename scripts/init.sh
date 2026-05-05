@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # =============================================================================
-# Project #001 {Kid} — Init / Validation Script
+# Project #001 {Mias} — Init / Validation Script
 # =============================================================================
 # Usage:
 #   ./scripts/init.sh            → Full setup (install deps, validate env)
@@ -151,9 +151,9 @@ run_desktop() {
     fi
 
     cd "$PROJECT_ROOT"
-    docker build -t kid-desktop-server -f desktop/Dockerfile .
+    docker build -t Mias-desktop-server -f desktop/Dockerfile .
     info "Starting desktop model server on port 8400..."
-    docker run --rm --gpus all -p 8400:8400 kid-desktop-server
+    docker run --rm --gpus all -p 8400:8400 Mias-desktop-server
 }
 
 # ---------------------------------------------------------------------------
@@ -162,7 +162,7 @@ run_desktop() {
 main() {
     echo ""
     echo "  ╔═══════════════════════════════════════╗"
-    echo "  ║   Project #001 {Kid} — Init Script    ║"
+    echo "  ║   Project #001 {Mias} — Init Script    ║"
     echo "  ║   Zero-Cloud · Local-First · Private  ║"
     echo "  ╚═══════════════════════════════════════╝"
     echo ""

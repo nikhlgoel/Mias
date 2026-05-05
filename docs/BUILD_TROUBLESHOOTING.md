@@ -1,4 +1,4 @@
-# ⚠️ CRITICAL: Build Locations & Setup Instructions
+﻿# ⚠️ CRITICAL: Build Locations & Setup Instructions
 
 ## 🚨 WHERE TO RUN COMMANDS
 
@@ -83,10 +83,10 @@ REM 7. Install APK
 adb install -r app\build\outputs\apk\debug\app-debug.apk
 
 REM 8. Launch app
-adb shell am start -n dev.kid.app/.app.ui.MainActivity
+adb shell am start -n dev.mias.app/.app.ui.MainActivity
 
 REM 9. View live logs
-adb logcat | findstr "kid"
+adb logcat | findstr "Mias"
 ```
 
 ---
@@ -117,10 +117,10 @@ adb devices
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 # 8. Launch app
-adb shell am start -n dev.kid.app/.app.ui.MainActivity
+adb shell am start -n dev.mias.app/.app.ui.MainActivity
 
 # 9. View live logs
-adb logcat | grep kid
+adb logcat | grep Mias
 ```
 
 ---

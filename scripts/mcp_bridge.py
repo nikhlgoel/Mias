@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Project — Mias MCP Bridge Server
 # Release: #001
@@ -72,7 +72,7 @@ class MCPBridgeHandler(BaseHTTPRequestHandler):
             response = make_jsonrpc_response(req_id, {
                 "protocolVersion": "2025-03-26",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "kid-mcp-bridge", "version": "0.1.0"},
+                "serverInfo": {"name": "Mias-mcp-bridge", "version": "0.1.0"},
             })
         elif method == "tools/list":
             response = make_jsonrpc_response(req_id, {
@@ -107,7 +107,7 @@ class MCPBridgeHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/health":
-            self._send_json(200, {"status": "ok", "service": "kid-mcp-bridge"})
+            self._send_json(200, {"status": "ok", "service": "Mias-mcp-bridge"})
         else:
             self._send_json(404, {"error": "Not found"})
 
@@ -168,14 +168,14 @@ class MCPBridgeHandler(BaseHTTPRequestHandler):
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Kid MCP Bridge Server")
+    parser = argparse.ArgumentParser(description="Mias MCP Bridge Server")
     parser.add_argument("--host", default="127.0.0.1", help="Bind address (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8401, help="Port (default: 8401)")
     args = parser.parse_args()
 
     # Security: refuse to bind to 0.0.0.0
     if args.host == "0.0.0.0":
-        logger.error("Refusing to bind to 0.0.0.0 — Kid is local-only. Use 127.0.0.1 or a Tailscale IP.")
+        logger.error("Refusing to bind to 0.0.0.0 — Mias is local-only. Use 127.0.0.1 or a Tailscale IP.")
         sys.exit(1)
 
     server = HTTPServer((args.host, args.port), MCPBridgeHandler)

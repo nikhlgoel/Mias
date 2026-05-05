@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Hardware Performance Counters - REAL PRODUCTION IMPLEMENTATION
  * 
  * ACTUAL WORKING CODE - No simulations, no stubs, no "would" comments.
@@ -13,7 +13,7 @@
  * - Actual memory bandwidth measurement
  */
 
-package dev.kid.core.neural.hardware
+package dev.mias.core.neural.hardware
 
 import android.os.Build
 import android.system.Os

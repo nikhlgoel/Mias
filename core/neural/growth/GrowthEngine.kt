@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Growth Engine - REAL PRODUCTION IMPLEMENTATION
  * 
  * ACTUAL WORKING CODE - No simulations, no stubs, no "would" comments.
@@ -12,12 +12,12 @@
  * - Real-time model optimization based on traced patterns
  */
 
-package dev.kid.core.neural.growth
+package dev.mias.core.neural.growth
 
 import android.content.Context
 import android.util.Log
-import dev.kid.core.neural.assembly.*
-import dev.kid.core.neural.context.ContextFeatures
+import dev.mias.core.neural.assembly.*
+import dev.mias.core.neural.context.ContextFeatures
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.*
@@ -440,7 +440,7 @@ class GrowthEngine @Inject constructor(
     }
 
     private fun loadPatternsFromDisk() {
-        val file = File("/data/data/dev.kid/files/growth_patterns.bin")
+        val file = File("/data/data/dev.mias/files/growth_patterns.bin")
         if (!file.exists()) return
         
         try {

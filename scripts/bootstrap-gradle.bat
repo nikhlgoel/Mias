@@ -1,5 +1,5 @@
-@echo off
-REM {Kid} V4 - Gradle Wrapper Bootstrap (Windows)
+﻿@echo off
+REM {Mias} V4 - Gradle Wrapper Bootstrap (Windows)
 REM Run this from project root if gradle-wrapper.jar is missing
 
 setlocal enabledelayedexpansion

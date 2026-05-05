@@ -49,6 +49,19 @@ desktop.ini
 *.bin
 *.safetensors
 desktop/models/
+core/inference/src/main/cpp/llama.cpp/
+
+# === Downloaded model storage ===
+app/src/main/assets/models/
+files/models/
+
+# === Temporary/partial downloads ===
+*.download
+*.partial
+
+# === Native build outputs ===
+core/inference/.cxx/
+core/inference/build/
 
 # === Python ===
 __pycache__/

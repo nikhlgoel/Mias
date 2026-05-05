@@ -1,6 +1,6 @@
-package dev.kid.core.neural.assembly
+﻿package dev.mias.core.neural.assembly
 
-import dev.kid.core.neural.PlatformType
+import dev.mias.core.neural.PlatformType
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -138,44 +138,4 @@ class X86Optimizer @Inject constructor() : AssemblyOptimizer {
     }
 }
 
-// ── Quantum Optimizer (Future Quantum Computers) ──
 
-@Singleton
-class QuantumOptimizer @Inject constructor() : AssemblyOptimizer {
-    override fun setup() {
-        // Setup quantum-specific optimizations
-        // - Initialize qubit simulator
-        // - Configure quantum gates
-    }
-
-    override suspend fun optimize(instructions: List<InstructionTrace>): OptimizedPattern {
-        // Quantum optimization uses different paradigm
-        // - Convert classical instructions to quantum circuits
-        // - Use Grover's or Shor's algorithm where applicable
-        // - Return quantum-enhanced classical instructions
-
-        val optimized = mutableListOf<String>()
-
-        // Example: Use quantum parallelism for search
-        if (instructions.any { it.instruction.contains("CMP") }) {
-            optimized.add("QUANTUM_GROVER_SEARCH") // Quantum search
-            optimized.add("MEASURE_RESULT")
-        } else {
-            optimized.addAll(instructions.map { it.instruction })
-        }
-
-        return OptimizedPattern(
-            originalInstructions = instructions.map { it.instruction },
-            optimizedInstructions = optimized,
-            expectedSpeedup = 2.0f, // Quantum speedup for certain problems
-        )
-    }
-
-    override fun getSupportedInstructions(): List<String> {
-        return listOf(
-            "HADAMARD", "CNOT", "PHASE", // Quantum gates
-            "QUANTUM_GROVER_SEARCH",
-            "QUANTUM_SHOR_FACTORING",
-        )
-    }
-}

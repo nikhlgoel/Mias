@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural XGBoost - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -14,10 +14,10 @@
  * - Actual feature importance and SHAP values
  */
 
-package dev.kid.core.neural.xgboost
+package dev.mias.core.neural.xgboost
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.NeuralArchitectureFramework
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.*

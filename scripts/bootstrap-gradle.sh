@@ -1,6 +1,6 @@
-#!/bin/bash
+﻿#!/bin/bash
 
-# {Kid} V4 - Gradle Wrapper Bootstrap Script
+# {Mias} V4 - Gradle Wrapper Bootstrap Script
 # Run this from project root if gradle-wrapper.jar is missing
 
 set -e

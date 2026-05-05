@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Assembly Instruction - REAL PRODUCTION IMPLEMENTATION
  * 
  * ACTUAL WORKING CODE - No simulations, no stubs, no "would" comments.
@@ -11,7 +11,7 @@
  * - Actual control flow detection
  */
 
-package dev.kid.core.neural.assembly
+package dev.mias.core.neural.assembly
 
 import android.util.Log
 import java.io.*

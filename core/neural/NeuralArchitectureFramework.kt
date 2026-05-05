@@ -1,13 +1,12 @@
-/**
+﻿/**
  * Neural Architecture Framework - PRODUCTION GRADE IMPLEMENTATION
  *
  * REAL implementation with 2,500+ lines of production code:
  * - Actual ARM NEON/SVE instruction tracing via perf_event_open syscall
  * - x86 Intel PT (Processor Trace) integration with real hardware counters
- * - Quantum circuit simulation with 128+ qubit support
  * - Neural Knowledge Graph with 1M+ pattern capacity and HNSW indexing
  * - Real-time weight gradient capture during model inference
- * - Cross-platform support: Android, iOS, macOS, Windows, Linux, Quantum
+ * - Cross-platform support: Android, iOS, macOS, Windows, Linux
  * - Hardware Performance Monitoring Unit (PMU) integration
  * - LD_PRELOAD hooking for model function interception
  * - Memory-mapped trace buffers for zero-copy tracing
@@ -18,7 +17,7 @@
  * @since 2024
  */
 
-package dev.kid.core.neural
+package dev.mias.core.neural
 
 import android.content.Context
 import android.system.Os
@@ -26,12 +25,12 @@ import android.system.OsConstants
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import dagger.hilt.android.qualifiers.ApplicationContext
-import dev.kid.core.neural.assembly.*
-import dev.kid.core.neural.context.*
-import dev.kid.core.neural.growth.*
-import dev.kid.core.neural.quantum.*
-import dev.kid.core.neural.integration.*
-import dev.kid.core.neural.persistence.*
+import dev.mias.core.neural.assembly.*
+import dev.mias.core.neural.context.*
+import dev.mias.core.neural.growth.*
+
+import dev.mias.core.neural.integration.*
+import dev.mias.core.neural.persistence.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.*
@@ -54,7 +53,6 @@ import java.lang.reflect.Method
  * This is NOT a simulation. This hooks into real hardware:
  * - ARM: Uses perf_event_open with PERF_TYPE_HARDWARE, ARM PMU counters
  * - x86: Uses Intel PT via /sys/kernel/debug/tracing/, BTS (Branch Trace Store)
- * - Quantum: Interfaces with QIR (Quantum Intermediate Representation)
  *
  * Memory layout for trace buffers:
  * [Header 4KB][Instruction Buffer 256MB][Metadata 4MB][Stack Traces 16MB]
@@ -95,10 +93,6 @@ class NeuralArchitectureFramework @Inject constructor(
         private const val HNSW_M = 32 // HNSW graph connections
         private const val HNSW_EF_CONSTRUCTION = 200
 
-        // Quantum
-        private const val QUANTUM_QUBITS_MAX = 128
-        private const val QUANTUM_CIRCUIT_DEPTH_MAX = 1_000
-
         // perf_event_open constants (Linux kernel)
         private const val PERF_TYPE_HARDWARE = 0
         private const val PERF_TYPE_SOFTWARE = 1
@@ -127,7 +121,7 @@ class NeuralArchitectureFramework @Inject constructor(
     private lateinit var contextAnalyzer: ContextAnalyzer
     private lateinit var growthEngine: GrowthEngine
     private lateinit var assemblyLayer: AssemblyAbstractionLayer
-    private lateinit var quantumBridge: QuantumBridge
+
     private lateinit var integration: NeuralIntegration
     private lateinit var persistenceManager: PersistenceManager
     private lateinit var performanceMonitor: PerformanceMonitor
@@ -221,8 +215,7 @@ class NeuralArchitectureFramework @Inject constructor(
      * 3. Initializes memory-mapped trace buffers
      * 4. Sets up signal handlers for trace capture
      * 5. Creates neural knowledge graph with HNSW indexing
-     * 6. Initializes quantum bridge (if available)
-     * 7. Loads previous persistent state
+     * 6. Loads previous persistent state
      * 8. Starts background growth and persistence loops
      *
      * Expected initialization time: 2-5 seconds on modern hardware
@@ -275,46 +268,37 @@ class NeuralArchitectureFramework @Inject constructor(
             )
             growthEngine.initialize()
 
-            // === STEP 7: Setup Quantum Bridge (if available) ===
-            Log.i(TAG, "[7/13] Setting up Quantum Bridge...")
-            quantumBridge = QuantumBridge()
-            if (currentPlatform == PlatformType.QUANTUM || isQuantumSimulatorAvailable()) {
-                quantumBridge.initialize(QUANTUM_QUBITS_MAX)
-                Log.i(TAG, "Quantum Bridge initialized with $QUANTUM_QUBITS_MAX qubits")
-            }
-
-            // === STEP 8: Initialize Integration Layer ===
-            Log.i(TAG, "[8/13] Initializing Integration Layer...")
+            // === STEP 7: Initialize Integration Layer ===
+            Log.i(TAG, "[7/12] Initializing Integration Layer...")
             integration = NeuralIntegration(
                 framework = this@NeuralArchitectureFramework,
                 assemblyLayer = assemblyLayer,
                 growthEngine = growthEngine,
-                quantumBridge = quantumBridge,
             )
 
-            // === STEP 9: Setup Persistence Manager ===
-            Log.i(TAG, "[9/13] Setting up Persistence Manager...")
+            // === STEP 8: Setup Persistence Manager ===
+            Log.i(TAG, "[8/12] Setting up Persistence Manager...")
             persistenceManager = PersistenceManager(context, knowledgeGraph, patternEmbeddings)
             persistenceManager.initialize()
 
             // Now set persistence manager in growth engine
             growthEngine.setPersistenceManager(persistenceManager)
 
-            // === STEP 10: Initialize Performance Monitor ===
-            Log.i(TAG, "[10/13] Initializing Performance Monitor...")
+            // === STEP 9: Initialize Performance Monitor ===
+            Log.i(TAG, "[9/12] Initializing Performance Monitor...")
             performanceMonitor = PerformanceMonitor(perfCounters, systemMonitor)
             performanceMonitor.start()
 
-            // === STEP 11: Start Hardware Performance Counters ===
-            Log.i(TAG, "[11/13] Starting hardware performance counters...")
+            // === STEP 10: Start Hardware Performance Counters ===
+            Log.i(TAG, "[10/12] Starting hardware performance counters...")
             startPerformanceCounters()
 
-            // === STEP 12: Load Previous State ===
-            Log.i(TAG, "[12/13] Loading persistent state...")
+            // === STEP 11: Load Previous State ===
+            Log.i(TAG, "[11/12] Loading persistent state...")
             loadPersistentState()
 
-            // === STEP 13: Start Background Services ===
-            Log.i(TAG, "[13/13] Starting background services...")
+            // === STEP 12: Start Background Services ===
+            Log.i(TAG, "[12/12] Starting background services...")
             startBackgroundServices()
 
             // === INITIALIZATION COMPLETE ===
@@ -326,7 +310,7 @@ class NeuralArchitectureFramework @Inject constructor(
                 knowledgeGraphSize = knowledgeGraph.size(),
                 perfCountersActive = perfCounters.getActiveCount(),
                 traceBuffersAllocated = traceBuffers.size,
-                quantumReady = quantumBridge.isInitialized(),
+
             )
 
             isFrameworkActive.value = true
@@ -406,7 +390,6 @@ class NeuralArchitectureFramework @Inject constructor(
                 if (arch.contains("aarch64")) PlatformType.LINUX_ARM
                 else PlatformType.LINUX_X86
             }
-            arch.contains("quantum") -> PlatformType.QUANTUM
             else -> {
                 Log.w(TAG, "Unknown platform: arch=$arch, os=$osName")
                 PlatformType.X86_64 // Safe default
@@ -452,9 +435,6 @@ class NeuralArchitectureFramework @Inject constructor(
                 PlatformType.LINUX_X86, PlatformType.MAC_X86,
             ) -> {
                 enumerateX86Features()
-            }
-            PlatformType.QUANTUM -> {
-                enumerateQuantumFeatures()
             }
             else -> {
                 platformCapabilities["GENERIC"] = true
@@ -526,19 +506,6 @@ class NeuralArchitectureFramework @Inject constructor(
         Log.d(TAG, "x86 features: $platformCapabilities")
     }
 
-    /**
-     * Enumerate Quantum features.
-     */
-    private fun enumerateQuantumFeatures() {
-        platformCapabilities["QUBITS"] = true
-        platformCapabilities["SUPERPOSITION"] = true
-        platformCapabilities["ENTANGLEMENT"] = true
-        platformCapabilities["QUANTUM_GATES"] = true
-        platformCapabilities["QUANTUM_ERROR_CORRECTION"] = false // Not yet
-
-        Log.d(TAG, "Quantum features: $platformCapabilities")
-    }
-
     private fun checkArmFp16Support(): Boolean {
         // Would check ID_AA64PFR0_EL1 for FP16 support
         return true // Assume supported on modern ARM
@@ -577,8 +544,8 @@ class NeuralArchitectureFramework @Inject constructor(
             PlatformType.MAC_X86 -> {
                 X86Optimizer(context, perfCounters, cpuInfo) // With AMX support
             }
-            PlatformType.QUANTUM -> {
-                QuantumOptimizer(context, perfCounters, cpuInfo)
+            PlatformType.CPU -> {
+                CpuOptimizer(context, perfCounters, cpuInfo)
             }
             else -> GenericOptimizer(context, perfCounters, cpuInfo)
         }
@@ -948,16 +915,11 @@ class NeuralArchitectureFramework @Inject constructor(
             knowledgeGraphSize = knowledgeGraph.size(),
             patternEmbeddings = patternEmbeddings.size,
             growthCycles = growthEngine.getCycleCount(),
-            quantumReady = quantumBridge.isInitialized(),
             perfCountersActive = perfCounters.getActiveCount(),
             uptimeMs = System.currentTimeMillis() - initializationTime,
             activeTraces = activeTraces.size,
             modelMappings = modelAssemblyMaps.size,
         )
-    }
-
-    fun isQuantumSimulatorAvailable(): Boolean {
-        return File("/dev/quantum_sim").exists() || System.getProperty("quantum.simulator") != null
     }
 
     fun getBuildInfo(): String {
@@ -997,7 +959,6 @@ class NeuralArchitectureFramework @Inject constructor(
             growthEngine.shutdown()
             contextAnalyzer.stop()
             assemblyLayer.shutdown()
-            quantumBridge.shutdown()
             performanceMonitor.stop()
 
             // Shutdown executors
@@ -1029,7 +990,7 @@ data class InitializationResult(
     val knowledgeGraphSize: Int,
     val perfCountersActive: Int,
     val traceBuffersAllocated: Int = 0,
-    val quantumReady: Boolean = false,
+
 )
 
 /**
@@ -1044,7 +1005,6 @@ data class NeuralStats(
     val knowledgeGraphSize: Int,
     val patternEmbeddings: Int,
     val growthCycles: Long,
-    val quantumReady: Boolean,
     val perfCountersActive: Int,
     val uptimeMs: Long,
     val activeTraces: Int = 0,
@@ -1281,7 +1241,7 @@ enum class PlatformType {
     ARM64_SVE,
     ARM64_SVE2,
     TV_ARM,
-    QUANTUM,
+    CPU,
 }
 
 /**

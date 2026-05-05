@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural Swin - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -13,11 +13,11 @@
  * - Real downstream task adaptation (classification, segmentation, detection)
  */
 
-package dev.kid.core.neural.swin
+package dev.mias.core.neural.swin
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
-import dev.kid.core.neural.layer.LayerNorm
+import dev.mias.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.layer.LayerNorm
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.*

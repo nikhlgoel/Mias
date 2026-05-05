@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural Runtime - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -12,11 +12,11 @@
  * - Actual multi-threading and parallel execution
  */
 
-package dev.kid.core.neural.runtime
+package dev.mias.core.neural.runtime
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
-import dev.kid.core.neural.PlatformType
+import dev.mias.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.PlatformType
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.nio.ByteBuffer
@@ -212,9 +212,6 @@ class NeuralRuntime(
                 hardwareAcceleration = HW_ACCEL_AVX
                 // Check for AVX-512, AMX
                 // In production, would use CPUID instruction
-            }
-            PlatformType.QUANTUM -> {
-                hardwareAcceleration = 0 // No hardware acceleration for quantum
             }
             else -> {
                 hardwareAcceleration = 0

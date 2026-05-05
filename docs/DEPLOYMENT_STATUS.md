@@ -1,4 +1,4 @@
-# 🚀 DEPLOYMENT SUMMARY — Mias Ready for Testing
+﻿# 🚀 DEPLOYMENT SUMMARY — Mias Ready for Testing
 
 **Generated:** April 12, 2026  
 **Status:** ✅ **READY FOR TESTING**
@@ -108,7 +108,7 @@ nikhlgoel/Mias (github.com)
 │   ├── PRD.docx
 │   └── DOC#001.docx
 ├── app/                           ← Android app (Kotlin)
-│   ├── src/main/kotlin/dev/kid/
+│   ├── src/main/kotlin/dev/mias/
 │   │   ├── .app.ui/screens        (7 Compose screens)
 │   │   └── ...
 │   ├── build.gradle.kts
@@ -146,7 +146,7 @@ cd mias/
 ```bash
 adb devices                  # Verify connection
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n dev.kid/.app.MainActivity
+adb shell am start -n dev.Mias/.app.MainActivity
 ```
 
 #### Step 3: First User Flow
@@ -154,7 +154,7 @@ adb shell am start -n dev.kid/.app.MainActivity
 2. **Privacy Consent** → Review local-only policy
 3. **Biometric Gate** → Register fingerprint or face
 4. **Home Screen** → See central orb + 6 nav buttons
-5. **Chat Test** → Type "Hi Kid" → Get response
+5. **Chat Test** → Type "Hi Mias" → Get response
 
 #### ✅ Success Criteria
 - App launches without crashes
@@ -177,8 +177,8 @@ adb shell am start -n dev.kid/.app.MainActivity
 #### Test Agent Capabilities
 ```
 1. File System: Create/read file via agent
-2. Web Fetch: Ask Kid to fetch a URL
-3. Clipboard: Copy text, see Kid monitor it
+2. Web Fetch: Ask Mias to fetch a URL
+3. Clipboard: Copy text, see Mias monitor it
 4. Calculator: "What is 25 * 1.08 + 15%?"
 5. DateTime: "What time is it in Tokyo?"
 ```
@@ -187,8 +187,8 @@ adb shell am start -n dev.kid/.app.MainActivity
 ```bash
 # On PC:
 cd desktop/
-docker build -t kid-desktop-server .
-docker run --gpus all -p 8400:8400 kid-desktop-server
+docker build -t Mias-desktop-server .
+docker run --gpus all -p 8400:8400 Mias-desktop-server
 
 # On Android:
 # Install Tailscale → Connect → Settings → Input PC IP → Test

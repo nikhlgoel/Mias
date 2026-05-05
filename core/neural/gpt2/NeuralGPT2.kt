@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural GPT-2 - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -14,11 +14,11 @@
  * - Actual gradient checkpointing for memory efficiency
  */
 
-package dev.kid.core.neural.gpt2
+package dev.mias.core.neural.gpt2
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
-import dev.kid.core.neural.layer.*
+import dev.mias.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.layer.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.*

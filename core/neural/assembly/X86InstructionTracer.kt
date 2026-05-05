@@ -1,4 +1,4 @@
-/**
+﻿/**
  * x86 Instruction Tracer - PRODUCTION GRADE IMPLEMENTATION
  *
  * REAL x86/x86_64 tracing with 2,500+ lines of production code:
@@ -20,13 +20,13 @@
  * @since 2024
  */
 
-package dev.kid.core.neural.assembly.x86
+package dev.mias.core.neural.assembly.x86
 
 import android.content.Context
 import android.system.Os
 import android.system.OsConstants
 import android.util.Log
-import dev.kid.core.neural.assembly.*
+import dev.mias.core.neural.assembly.*
 import java.io.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder

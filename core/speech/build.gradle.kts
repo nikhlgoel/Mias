@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.hilt)
@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "dev.kid.core.speech"
+    namespace = "dev.mias.core.speech"
     compileSdk = 35
 
     defaultConfig {

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural Scheduler - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -12,10 +12,10 @@
  * - Actual scheduling visualization and analysis
  */
 
-package dev.kid.core.neural.scheduler
+package dev.mias.core.neural.scheduler
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.NeuralArchitectureFramework
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.time.*

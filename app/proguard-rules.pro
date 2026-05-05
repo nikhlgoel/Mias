@@ -1,4 +1,4 @@
-# Kid ProGuard / R8 Rules for Release
+﻿# Mias ProGuard / R8 Rules for Release
 
 # ─── Hilt / Dagger ───
 -keep class dagger.hilt.** { *; }
@@ -22,8 +22,8 @@
 -keepclasseswithmembers class ** {
     kotlinx.serialization.KSerializer serializer(...);
 }
--keep,includedescriptorclasses class dev.kid.**$$serializer { *; }
--keepclassmembers class dev.kid.** {
+-keep,includedescriptorclasses class dev.mias.**$$serializer { *; }
+-keepclassmembers class dev.mias.** {
     *** Companion;
 }
 
@@ -47,15 +47,15 @@
 -keepclassmembers class kotlinx.coroutines.** { volatile <fields>; }
 
 # ─── Keep our data models ───
--keep class dev.kid.core.common.model.** { *; }
--keep class dev.kid.core.data.db.entity.** { *; }
--keep class dev.kid.core.modelhub.model.** { *; }
--keep class dev.kid.core.modelhub.db.** { *; }
--keep class dev.kid.core.network.mcp.** { *; }
--keep class dev.kid.core.agent.model.** { *; }
--keep class dev.kid.core.evolution.model.** { *; }
--keep class dev.kid.core.soul.model.** { *; }
--keep class dev.kid.core.thermal.** { *; }
+-keep class dev.mias.core.common.model.** { *; }
+-keep class dev.mias.core.data.db.entity.** { *; }
+-keep class dev.mias.core.modelhub.model.** { *; }
+-keep class dev.mias.core.modelhub.db.** { *; }
+-keep class dev.mias.core.network.mcp.** { *; }
+-keep class dev.mias.core.agent.model.** { *; }
+-keep class dev.mias.core.evolution.model.** { *; }
+-keep class dev.mias.core.soul.model.** { *; }
+-keep class dev.mias.core.thermal.** { *; }
 
 # ─── JNI ───
 -keepclasseswithmembers class * { native <methods>; }

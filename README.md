@@ -1,4 +1,4 @@
-# Mias
+﻿# Mias
 
 A local AI assistant for your Android phone. No internet required. No cloud. Your data stays on your device.
 
@@ -49,7 +49,7 @@ cd mias
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 # Launch
-adb shell am start -n dev.kid/.app.MainActivity
+adb shell am start -n dev.Mias/.app.MainActivity
 ```
 
 On first launch:

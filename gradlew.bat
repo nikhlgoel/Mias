@@ -1,5 +1,5 @@
-@rem Gradle wrapper script for Windows.
-@rem Generated for Project {Kid} — Gradle 8.12
+﻿@rem Gradle wrapper script for Windows.
+@rem Generated for Project {Mias} — Gradle 8.12
 @rem
 @rem NOTE: gradle-wrapper.jar must be present in gradle\wrapper\ for this script to work.
 @rem Run `gradle wrapper` from Android Studio terminal to generate it.

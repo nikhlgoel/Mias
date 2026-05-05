@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural ResNet - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -13,13 +13,13 @@
  * - Real feature extraction capabilities
  */
 
-package dev.kid.core.neural.resnet
+package dev.mias.core.neural.resnet
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
-import dev.kid.core.neural.layer.Conv2D
-import dev.kid.core.neural.layer.BatchNorm2D
-import dev.kid.core.neural.activation.Activation
+import dev.mias.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.layer.Conv2D
+import dev.mias.core.neural.layer.BatchNorm2D
+import dev.mias.core.neural.activation.Activation
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.*

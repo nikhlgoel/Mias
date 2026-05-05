@@ -1,4 +1,4 @@
-"""
+﻿"""
 MCP Bridge — Contract Tests
 
 Tests the MCP bridge server's JSON-RPC protocol compliance.
@@ -85,7 +85,7 @@ class TestMcpBridgeContract:
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read())
         assert data["status"] == "ok"
-        assert "kid-mcp-bridge" in data["service"]
+        assert "Mias-mcp-bridge" in data["service"]
 
     def test_initialize(self, bridge_server):
         """initialize method returns protocol version and capabilities."""
@@ -93,7 +93,7 @@ class TestMcpBridgeContract:
         assert "result" in resp
         assert resp["result"]["protocolVersion"] == "2025-03-26"
         assert "tools" in resp["result"]["capabilities"]
-        assert resp["result"]["serverInfo"]["name"] == "kid-mcp-bridge"
+        assert resp["result"]["serverInfo"]["name"] == "Mias-mcp-bridge"
 
     def test_tools_list(self, bridge_server):
         """tools/list returns available tools."""

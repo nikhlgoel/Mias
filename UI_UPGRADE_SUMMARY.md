@@ -1,4 +1,4 @@
-# Mias UI Upgrade Summary
+﻿# Mias UI Upgrade Summary
 
 ## Overview
 Complete UI overhaul inspired by modern AI applications (Claude, ChatGPT, etc.) with a focus on glassmorphism, smooth animations, and modern design patterns.
@@ -7,7 +7,7 @@ Complete UI overhaul inspired by modern AI applications (Claude, ChatGPT, etc.) 
 
 ### 1. Theme System Upgrade (`core/ui/theme/`)
 
-#### KidColors.kt
+#### MiasColors.kt
 - **New color palette** with deeper blacks and vibrant accents
 - **Electric Blue primary** (#00D4FF) replacing old blue
 - **Vibrant Purple secondary** (#8B5CF6) for depth
@@ -15,14 +15,14 @@ Complete UI overhaul inspired by modern AI applications (Claude, ChatGPT, etc.) 
 - **Enhanced glass effects** with more nuanced transparency levels
 - **Improved cognition state colors** with better contrast
 
-#### KidTypography.kt
+#### MiasTypography.kt
 - **Expanded type scale** with DisplayLarge (48sp) for hero sections
 - **Better font weights** (ExtraBold, SemiBold, Medium)
 - **Improved line heights** for better readability
 - **New specialized styles**: Caption, ButtonLarge, ButtonMedium
 - **Negative letter-spacing** on headlines for modern look
 
-#### KidShapes.kt
+#### MiasShapes.kt
 - **More shape variants**: XSmall, XLarge, XXLarge
 - **Better component shapes**: GlassCard (20dp), GlassPanel (24dp)
 - **Specialized shapes**: Orb, StatusPill, IconButton, Avatar, Thumbnail
@@ -69,7 +69,7 @@ Complete UI overhaul inspired by modern AI applications (Claude, ChatGPT, etc.) 
 - `ModernBottomBar` for stats
 - `ModernActionChip` for quick actions
 
-### 4. Navigation Updates (`KidNavHost.kt`)
+### 4. Navigation Updates (`MiasNavHost.kt`)
 - **Enhanced transitions** with spring animations
 - **Better slide directions** for intuitive navigation
 - **ModernChatScreen** integration (when ready to switch)
@@ -89,10 +89,10 @@ Complete UI overhaul inspired by modern AI applications (Claude, ChatGPT, etc.) 
 6. **Edge-to-edge**: Full screen utilization with proper insets
 
 ## Files Modified
-- `core/ui/theme/KidColors.kt` - Complete color system overhaul
-- `core/ui/theme/KidTypography.kt` - Expanded type scale
-- `core/ui/theme/KidShapes.kt` - More shape variants
-- `app/ui/theme/KidTheme.kt` - System UI integration
+- `core/ui/theme/MiasColors.kt` - Complete color system overhaul
+- `core/ui/theme/MiasTypography.kt` - Expanded type scale
+- `core/ui/theme/MiasShapes.kt` - More shape variants
+- `app/ui/theme/MiasTheme.kt` - System UI integration
 
 ## Files Created
 - `core/ui/glass/GlassComponents.kt`
@@ -104,7 +104,7 @@ Complete UI overhaul inspired by modern AI applications (Claude, ChatGPT, etc.) 
 
 ## Next Steps
 1. Update `HomeScreen.kt` to use `ModernComponents`
-2. Switch `KidNavHost.kt` to use `ModernChatScreen`
+2. Switch `MiasNavHost.kt` to use `ModernChatScreen`
 3. Test on device for performance (glass effects can be expensive)
 4. Add more micro-interactions and haptic feedback
 5. Consider adding dynamic color (Material 3) support

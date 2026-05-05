@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural Model - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -13,10 +13,10 @@
  * - Real model profiling and analysis
  */
 
-package dev.kid.core.neural.model
+package dev.mias.core.neural.model
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.NeuralArchitectureFramework
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.*

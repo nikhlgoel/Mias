@@ -1,4 +1,4 @@
-# Mias — Architecture Overview
+﻿# Mias — Architecture Overview
 
 ## What is V4?
 
@@ -49,14 +49,14 @@
 
 ```
 :app
- ├── :core:common          (KidResult, CognitionState, BrainState, DI dispatchers)
+ ├── :core:common          (MiasResult, CognitionState, BrainState, DI dispatchers)
  ├── :core:data            (Room DB, ConversationRepository, HindsightMemory)
  ├── :core:inference       (ONNX/MediaPipe runtime, InferenceEngine)
  ├── :core:network         (Ktor client, Tailscale P2P discovery)
  ├── :core:thermal         (CPU/GPU thermal monitoring, throttle decisions)
  ├── :core:soul            (SoulEngine, personality traits, SomaticState)
  ├── :core:security        (biometric auth, encrypted storage)
- ├── :core:ui              (Compose components, KidTheme, KidMotion)
+ ├── :core:ui              (Compose components, MiasTheme, MiasMotion)
  ├── :core:model-hub       (ModelManager, ModelDownloadManager, CuratedModelRegistry)
  ├── :core:agent           (AgentOrchestrator, 7 capabilities, tool multibinding)
  ├── :core:evolution       (EvolutionEngine, EvolutionWorker, EvolutionService)
@@ -160,7 +160,7 @@ Network access is ONLY used for:
 
 ## Data Isolation And Manual Consent
 
-- All fed files and local memory live in app-private storage (`/data/data/dev.kid.app/...`) and are not readable by other apps.
+- All fed files and local memory live in app-private storage (`/data/data/dev.mias.app/...`) and are not readable by other apps.
 - Android backup and transfer channels are blocked in manifest and XML rules:
   1. `allowBackup=false`
   2. `fullBackupContent=@xml/backup_rules`

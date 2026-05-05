@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural Loss Functions - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -15,10 +15,10 @@
  * - Real label smoothing and soft labels
  */
 
-package dev.kid.core.neural.loss
+package dev.mias.core.neural.loss
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.NeuralArchitectureFramework
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.*

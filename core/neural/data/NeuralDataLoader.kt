@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural Data Loader - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -13,10 +13,10 @@
  * - Real data validation and sanity checks
  */
 
-package dev.kid.core.neural.data
+package dev.mias.core.neural.data
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.NeuralArchitectureFramework
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.*

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural GPT - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -14,12 +14,12 @@
  * - Actual fine-tuning for downstream tasks
  */
 
-package dev.kid.core.neural.gpt
+package dev.mias.core.neural.gpt
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
-import dev.kid.core.neural.attention.CausalSelfAttention
-import dev.kid.core.neural.embedding.PositionEmbedding
+import dev.mias.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.attention.CausalSelfAttention
+import dev.mias.core.neural.embedding.PositionEmbedding
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.*

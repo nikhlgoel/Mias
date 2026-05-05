@@ -4,7 +4,7 @@
 This is NOT a basic skeleton. This is a full production system with:
 - Real CPU instruction tracing via hardware performance counters
 - Actual assembly code injection and hooking
-- Cross-platform support (ARM NEON, x86 AVX-512, Quantum gates)
+- Cross-platform support (ARM NEON, x86 AVX-512)
 - Persistent neural knowledge graph with 10,000+ pattern capacity
 - Real-time weight gradient capture during inference
 
@@ -17,8 +17,7 @@ core/neural/
 │   ├── AssemblyAbstractionLayer.kt    (3,000 lines) ← Part 2
 │   ├── ArmInstructionTracer.kt      (2,000 lines) ← Part 3
 │   ├── X86InstructionTracer.kt      (2,000 lines) ← Part 4
-│   ├── QuantumInstructionTracer.kt  (1,500 lines) ← Part 5
-│   ├── InstructionDecoder.kt         (1,500 lines) ← Part 6
+│   ├── InstructionDecoder.kt         (1,500 lines) ← Part 5
 │   └── AssemblyOptimizers.kt        (1,000 lines) ← Part 7
 ├── growth/
 │   ├── GrowthEngine.kt              (2,000 lines) ← Part 8
@@ -29,10 +28,6 @@ core/neural/
 │   ├── ContextAnalyzer.kt           (1,500 lines) ← Part 12
 │   ├── DeepContextExtractor.kt     (1,000 lines) ← Part 13
 │   └── SemanticUnderstanding.kt      (1,000 lines) ← Part 14
-├── quantum/
-│   ├── QuantumBridge.kt              (2,000 lines) ← Part 15
-│   ├── QuantumSimulator.kt          (1,500 lines) ← Part 16
-│   └── QubitManager.kt             (1,000 lines) ← Part 17
 ├── integration/
 │   ├── NeuralIntegration.kt          (1,500 lines) ← Part 18
 │   ├── InferenceHook.kt             (1,000 lines) ← Part 19

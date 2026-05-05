@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural Compiler - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -12,11 +12,11 @@
  * - Actual dynamic shape inference
  */
 
-package dev.kid.core.neural.compiler
+package dev.mias.core.neural.compiler
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
-import dev.kid.core.neural.PlatformType
+import dev.mias.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.PlatformType
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.*
@@ -66,7 +66,6 @@ class NeuralCompiler(
         const val TARGET_X86_64_AVX512 = 5
         const val TARGET_GPU_OPENCL = 6
         const val TARGET_GPU_VULKAN = 7
-        const val TARGET_QUANTUM = 8
 
         // Operator types
         const val OP_DENSE = 0
@@ -194,10 +193,7 @@ class NeuralCompiler(
                 avxGenerator.initialize()
                 Log.d(TAG, "  AVX code generator initialized")
             }
-            PlatformType.QUANTUM -> {
-                // Quantum code generator would go here
-                Log.d(TAG, "  Quantum code generator not yet implemented")
-            }
+
         }
 
         // GPU generator (if available)
@@ -555,7 +551,7 @@ class NeuralCompiler(
             in setOf(PlatformType.ARM64_SVE2) -> TARGET_ARM64_SVE2
             in setOf(PlatformType.X86_64, PlatformType.WINDOWS_X86,
                 PlatformType.LINUX_X86, PlatformType.MAC_X86) -> TARGET_X86_64_AVX2
-            PlatformType.QUANTUM -> TARGET_QUANTUM
+            PlatformType.CPU -> TARGET_X86_64
             else -> TARGET_ARM64_V8
         }
     }

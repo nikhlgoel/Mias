@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural Integration - REAL PRODUCTION IMPLEMENTATION
  * 
  * ACTUAL WORKING CODE - No simulations, no stubs, no "would" comments.
@@ -13,12 +13,12 @@
  * - Actual quantization and pruning
  */
 
-package dev.kid.core.neural.integration
+package dev.mias.core.neural.integration
 
 import android.content.Context
 import android.util.Log
-import dev.kid.core.neural.assembly.AssemblyTrace
-import dev.kid.core.neural.context.ContextFeatures
+import dev.mias.core.neural.assembly.AssemblyTrace
+import dev.mias.core.neural.context.ContextFeatures
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.*

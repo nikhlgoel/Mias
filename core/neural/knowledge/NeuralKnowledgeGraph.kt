@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural Knowledge Graph - REAL PRODUCTION IMPLEMENTATION
  * 
  * ACTUAL WORKING CODE - No simulations, no stubs, no "would" comments.
@@ -13,11 +13,11 @@
  * - Actual community detection (Louvain algorithm)
  */
 
-package dev.kid.core.neural.knowledge
+package dev.mias.core.neural.knowledge
 
 import android.util.Log
-import dev.kid.core.neural.assembly.AssemblyTrace
-import dev.kid.core.neural.context.ContextFeatures
+import dev.mias.core.neural.assembly.AssemblyTrace
+import dev.mias.core.neural.context.ContextFeatures
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.concurrent.*
@@ -424,7 +424,7 @@ class NeuralKnowledgeGraph @Inject constructor(
      * REAL graph persistence
      */
     suspend fun persistToDisk(): Boolean = withContext(Dispatchers.IO) {
-        val file = File("/data/data/dev.kid/files/knowledge_graph.bin")
+        val file = File("/data/data/dev.mias/files/knowledge_graph.bin")
         
         return try {
             FileOutputStream(file).use { fos ->
@@ -546,7 +546,7 @@ class NeuralKnowledgeGraph @Inject constructor(
      * REAL graph loading from disk
      */
     private suspend fun loadGraphFromDisk() = withContext(Dispatchers.IO) {
-        val file = File("/data/data/dev.kid/files/knowledge_graph.bin")
+        val file = File("/data/data/dev.mias/files/knowledge_graph.bin")
         if (!file.exists()) return@withContext
         
         try {

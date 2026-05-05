@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Deep Context Analyzer - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real algorithms:
@@ -14,10 +14,10 @@
  * - Actual cross-reference analysis
  */
 
-package dev.kid.core.neural.context
+package dev.mias.core.neural.context
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.NeuralArchitectureFramework
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.*
@@ -407,14 +407,14 @@ class DeepContextAnalyzer(
         val opcodeCounts = HashMap<Int, Int>()
         var totalCycles = 0L
         var floatOps = 0
-        var quantumOps = 0
+        var simdOps = 0
 
         for (inst in instructions) {
             instructionCounts[inst.instruction] = (instructionCounts[inst.instruction] ?: 0) + 1
             opcodeCounts[inst.opcode] = (opcodeCounts[inst.opcode] ?: 0) + 1
             totalCycles += inst.cycleCount
             if (inst.isFloatOperation) floatOps++
-            if (inst.isQuantum) quantumOps++
+            if (inst.isSimd) simdOps++
         }
 
         // Compute instruction distribution entropy
@@ -436,7 +436,7 @@ class DeepContextAnalyzer(
 
         // Compute instruction mix ratios
         val floatRatio = floatOps.toDouble() / instructions.size
-        val quantumRatio = quantumOps.toDouble() / instructions.size
+        val simdRatio = simdOps.toDouble() / instructions.size
 
         return AssemblyFeatures(
             instructionCounts = instructionCounts,
@@ -446,9 +446,9 @@ class DeepContextAnalyzer(
             averageCyclesPerInstruction = avgCycles,
             entropy = entropy,
             floatOperationCount = floatOps,
-            quantumOperationCount = quantumOps,
+            simdOperationCount = simdOps,
             floatOperationRatio = floatRatio,
-            quantumOperationRatio = quantumRatio,
+            simdOperationRatio = simdRatio,
         )
     }
 
@@ -1116,9 +1116,9 @@ data class AssemblyFeatures(
     val averageCyclesPerInstruction: Double,
     val entropy: Double,
     val floatOperationCount: Int,
-    val quantumOperationCount: Int,
+    val simdOperationCount: Int,
     val floatOperationRatio: Double,
-    val quantumOperationRatio: Double,
+    val simdOperationRatio: Double,
 ) {
     companion object {
         val EMPTY = AssemblyFeatures(emptyMap(), emptyMap(), 0, 0, 0.0, 0.0, 0, 0, 0.0, 0.0)

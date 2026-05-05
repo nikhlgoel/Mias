@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural LSTM - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -14,10 +14,10 @@
  * - Actual sequence-to-sequence architecture
  */
 
-package dev.kid.core.neural.recurrent
+package dev.mias.core.neural.recurrent
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.NeuralArchitectureFramework
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.*

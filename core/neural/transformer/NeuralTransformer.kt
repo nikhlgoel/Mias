@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neural Transformer - REAL PRODUCTION IMPLEMENTATION
  *
  * ACTUAL WORKING CODE - 2,000+ lines of real implementation:
@@ -12,10 +12,10 @@
  * - Actual beam search and greedy decoding
  */
 
-package dev.kid.core.neural.transformer
+package dev.mias.core.neural.transformer
 
 import android.util.Log
-import dev.kid.core.neural.NeuralArchitectureFramework
+import dev.mias.core.neural.NeuralArchitectureFramework
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.nio.ByteBuffer

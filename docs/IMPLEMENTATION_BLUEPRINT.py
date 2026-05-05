@@ -1,6 +1,6 @@
-
+﻿
 # ══════════════════════════════════════════════════════════════════════════════
-# PROJECT #001 {KID} — MASTER IMPLEMENTATION BLUEPRINT
+# PROJECT #001 {Mias} — MASTER IMPLEMENTATION BLUEPRINT
 # "Divine Buddy" Sovereign AI Ecosystem
 # ══════════════════════════════════════════════════════════════════════════════
 #
@@ -109,7 +109,7 @@
 
 # ── 2A. InferenceOrchestrator ────────────────────────────────────────────
 #
-# File: core/inference/src/main/kotlin/dev/kid/core/inference/InferenceOrchestrator.kt
+# File: core/inference/src/main/kotlin/dev/mias/core/inference/InferenceOrchestrator.kt
 #
 # This is the "consciousness router." It owns zero model logic itself.
 # It reads hardware state from TAWS and routes to the appropriate engine.
@@ -149,7 +149,7 @@
 
 # ── 2B. Gemma-4-e4b NPU Engine (LiteRT-LM) ─────────────────────────────
 #
-# File: core/inference/litert/src/main/kotlin/dev/kid/core/inference/litert/GemmaLiteRtEngine.kt
+# File: core/inference/litert/src/main/kotlin/dev/mias/core/inference/litert/GemmaLiteRtEngine.kt
 # JNI:  core/inference/litert/src/main/cpp/litert_jni_bridge.cpp
 #
 # Architecture (from research):
@@ -174,7 +174,7 @@
 #      app/src/main/jniLibs/arm64-v8a/liblitert_lm.so
 #      app/src/main/jniLibs/arm64-v8a/libdispatch_api_mtk.so
 #   5. Model payload stored in app-internal storage (not assets — too large):
-#      /data/data/dev.kid.app/files/models/gemma4e4b.litertlm
+#      /data/data/dev.mias.app/files/models/gemma4e4b.litertlm
 #
 # JNI Bridge Design:
 #   The Kotlin layer NEVER touches raw model memory. The JNI bridge exposes:
@@ -210,7 +210,7 @@
 
 # ── 2C. MobileLLM-R1.5 Survival Engine ──────────────────────────────────
 #
-# File: core/inference/mobilellm/src/main/kotlin/dev/kid/core/inference/mobilellm/MobileLlmEngine.kt
+# File: core/inference/mobilellm/src/main/kotlin/dev/mias/core/inference/mobilellm/MobileLlmEngine.kt
 #
 # Architecture (from Meta research paper):
 #   - Deep-and-thin: 22 layers, dim=1536, hidden_dim=6144
@@ -243,7 +243,7 @@
 
 # ── 2D. ReAct Engine (Shared Logic) ──────────────────────────────────────
 #
-# File: core/inference/react/src/main/kotlin/dev/kid/core/inference/react/ReActEngine.kt
+# File: core/inference/react/src/main/kotlin/dev/mias/core/inference/react/ReActEngine.kt
 #
 # The ReAct (Reasoning + Acting) loop is MODEL-AGNOSTIC. It wraps any
 # InferenceEngine implementation and drives the observe→think→act cycle.
@@ -293,7 +293,7 @@
 # ║  SECTION 3 — CORE:THERMAL — The TAWS Governor                         ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 #
-# File: core/thermal/src/main/kotlin/dev/kid/core/thermal/TawsGovernor.kt
+# File: core/thermal/src/main/kotlin/dev/mias/core/thermal/TawsGovernor.kt
 #
 # TAWS = Thermal-Aware Workload Scheduler
 #
@@ -373,7 +373,7 @@
 
 # ── 4A. Tailscale Mesh Client ────────────────────────────────────────────
 #
-# File: core/network/src/main/kotlin/dev/kid/core/network/TailscaleMeshClient.kt
+# File: core/network/src/main/kotlin/dev/mias/core/network/TailscaleMeshClient.kt
 #
 # Tailscale runs as a system-level VPN on both devices. Our app doesn't
 # manage Tailscale itself — it discovers peers and communicates over the
@@ -395,17 +395,17 @@
 #       private val tailscaleApi = "http://127.0.0.1:41112"
 #       private val desktopHostname = "desktop-g15"  // from DataStore prefs
 #
-#       override suspend fun discoverPeers(): KidResult<List<PeerNode>> =
+#       override suspend fun discoverPeers(): MiasResult<List<PeerNode>> =
 #           withContext(dispatcher) {
 #               // Query Tailscale local API for peer status
 #               // Parse JSON response into PeerNode list
-#               // Filter for online peers with Kid MCP server tag
+#               // Filter for online peers with Mias MCP server tag
 #           }
 #   }
 
 # ── 4B. MCP Host/Client (Android Side) ──────────────────────────────────
 #
-# File: core/network/mcp/src/main/kotlin/dev/kid/core/network/mcp/McpClient.kt
+# File: core/network/mcp/src/main/kotlin/dev/mias/core/network/mcp/McpClient.kt
 #
 # The Android app is BOTH an MCP Host (orchestrating tool calls) and an
 # MCP Client (connecting to the desktop MCP server).
@@ -441,13 +441,13 @@
 # File: desktop/mcp_server.py
 #
 # The desktop MCP server registers with Windows ODR for discoverability:
-#   $ odr mcp add kid-mcp-manifest.json
+#   $ odr mcp add Mias-mcp-manifest.json
 #
-# kid-mcp-manifest.json:
+# Mias-mcp-manifest.json:
 #   {
-#     "id": "dev.kid.desktop-server",
-#     "name": "Kid Desktop Nervous System",
-#     "description": "Local Qwen3-Coder-Next inference + tools for Kid ecosystem",
+#     "id": "dev.mias.desktop-server",
+#     "name": "Mias Desktop Nervous System",
+#     "description": "Local Qwen3-Coder-Next inference + tools for Mias ecosystem",
 #     "transport": { "type": "sse", "url": "http://localhost:8401/sse" },
 #     "tools": [
 #       { "name": "generate", ... },
@@ -459,7 +459,7 @@
 #
 # MCP Server Containment:
 #   Windows ODR runs MCP servers in a contained agent session by default.
-#   For Kid, we use package identity via MSIX to grant full access to:
+#   For Mias, we use package identity via MSIX to grant full access to:
 #   - Local filesystem (user's code repos)
 #   - Git CLI
 #   - Python runtime (sandboxed)
@@ -479,7 +479,7 @@
 #   2. Receives { "mac": "AA:BB:CC:DD:EE:FF" } from Android
 #   3. Broadcasts WoL magic packet on local LAN (Layer 2)
 #   4. Dell G15 BIOS receives magic packet → wakes from S3/S4/S5
-#   5. Windows boots → Tailscale auto-starts → Kid MCP server auto-starts
+#   5. Windows boots → Tailscale auto-starts → Mias MCP server auto-starts
 #   6. Android detects desktop peer online via periodic polling
 #
 # Fallback: If no WoL proxy exists, the user must manually wake the PC.
@@ -487,7 +487,7 @@
 
 # ── 4E. Android 17 Handoff (Cross-Device Continuity) ─────────────────────
 #
-# File: core/network/handoff/src/main/kotlin/dev/kid/core/network/handoff/HandoffManager.kt
+# File: core/network/handoff/src/main/kotlin/dev/mias/core/network/handoff/HandoffManager.kt
 #
 # Android 17 introduces native handoff APIs for transferring app state
 # between nearby devices. When the user walks to their desktop:
@@ -513,10 +513,10 @@
 # ║  SECTION 5 — CORE:DATA:HINDSIGHT — Biomimetic Episodic Memory        ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 #
-# File: core/data/hindsight/src/main/kotlin/dev/kid/core/data/hindsight/HindsightMemory.kt
+# File: core/data/hindsight/src/main/kotlin/dev/mias/core/data/hindsight/HindsightMemory.kt
 #
 # Standard RAG (vector search over document chunks) fails for a personal
-# AI because it has NO CONCEPT OF TIME or CHANGE. If you tell Kid an idea
+# AI because it has NO CONCEPT OF TIME or CHANGE. If you tell Mias an idea
 # on Monday and revise it Wednesday, RAG returns BOTH as equally relevant.
 #
 # Hindsight Memory solves this with a 3-tier knowledge hierarchy:
@@ -555,7 +555,7 @@
 #   6. Include TEMPORAL MARKERS: "This fact was updated 2 days ago"
 #                                "This model was formed over 15 interactions"
 #
-# This means Kid understands HOW ideas evolved, not just what they are.
+# This means Mias understands HOW ideas evolved, not just what they are.
 #
 # ── reflect() Operation ─────────────────────────────────────────────────
 #
@@ -628,14 +628,14 @@
 # ║  SECTION 6 — CORE:SOUL — Personality Evolution Engine                  ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 #
-# File: core/soul/src/main/kotlin/dev/kid/core/soul/SoulEngine.kt
+# File: core/soul/src/main/kotlin/dev/mias/core/soul/SoulEngine.kt
 #
-# The Soul Engine makes Kid feel like a PERSON, not a tool. It manages
+# The Soul Engine makes Mias feel like a PERSON, not a tool. It manages
 # dynamic personality through LoRA weight blending.
 #
 # ── LoRA Adapter System ──────────────────────────────────────────────────
 #
-# Instead of one monolithic personality, Kid maintains a set of specialized
+# Instead of one monolithic personality, Mias maintains a set of specialized
 # ~50MB LoRA adapter blocks stored locally:
 #
 #   lora_empathy.bin      — Supportive, understanding tone
@@ -669,10 +669,10 @@
 # ── Emotional Mirroring ──────────────────────────────────────────────────
 #
 # The Soul Engine doesn't just detect emotion — it MIRRORS appropriately:
-#   - User excited → Kid matches energy (but doesn't exceed it)
-#   - User frustrated → Kid acknowledges, then pivots to solutions
-#   - User in flow state → Kid becomes minimal (short, direct answers)
-#   - User nostalgic → Kid references shared Hindsight memories
+#   - User excited → Mias matches energy (but doesn't exceed it)
+#   - User frustrated → Mias acknowledges, then pivots to solutions
+#   - User in flow state → Mias becomes minimal (short, direct answers)
+#   - User nostalgic → Mias references shared Hindsight memories
 #
 # Implementation: A lightweight sentiment model (~5MB ONNX) runs on CPU
 # before every Gemma/MobileLLM inference. Its output feeds the LoRA
@@ -686,7 +686,7 @@
 #   - Contextually appropriate formality shifting
 #   - Cricket metaphors for technical explanations
 #
-# This is NOT translation. Kid speaks the way the user actually talks —
+# This is NOT translation. Mias speaks the way the user actually talks —
 # mixing English and Punjabi naturally in a single sentence.
 # Example: "Bro, tere code di efficiency vaddi hai, par ithe ik edge case
 #           miss ho gya — iss null check nu handle kar pehlan."
@@ -696,9 +696,9 @@
 # ║  SECTION 7 — CORE:SECURITY — Zero-Knowledge Vault                     ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 #
-# File: core/security/src/main/kotlin/dev/kid/core/security/ZkVault.kt
+# File: core/security/src/main/kotlin/dev/mias/core/security/ZkVault.kt
 #
-# Kid holds deeply personal data — thoughts, code, plans, relationships.
+# Mias holds deeply personal data — thoughts, code, plans, relationships.
 # The security model treats the AI's identity as seriously as a human's.
 #
 # ── Biometric Gate ───────────────────────────────────────────────────────
@@ -745,14 +745,14 @@
 # ║  SECTION 8 — CORE:UI — Liquid Glass Design System                     ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 #
-# File: core/ui/src/main/kotlin/dev/kid/core/ui/liquidglass/
+# File: core/ui/src/main/kotlin/dev/mias/core/ui/liquidglass/
 #
 # ── The Design Philosophy ────────────────────────────────────────────────
 #
 # The UI is NOT a chat app with fancy colors. It's a LIVING MATERIAL.
 # Every pixel responds to:
-#   1. What Kid is thinking (ReAct state)
-#   2. How Kid feels (Soul Engine blend coefficients)
+#   1. What Mias is thinking (ReAct state)
+#   2. How Mias feels (Soul Engine blend coefficients)
 #   3. What the hardware is doing (TAWS thermal state)
 #   4. What the user is doing (scroll, touch, idle)
 #
@@ -788,7 +788,7 @@
 #
 # ── Proactive Nudge Widgets ──────────────────────────────────────────────
 #
-# Kid doesn't wait to be asked. It surfaces thoughts as ambient widgets:
+# Mias doesn't wait to be asked. It surfaces thoughts as ambient widgets:
 #
 # data class Nudge(
 #     val type: NudgeType,          // SUGGESTION, REMINDER, INSIGHT, GREETING
@@ -815,7 +815,7 @@
 #   3. Drop to 60Hz refresh
 #   4. Simplify animations to opacity-only transitions
 #   5. Visual indicator: glass tint shifts to warm amber
-#   The user SEES that Kid is in a constrained state — it's honest.
+#   The user SEES that Mias is in a constrained state — it's honest.
 
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -983,7 +983,7 @@
 # │   ☐ Download Qwen3-Coder-Next-GGUF (Q4_K_M, ~5GB)                   │
 # │   ☐ Enhance desktop/server.py with llama-cpp-python                  │
 # │   ☐ Implement MCP server (desktop/mcp_server.py) with tool handlers  │
-# │   ☐ Register with Windows ODR: odr mcp add kid-mcp-manifest.json    │
+# │   ☐ Register with Windows ODR: odr mcp add Mias-mcp-manifest.json    │
 # │   ☐ Test: Android McpClient → Tailscale → Desktop MCP → Qwen3       │
 # │   ☐ Benchmark: End-to-end latency for offloaded generation           │
 # │                                                                        │
@@ -1006,7 +1006,7 @@
 # │   ✓ WoL wakes Dell G15 from Android command                         │
 # │   ✓ TAWS RL scheduler active and logging decisions                   │
 # │   ✓ Handoff transfers full state between devices                     │
-# │   ✓ Windows ODR registers Kid MCP server                             │
+# │   ✓ Windows ODR registers Mias MCP server                             │
 # │                                                                        │
 # ├─────────────────────────────────────────────────────────────────────────┤
 # │ WEEK 4: DIVINE SYNC & RELEASE                                         │
@@ -1044,14 +1044,14 @@
 # │   ☐ Final integration testing on Dell G15                            │
 # │   ☐ Cross-device test: full handoff + offload + return               │
 # │   ☐ Record demo video showing all three brains in action             │
-# │   ☐ Tag release: v0.1.0-kid                                         │
+# │   ☐ Tag release: v0.1.0-Mias                                         │
 # │   ☐ Push to GitHub with full README + architecture diagram           │
 # │                                                                        │
 # │ WEEK 4 EXIT CRITERIA:                                                  │
 # │   ✓ Liquid Glass UI renders at 60fps with cognitive state colors     │
 # │   ✓ Biometric lock + Safe Word + Exclusivity Lock all functional     │
 # │   ✓ Self-auditing agent reviews commits and finds real issues        │
-# │   ✓ GitHub Release #001 {Kid} tagged and published                   │
+# │   ✓ GitHub Release #001 {Mias} tagged and published                   │
 # │   ✓ Zero cloud dependencies. Zero external API calls.               │
 # │   ✓ All tests green. All audits clean.                               │
 # └─────────────────────────────────────────────────────────────────────────┘
@@ -1168,6 +1168,6 @@
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║  END OF MASTER IMPLEMENTATION BLUEPRINT                                ║
-# ║  Project #001 {Kid} — "Divine Buddy" Sovereign AI Ecosystem            ║
+# ║  Project #001 {Mias} — "Divine Buddy" Sovereign AI Ecosystem            ║
 # ║  Zero-Cloud · Local-First · Private · Alive                            ║
 # ╚══════════════════════════════════════════════════════════════════════════╝

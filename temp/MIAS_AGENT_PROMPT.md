@@ -1,4 +1,4 @@
-# Mias — Copilot Agent Prompt
+﻿# Mias — Copilot Agent Prompt
 
 Paste this entire block into GitHub Copilot Agent Mode (or your Claude Opus agent). It covers all changes from the latest review. Execute everything in sequence. No check-ins unless a decision is needed (those are marked **[DECISION]**).
 
@@ -8,7 +8,7 @@ Paste this entire block into GitHub Copilot Agent Mode (or your Claude Opus agen
 
 Project: Mias — local Android AI assistant  
 Root: `app/`, `core/`, `desktop/`, `scripts/`, `docs/`  
-Package namespace: `dev.kid` (keep internally — cosmetic rename deferred)  
+Package namespace: `dev.Mias` (keep internally — cosmetic rename deferred)  
 Application ID: already updated to `io.mias.app` in `app/build.gradle.kts`
 
 ---
@@ -23,7 +23,7 @@ These are already applied in the updated zip. Verify they're correct in your wor
 |---|---|
 | `app/.../splash/SplashScreen.kt:252` | `text = "{Mias}"` |
 | `app/.../splash/SplashScreen.kt:267` | `text = "Local AI. No cloud. Your data."` |
-| `core/ui/.../components/KidInputBar.kt:43` | `placeholder: String = "Talk to Mias..."` |
+| `core/ui/.../components/MiasInputBar.kt:43` | `placeholder: String = "Talk to Mias..."` |
 | `app/.../evolution/EvolutionScreen.kt:168` | `"Mias evolves silently while idle — every 6 hours"` |
 | `core/evolution/.../service/EvolutionService.kt:78` | `.setContentTitle("Mias")` |
 | `core/inference/.../orchestrator/InferenceOrchestrator.kt:120` | `"You are Mias, a private AI assistant"` |
@@ -37,10 +37,10 @@ These are already applied in the updated zip. Verify they're correct in your wor
 
 **The ViewModel exists. The screen does not. Build it.**
 
-File to create: `app/src/main/kotlin/dev/kid/app/ui/voice/VoiceChatScreen.kt`
+File to create: `app/src/main/kotlin/dev/mias/app/ui/voice/VoiceChatScreen.kt`
 
 Requirements:
-- Full-screen dark layout (background: `KidColors.Background`)
+- Full-screen dark layout (background: `MiasColors.Background`)
 - Center: `AnimatedOrb` component — pulsing larger when `isListening = true`, color shift to brighter cyan when `isProcessing = true`
 - Bottom third: live transcript text (scrollable, shows real-time STT output)
 - Bottom: two states
@@ -50,22 +50,22 @@ Requirements:
 - Wire to `VoiceChatViewModel` — observe `uiState` flow, call `startListening()` / `stopListening()`
 - No chat input bar, no keyboard — voice only
 
-Add route to `KidNavHost.kt`:
+Add route to `MiasNavHost.kt`:
 ```kotlin
-composable(KidRoutes.VOICE) {
+composable(MiasRoutes.VOICE) {
     VoiceChatScreen(onBack = { navController.navigateUp() })
 }
 ```
 
-Add `VOICE = "voice"` to `KidRoutes` object.
+Add `VOICE = "voice"` to `MiasRoutes` object.
 
-Wire the Voice button in `HomeScreen.kt` to navigate to `KidRoutes.VOICE`.
+Wire the Voice button in `HomeScreen.kt` to navigate to `MiasRoutes.VOICE`.
 
 ---
 
 ## Session 3 — ReActEngine Guards (critical stability, ~2 hours)
 
-File: `core/inference/src/main/kotlin/dev/kid/core/inference/react/ReActEngine.kt`
+File: `core/inference/src/main/kotlin/dev/mias/core/inference/react/ReActEngine.kt`
 
 **Add these three guards:**
 
@@ -111,7 +111,7 @@ Add to `core/inference/build.gradle.kts`:
 implementation(libs.mediapipe.genai)
 ```
 
-Create new file: `core/inference/src/main/kotlin/dev/kid/core/inference/engine/GoogleAiEdgeEngine.kt`
+Create new file: `core/inference/src/main/kotlin/dev/mias/core/inference/engine/GoogleAiEdgeEngine.kt`
 
 Requirements:
 - Implement `InferenceEngine` interface
@@ -129,7 +129,7 @@ Update `InferenceOrchestrator.kt`:
 
 ## Session 5 — HindsightMemory Dedup (~2 hours)
 
-File: `core/data/src/main/kotlin/dev/kid/core/data/hindsight/HindsightMemory.kt`
+File: `core/data/src/main/kotlin/dev/mias/core/data/hindsight/HindsightMemory.kt`
 
 Before writing a new hindsight entry, check cosine similarity against recent entries:
 
@@ -150,7 +150,7 @@ Only write the entry if `!isDuplicate(embedding)`.
 
 ## Session 6 — Tailscale Dependency Check (~1 hour)
 
-File: `core/network/src/main/kotlin/dev/kid/core/network/TailscaleMeshClient.kt`
+File: `core/network/src/main/kotlin/dev/mias/core/network/TailscaleMeshClient.kt`
 
 Add check before attempting connection:
 ```kotlin
@@ -204,7 +204,7 @@ HEALTHCHECK --interval=30s --timeout=5s CMD curl -f http://localhost:8080/health
 
 ## Session 8 — MCP Spec Compliance (~2 days)
 
-File: `core/network/src/main/kotlin/dev/kid/core/network/mcp/McpClient.kt`
+File: `core/network/src/main/kotlin/dev/mias/core/network/mcp/McpClient.kt`
 
 Full MCP 2024-11 initialization sequence:
 
@@ -222,13 +222,13 @@ Current implementation skips this handshake. Add:
 3. `callTool(name, args)` — typed request/response
 4. `McpCapability` sealed class for typed capability negotiation
 
-See `core/network/src/main/kotlin/dev/kid/core/network/mcp/McpModels.kt` for existing model structures — extend those.
+See `core/network/src/main/kotlin/dev/mias/core/network/mcp/McpModels.kt` for existing model structures — extend those.
 
 ---
 
 ## Notes for Agent
 
-- Don't change `dev.kid` package names or import paths. Application ID (`io.mias.app`) is separate from namespace.
-- Don't rename class files (KidTheme, KidColors, etc.) — scheduled for a future major refactor when the codebase is stable.
+- Don't change `dev.Mias` package names or import paths. Application ID (`io.mias.app`) is separate from namespace.
+- Don't rename class files (MiasTheme, MiasColors, etc.) — scheduled for a future major refactor when the codebase is stable.
 - All new files: follow existing code style in the module they're added to.
 - Tests: add a basic test to `src/test/` for any new logic you add (not UI).
