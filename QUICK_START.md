@@ -1,87 +1,56 @@
+<<<<<<< HEAD
 ﻿# 🎉 FINAL DEPLOYMENT SUMMARY
 
 **Mias — Local AI Assistant**  
 **Status:** ✅ **95% COMPLETE** | Ready for Testing
+=======
+Here’s the same content, reformatted for maximum visual clarity—clean headings, bold keys, code blocks, and a scannable table.
+>>>>>>> 1ac89bd61ae0138d1dbb687ebaafda7fe27f0756
 
 ---
 
-## 📋 What You Have Now
+# Quick Start: Mias — Local AI Assistant
 
-### ✅ Complete AI Ecosystem
-- **7 Core Modules** (model-hub, agent, evolution, thermal, soul, security, resilience)
-- **7 UI Screens** (Home, Chat, BrainMarket, Agents, Evolution, Settings, Splash)
-- **7 Agent Capabilities** (file, web, clipboard, calc, app-launch, datetime, notifications)
-- **4-Layer Privacy Enforcement** (backup-deny, biometric, consent-tokens, encryption)
-- **Multi-Brain Architecture** (GEMMA NPU → MobileLLM CPU → Qwen3 Desktop)
-- **Thermal Awareness** (automatic model downswitching on overheat)
-- **Hindsight Memory** (3-tier episodic learning with consolidation)
-- **Soul Engine** (LoRA-based personality blending)
-
-### ✨ NEW: ChatGPT-Level Speech-to-Text
-- **On-device ML Kit Recognition** (no cloud, fully private)
-- **13-Language Support** (English, Spanish, French, German, Hindi, Japanese, Chinese, Portuguese, Italian, etc.)
-- **Real-time Transcription** (partial results as you speak)
-- **Confidence Scoring** (0-100% display)
-- **Auto-Language Detection** (optional toggle in Settings)
-- **Beautiful UI Components** (pulsing mic button, status indicators, animations)
-- **Permission Flow** (requests on startup, one-by-one dialogs)
-- **Language Selection Menu** (Settings → Speech & Transcription)
+**Mias** — Android, multi-module Kotlin app.  
+On-device speech-to-text, multi-brain inference, privacy enforcement.
 
 ---
 
-## 🔧 Issues Fixed
+## 📋 Prerequisites
 
-### ❌ Build Location Error
-**Your Error:**
+- **Android SDK** (API 34+)
+- **JDK** 17+
+- **ADB** (Android Debug Bridge)
+- **Git**
+- Physical device/emulator with **Google Play Services** (required for ML Kit)
+
+---
+
+## ⬇️ Clone & Bootstrap
+
 ```bash
-cd w:\###\gradle
-./gradlew assembleDebug
-# Error: Could not find or load main class...
+git clone <repo-url>
+cd mias
 ```
 
-**Fix Applied:**
-```bash
-cd w:\###                         # PROJECT ROOT (not gradle/)
-gradlew.bat assembleDebug         # Use .bat on Windows
-# OR: ./gradlew assembleDebug     # Use this on macOS/Linux
-```
+If `gradlew` is missing or broken:
 
-### ❌ Missing gradle-wrapper.jar
-**Cause:** Binary wrapper JAR not committed to git
-
-**Fix Applied:**
-- ✅ `scripts/bootstrap-gradle.bat` (Windows bootstrap script)
-- ✅ `scripts/bootstrap-gradle.sh` (Unix bootstrap script)
-- ✅ `docs/BUILD_TROUBLESHOOTING.md` (detailed troubleshooting guide)
-
-**How to Use:**
-```bash
-# Windows
-cd w:\###
+**Windows**
+```batch
 scripts\bootstrap-gradle.bat
+```
 
-# macOS/Linux
-cd /path/to/mias
+**macOS / Linux**
+```bash
 chmod +x scripts/bootstrap-gradle.sh
 ./scripts/bootstrap-gradle.sh
 ```
 
-### ❌ APK Not Building
-**Root Cause:** Gradle wrapper not functional
-
-**Resolution:** All fixed with bootstrap scripts above
-
-### ❌ Microphone Not Integrated
-**Resolution:** 
-- ✅ Core:speech module created
-- ✅ Google ML Kit integrated
-- ✅ Permission handler implemented
-- ✅ UI components added (SpeechButton)
-
 ---
 
-## 📁 New Files & Modules
+## 🔨 Build
 
+<<<<<<< HEAD
 ### Core:speech Module
 ```
 core/speech/
@@ -162,62 +131,105 @@ scripts/
 ### ONE-TIME SETUP (First Time Only)
 
 **Windows:**
+=======
+> ⚠️ Always run from the **project root**, not the `gradle/` directory.
+
+**Windows**
+>>>>>>> 1ac89bd61ae0138d1dbb687ebaafda7fe27f0756
 ```batch
-cd w:\###
-scripts\bootstrap-gradle.bat
-```
-
-**macOS/Linux:**
-```bash
-cd /path/to/mias
-chmod +x scripts/bootstrap-gradle.sh
-./scripts/bootstrap-gradle.sh
-```
-
-### BUILD & INSTALL
-
-**Windows:**
-```batch
-cd w:\###
 gradlew.bat assembleDebug
+<<<<<<< HEAD
 adb install -r app\build\outputs\apk\debug\app-debug.apk
 adb shell am start -n dev.mias.app/.app.ui.MainActivity
+=======
+>>>>>>> 1ac89bd61ae0138d1dbb687ebaafda7fe27f0756
 ```
 
-**macOS/Linux:**
+**macOS / Linux**
 ```bash
-cd /path/to/mias
 ./gradlew assembleDebug
+```
+
+**Output APK**  
+`app/build/outputs/apk/debug/app-debug.apk`
+
+---
+
+## 📲 Install & Launch
+
+**Install**
+```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk
+<<<<<<< HEAD
 adb shell am start -n dev.mias.app/.app.ui.MainActivity
+=======
+```
+
+**Launch**
+```bash
+adb shell am start -n dev.kid.app/.app.ui.MainActivity
+>>>>>>> 1ac89bd61ae0138d1dbb687ebaafda7fe27f0756
 ```
 
 ---
 
-## 📊 Completeness Metrics
+## 🚀 First Launch Flow
+
+1. **Splash screen** (neural eye animation)
+2. **Permission dialogs** (one at a time):
+   - `RECORD_AUDIO` — microphone (required for speech)
+   - `READ_EXTERNAL_STORAGE` — optional (file access)
+   - `CAMERA` — optional (biometric)
+   - Notifications — optional
+3. **Biometric registration** (if camera granted)
+4. **Main Chat screen** loads
+
+---
+
+## 🎤 Speech-to-Text Usage
+
+1. Open the **Chat screen**
+2. Tap the **microphone button** (bottom input area)
+3. Speak → button **pulses red** while recording
+4. Real‑time **partial transcription** is shown
+5. Tap **Stop** (or auto‑stop) → final text placed in input bar
+6. Tap **Send**
+
+Configure language / confidence:  
+**Settings → Speech & Transcription**
+
+---
+
+## 🛠️ Common Build Issues
+
+| Error | Fix |
+|-------|-----|
+| `Could not find or load main class org.gradle.wrapper.GradleWrapperMain` | Run from **project root**, use `gradlew.bat` (Win) or `./gradlew` (Unix) |
+| `gradlew: command not found` | Run the bootstrap script first |
+| APK build fails – missing SDK | Install required platforms via Android Studio’s SDK Manager |
+| `adb: device not found` | Enable USB debugging; run `adb devices` |
+| Microphone permission denied | Grant when prompted, or via **Settings → App Permissions → Microphone** |
+| Speech transcription not working | Check internet (ML Kit models download on first use); test mic in another app |
+
+---
+
+## 📁 Project Structure (Key Modules)
 
 ```
-Overall Readiness:     95% (was 90%)
-
-Breakdown:
-├─ Architecture:         80% (Complete V4 spec)
-├─ Implementation:       95% (All modules + speech)
-├─ Documentation:        80% (Setup + Arch + Build guide)
-├─ Privacy Hardening:    100% (4-layer locked)
-├─ Speech-to-Text:       100% (ML Kit integrated)
-├─ Testing:              70% (87 unit tests + manual QA needed)
-└─ Model Quantization:   5% (Awaiting GGUF downloads)
-
-Non-Blocking Items:
-├─ Device hardware (user has it)
-├─ Model downloads (1-2 hours)
-└─ Thermal ML training (post-testing)
+core/speech/        - Google ML Kit speech recognition
+core/model-hub/     - Multi-brain model router (GEMMA, MobileLLM, Qwen3)
+core/agent/         - Device-action agents (file, web, calc, etc.)
+core/soul/          - LoRA personality blending
+core/thermal/       - Thermal-aware model downswitching
+core/ui/            - Shared UI components (SpeechButton, FAB)
+app/                - Main app, permissions, UI screens
 ```
 
 ---
 
-## 🎯 What Makes This Amazing
+## ✅ Minimal Verification Checklist
 
+<<<<<<< HEAD
 ### Speech Quality
 - ✅ **On-device** (Google ML Kit) — no cloud, 100% private
 - ✅ **Real-time** — partial results as you speak
@@ -362,3 +374,12 @@ During first launch:
 💜 **Mias — open source local AI**
 
 </div>
+=======
+- [ ] APK builds and installs
+- [ ] App launches without crash
+- [ ] Splash screen renders
+- [ ] Permission dialogs appear
+- [ ] Chat screen loads
+- [ ] Microphone button visible & functional
+- [ ] Transcription appears in input bar
+>>>>>>> 1ac89bd61ae0138d1dbb687ebaafda7fe27f0756
