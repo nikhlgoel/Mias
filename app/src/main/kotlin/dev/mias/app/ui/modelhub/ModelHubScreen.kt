@@ -31,9 +31,14 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AutoFixHigh
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -100,7 +105,7 @@ fun ModelHubScreen(
                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = MiasColors.TextPrimary)
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Brain Market", style = MiasTypography.TitleMedium, color = MiasColors.TextPrimary, fontWeight = FontWeight.SemiBold)
+                    Text("Models", style = MiasTypography.TitleMedium, color = MiasColors.TextPrimary, fontWeight = FontWeight.SemiBold)
                     Text(
                         "${state.installedModels.size} installed · ${formatSize(state.storageUsedBytes)} used",
                         style = MiasTypography.LabelSmall, color = MiasColors.TextSecondary,
@@ -147,23 +152,62 @@ fun ModelHubScreen(
             Spacer(Modifier.height(8.dp))
 
             // Installed models
+            var pendingDeleteId by remember { mutableStateOf<String?>(null) }
+            var pendingDeleteName by remember { mutableStateOf("") }
+
             AnimatedVisibility(visible = state.installedModels.isNotEmpty(), enter = fadeIn(), exit = fadeOut()) {
                 Column {
-                    SectionLabel("Installed Brains")
+                    SectionLabel("Installed")
                     state.installedModels.forEach { model ->
-                        ModelCard(
-                            modelCard = model.card,
-                            isActive = true,
-                            downloadState = state.downloadStates[model.id],
-                            onAction = { viewModel.deleteModel(model.id) },
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            ModelCard(
+                                modelCard = model.card,
+                                isActive = true,
+                                downloadState = state.downloadStates[model.id],
+                                onAction = { /* tap on installed = no-op; delete via the trash icon */ },
+                                modifier = Modifier.weight(1f),
+                            )
+                            IconButton(
+                                onClick = {
+                                    pendingDeleteId = model.id
+                                    pendingDeleteName = model.card.name
+                                },
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Delete,
+                                    contentDescription = "Delete ${model.card.name}",
+                                    tint = MiasColors.TextSecondary,
+                                )
+                            }
+                        }
                     }
                     Spacer(Modifier.height(8.dp))
                 }
             }
 
-            SectionLabel("Available Brains")
+            if (pendingDeleteId != null) {
+                AlertDialog(
+                    onDismissRequest = { pendingDeleteId = null },
+                    title = { Text("Delete $pendingDeleteName?") },
+                    text = { Text("The model file will be removed from this device. You can re-download it later.") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            pendingDeleteId?.let(viewModel::deleteModel)
+                            pendingDeleteId = null
+                        }) { Text("Delete") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { pendingDeleteId = null }) { Text("Cancel") }
+                    },
+                )
+            }
+
+            SectionLabel("Available")
 
             LazyColumn(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 80.dp),

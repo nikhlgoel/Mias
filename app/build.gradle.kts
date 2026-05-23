@@ -44,13 +44,31 @@ android {
         }
     }
 
-    // 16 KB page size compliance: tell AGP to use uncompressed JNI libs
-    // (required for the loader to honour the 16 KB alignment we set in
-    // CMake via -Wl,-z,max-page-size=16384). Default since AGP 4.2, made
-    // explicit here so a future flip can't silently re-break alignment.
     packaging {
+        // 16 KB page size compliance: tell AGP to use uncompressed JNI libs
+        // (required for the loader to honour the 16 KB alignment we set in
+        // CMake via -Wl,-z,max-page-size=16384). Default since AGP 4.2, made
+        // explicit here so a future flip can't silently re-break alignment.
         jniLibs {
             useLegacyPackaging = false
+        }
+        // Drop noise that libraries ship but the app doesn't need at runtime.
+        // Keeps the APK from carrying duplicate licenses, ktlint baselines,
+        // and the coroutines debug agent (only useful when attached).
+        resources {
+            excludes += listOf(
+                "META-INF/AL2.0",
+                "META-INF/LGPL2.1",
+                "META-INF/LICENSE*",
+                "META-INF/NOTICE*",
+                "META-INF/DEPENDENCIES",
+                "META-INF/*.kotlin_module",
+                "META-INF/proguard/**",
+                "META-INF/versions/**",
+                "DebugProbesKt.bin",
+                "kotlin-tooling-metadata.json",
+                "**/*.txt",
+            )
         }
     }
 

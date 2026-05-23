@@ -23,13 +23,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Chat
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.AutoFixHigh
-import androidx.compose.material.icons.rounded.Psychology
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -49,7 +46,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mias.core.ui.components.AnimatedOrb
-import dev.mias.core.ui.components.NudgeCard
 import dev.mias.core.ui.components.StatusPill
 import dev.mias.core.ui.glass.CognitionGlow
 import dev.mias.core.ui.theme.MiasColors
@@ -60,8 +56,7 @@ fun HomeScreen(
     onNavigateToChat: (String?) -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToModelHub: () -> Unit = {},
-    onNavigateToAgent: () -> Unit = {},
-    onNavigateToEvolution: () -> Unit = {},
+    onNavigateToChats: () -> Unit = {},
     onNavigateToVoice: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -91,33 +86,28 @@ fun HomeScreen(
                     brainState = state.brainState,
                     cognitionState = state.cognitionState,
                 )
-                IconButton(onClick = onNavigateToSettings) {
-                    Icon(
-                        imageVector = Icons.Rounded.Settings,
-                        contentDescription = "Settings",
-                        tint = MiasColors.TextSecondary,
-                    )
-                }
-                IconButton(onClick = onNavigateToModelHub) {
-                    Icon(
-                        imageVector = Icons.Rounded.WorkspacePremium,
-                        contentDescription = "Model Hub",
-                        tint = MiasColors.TextSecondary,
-                    )
-                }
-                IconButton(onClick = onNavigateToAgent) {
-                    Icon(
-                        imageVector = Icons.Rounded.Psychology,
-                        contentDescription = "Agent",
-                        tint = MiasColors.TextSecondary,
-                    )
-                }
-                IconButton(onClick = onNavigateToEvolution) {
-                    Icon(
-                        imageVector = Icons.Rounded.AutoFixHigh,
-                        contentDescription = "Evolution",
-                        tint = MiasColors.TextSecondary,
-                    )
+                Row {
+                    IconButton(onClick = onNavigateToChats) {
+                        Icon(
+                            imageVector = Icons.Rounded.History,
+                            contentDescription = "Chats",
+                            tint = MiasColors.TextSecondary,
+                        )
+                    }
+                    IconButton(onClick = onNavigateToModelHub) {
+                        Icon(
+                            imageVector = Icons.Rounded.WorkspacePremium,
+                            contentDescription = "Models",
+                            tint = MiasColors.TextSecondary,
+                        )
+                    }
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(
+                            imageVector = Icons.Rounded.Settings,
+                            contentDescription = "Settings",
+                            tint = MiasColors.TextSecondary,
+                        )
+                    }
                 }
             }
 
@@ -219,26 +209,6 @@ fun HomeScreen(
                         ),
                         border = BorderStroke(1.dp, MiasColors.GlassBorder)
                     )
-                }
-            }
-
-            // ── Nudges Area ──
-            if (state.nudges.isNotEmpty()) {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    items(
-                        items = state.nudges,
-                        key = { it.id },
-                    ) { nudge ->
-                        NudgeCard(
-                            nudge = nudge,
-                            onClick = { viewModel.dismissNudge(nudge.id) },
-                        )
-                    }
                 }
             }
 

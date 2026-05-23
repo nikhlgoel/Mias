@@ -14,6 +14,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import dev.mias.app.ui.agent.AgentScreen
 import dev.mias.app.ui.chat.ChatScreen
+import dev.mias.app.ui.chats.ChatsScreen
 import dev.mias.app.ui.evolution.EvolutionScreen
 import dev.mias.app.ui.home.HomeScreen
 import dev.mias.app.ui.modelhub.ModelHubScreen
@@ -25,6 +26,7 @@ object MiasRoutes {
     const val SPLASH = "splash"
     const val HOME = "home"
     const val CHAT = "chat?conversationId={conversationId}"
+    const val CHATS = "chats"
     const val SETTINGS = "settings"
     const val MODEL_HUB = "modelhub"
     const val AGENT = "agent"
@@ -73,9 +75,17 @@ fun MiasNavHost(modifier: Modifier = Modifier) {
                 onNavigateToChat = { navController.navigate(MiasRoutes.chatRoute(it)) },
                 onNavigateToSettings = { navController.navigate(MiasRoutes.SETTINGS) },
                 onNavigateToModelHub = { navController.navigate(MiasRoutes.MODEL_HUB) },
-                onNavigateToAgent = { navController.navigate(MiasRoutes.AGENT) },
-                onNavigateToEvolution = { navController.navigate(MiasRoutes.EVOLUTION) },
+                onNavigateToChats = { navController.navigate(MiasRoutes.CHATS) },
                 onNavigateToVoice = { navController.navigate(MiasRoutes.VOICE) },
+            )
+        }
+
+        composable(MiasRoutes.CHATS) {
+            ChatsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onOpenConversation = { id ->
+                    navController.navigate(MiasRoutes.chatRoute(id))
+                },
             )
         }
 
@@ -93,7 +103,10 @@ fun MiasNavHost(modifier: Modifier = Modifier) {
         }
 
         composable(MiasRoutes.SETTINGS) {
-            SettingsScreen(onNavigateBack = { navController.popBackStack() })
+            SettingsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToModels = { navController.navigate(MiasRoutes.MODEL_HUB) },
+            )
         }
 
         composable(MiasRoutes.MODEL_HUB) {

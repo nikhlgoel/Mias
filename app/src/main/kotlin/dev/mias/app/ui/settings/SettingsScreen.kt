@@ -1,4 +1,4 @@
-﻿package dev.mias.app.ui.settings
+package dev.mias.app.ui.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,13 +20,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Cloud
-import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,16 +35,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.mias.core.ui.components.BrainStatusBar
+import dev.mias.core.modelhub.model.InstalledModel
+import dev.mias.core.modelhub.model.ModelRole
+import dev.mias.core.speech.SpeechLanguage
 import dev.mias.core.ui.glass.GlassCard
 import dev.mias.core.ui.theme.MiasColors
 import dev.mias.core.ui.theme.MiasShapes
 import dev.mias.core.ui.theme.MiasTypography
-import dev.mias.core.speech.SpeechLanguage
 
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToModels: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -59,7 +59,6 @@ fun SettingsScreen(
             .windowInsetsPadding(WindowInsets.statusBars)
             .verticalScroll(rememberScrollState()),
     ) {
-        // ── Top Bar ──
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -75,7 +74,7 @@ fun SettingsScreen(
             }
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "System Status",
+                text = "Settings",
                 style = MiasTypography.HeadlineMedium,
                 color = MiasColors.TextPrimary,
             )
@@ -84,61 +83,80 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-            // ── Active Brain Status ──
-            BrainStatusBar(
-                brainState = state.brainState,
-                thermalTemp = state.thermalTemp,
-                batteryLevel = state.batteryLevel,
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // ── Model Registry ──
-            SectionHeader(title = "Neural Registry")
+            // ── Device status ────────────────────────────────────
+            SectionHeader("Device")
             Spacer(modifier = Modifier.height(8.dp))
-            ModelCard(
-                name = state.modelInfo.primaryModel,
-                role = "Primary Brain (On-Device NPU)",
-                quant = state.modelInfo.primaryQuant,
-                isActive = state.brainState == dev.mias.core.common.model.BrainState.GEMMA_NPU,
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            ModelCard(
-                name = state.modelInfo.survivalModel,
-                role = "Survival Brain (CPU Fallback)",
-                quant = "INT4 ONNX",
-                isActive = state.brainState == dev.mias.core.common.model.BrainState.MOBILELLM_SURVIVAL,
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            ModelCard(
-                name = state.modelInfo.desktopModel,
-                role = "Desktop Brain (Via Tailscale Mesh)",
-                quant = "Q4_K_M GGUF",
-                isActive = state.brainState == dev.mias.core.common.model.BrainState.QWEN_DESKTOP,
-                isReachable = state.isDesktopReachable,
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // ── Soul Personality Blend ──
-            SectionHeader(title = "Soul Blend")
-            Spacer(modifier = Modifier.height(8.dp))
-            GlassCard(accentColor = MiasColors.SentimentCurious) {
-                Column {
-                    state.soulTraits.forEach { (trait, weight) ->
-                        SoulTraitRow(
-                            name = trait.name.lowercase().replaceFirstChar { it.uppercase() },
-                            weight = weight,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
+            GlassCard(accentColor = MiasColors.SurfaceGlass) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    StatusRow(
+                        label = "Temperature",
+                        value = state.thermalTempC?.let { "${"%.0f".format(it)}°C" }
+                            ?: "Not reporting yet",
+                    )
+                    StatusRow(
+                        label = "Battery",
+                        value = state.batteryLevel?.let { "$it%" } ?: "Not reporting yet",
+                    )
+                    StatusRow(
+                        label = "Desktop offload",
+                        value = if (state.isDesktopReachable) "Connected" else "Not configured",
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // ── Speech & Transcription ──
-            SectionHeader(title = "Speech & Transcription")
+            // ── Installed models ─────────────────────────────────
+            SectionHeader("Models")
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (state.installedModels.isEmpty()) {
+                GlassCard(accentColor = MiasColors.SurfaceGlass) {
+                    Column {
+                        Text(
+                            "No models installed yet.",
+                            style = MiasTypography.BodyMedium,
+                            color = MiasColors.TextPrimary,
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            "Open Models from the Home screen and pick one " +
+                                "(Qwen2.5 0.5B is a good first download).",
+                            style = MiasTypography.BodySmall,
+                            color = MiasColors.TextSecondary,
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(MiasShapes.Card)
+                                .background(MiasColors.Primary.copy(alpha = 0.2f))
+                                .clickable(onClick = onNavigateToModels)
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                        ) {
+                            Text(
+                                "Open Models",
+                                style = MiasTypography.LabelMedium,
+                                color = MiasColors.TextPrimary,
+                            )
+                        }
+                    }
+                }
+            } else {
+                state.installedModels.forEach { model ->
+                    val assignedRoles = ModelRole.entries
+                        .filter { state.roleAssignments[it] == model.id }
+                    InstalledModelRow(
+                        model = model,
+                        assignedRoles = assignedRoles,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ── Speech ───────────────────────────────────────────
+            SectionHeader("Voice input")
             Spacer(modifier = Modifier.height(8.dp))
             GlassCard(accentColor = MiasColors.Primary) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -153,7 +171,7 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
-                            text = "Auto Detect Language",
+                            text = "Auto-detect language",
                             style = MiasTypography.BodyMedium,
                             color = MiasColors.TextSecondary,
                         )
@@ -166,14 +184,14 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        SpeechChip(
-                            modifier = Modifier.fillMaxWidth(0.48f),
+                        LangChip(
+                            modifier = Modifier.weight(1f),
                             label = "English (US)",
                             selected = state.speechLanguage == SpeechLanguage.ENGLISH_US,
                             onClick = { viewModel.setSpeechLanguage(SpeechLanguage.ENGLISH_US) },
                         )
-                        SpeechChip(
-                            modifier = Modifier.fillMaxWidth(0.48f),
+                        LangChip(
+                            modifier = Modifier.weight(1f),
                             label = "English (UK)",
                             selected = state.speechLanguage == SpeechLanguage.ENGLISH_GB,
                             onClick = { viewModel.setSpeechLanguage(SpeechLanguage.ENGLISH_GB) },
@@ -184,8 +202,8 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // ── Privacy Badge ──
-            SectionHeader(title = "Privacy")
+            // ── Privacy ──────────────────────────────────────────
+            SectionHeader("Privacy")
             Spacer(modifier = Modifier.height(8.dp))
             GlassCard(accentColor = MiasColors.Success) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -198,12 +216,13 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "Zero-Cloud Active",
+                            text = "On-device only",
                             style = MiasTypography.LabelLarge,
                             color = MiasColors.TextPrimary,
                         )
                         Text(
-                            text = "All inference local. No data leaves this device.",
+                            text = "Inference runs locally. The only outbound traffic " +
+                                "is model downloads from huggingface.co.",
                             style = MiasTypography.BodySmall,
                             color = MiasColors.TextSecondary,
                         )
@@ -217,7 +236,70 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SpeechChip(
+private fun StatusRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MiasTypography.BodyMedium, color = MiasColors.TextSecondary)
+        Text(value, style = MiasTypography.LabelMedium, color = MiasColors.TextPrimary)
+    }
+}
+
+@Composable
+private fun InstalledModelRow(
+    model: InstalledModel,
+    assignedRoles: List<ModelRole>,
+) {
+    GlassCard(
+        accentColor = if (assignedRoles.isNotEmpty()) MiasColors.CognitionActing else MiasColors.SurfaceGlass,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Rounded.Memory,
+                contentDescription = null,
+                tint = if (assignedRoles.isNotEmpty()) MiasColors.CognitionActing else MiasColors.TextTertiary,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = model.card.name,
+                    style = MiasTypography.LabelLarge,
+                    color = MiasColors.TextPrimary,
+                )
+                Text(
+                    text = "${model.card.parameterCount} · ${model.card.quantization} · " +
+                        formatMb(model.sizeOnDisk),
+                    style = MiasTypography.BodySmall,
+                    color = MiasColors.TextSecondary,
+                )
+                if (assignedRoles.isNotEmpty()) {
+                    Text(
+                        text = "Assigned: " + assignedRoles.joinToString(", ") {
+                            it.name.lowercase().replaceFirstChar { c -> c.uppercase() }
+                        },
+                        style = MiasTypography.LabelSmall,
+                        color = MiasColors.CognitionActing,
+                    )
+                }
+            }
+            if (assignedRoles.isNotEmpty()) {
+                Icon(
+                    imageVector = Icons.Rounded.CheckCircle,
+                    contentDescription = "Active",
+                    tint = MiasColors.CognitionActing,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LangChip(
     modifier: Modifier = Modifier,
     label: String,
     selected: Boolean,
@@ -227,8 +309,8 @@ private fun SpeechChip(
         modifier = modifier
             .clip(MiasShapes.Large)
             .background(if (selected) MiasColors.Primary.copy(alpha = 0.22f) else MiasColors.SurfaceGlass)
-            .padding(horizontal = 10.dp, vertical = 8.dp)
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
         Text(
             text = label,
@@ -248,91 +330,7 @@ private fun SectionHeader(title: String) {
     )
 }
 
-@Composable
-private fun ModelCard(
-    name: String,
-    role: String,
-    quant: String,
-    isActive: Boolean,
-    isReachable: Boolean = true,
-) {
-    GlassCard(
-        accentColor = if (isActive) MiasColors.CognitionActing else MiasColors.SurfaceGlass,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Rounded.Memory,
-                    contentDescription = null,
-                    tint = if (isActive) MiasColors.CognitionActing else MiasColors.TextTertiary,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = name,
-                        style = MiasTypography.LabelLarge,
-                        color = MiasColors.TextPrimary,
-                    )
-                    Text(
-                        text = role,
-                        style = MiasTypography.BodySmall,
-                        color = MiasColors.TextSecondary,
-                    )
-                    Text(
-                        text = "Quantization: $quant",
-                        style = MiasTypography.LabelSmall,
-                        color = MiasColors.TextTertiary,
-                    )
-                }
-            }
-
-            if (!isReachable) {
-                Icon(
-                    imageVector = Icons.Rounded.CloudOff,
-                    contentDescription = "Offline",
-                    tint = MiasColors.TextTertiary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SoulTraitRow(
-    name: String,
-    weight: Float,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = name,
-            style = MiasTypography.LabelMedium,
-            color = MiasColors.TextSecondary,
-            modifier = Modifier.width(80.dp),
-        )
-        LinearProgressIndicator(
-            progress = { weight.coerceIn(0f, 1f) },
-            modifier = Modifier
-                .weight(1f)
-                .height(4.dp)
-                .clip(MiasShapes.Full),
-            color = MiasColors.Primary,
-            trackColor = MiasColors.SurfaceGlass,
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = "${(weight * 100).toInt()}%",
-            style = MiasTypography.LabelSmall,
-            color = MiasColors.TextTertiary,
-        )
-    }
+private fun formatMb(bytes: Long): String {
+    val mb = bytes / 1_000_000.0
+    return if (mb >= 1000) "${"%.1f".format(mb / 1000)} GB" else "${mb.toInt()} MB"
 }

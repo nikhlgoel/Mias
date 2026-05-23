@@ -18,7 +18,6 @@ import dev.mias.core.data.hindsight.HindsightMemory
 import dev.mias.core.inference.orchestrator.InferenceOrchestrator
 import dev.mias.core.inference.react.ReActStep
 import dev.mias.core.language.IntentExtractor
-import dev.mias.core.soul.SoulEngine
 import dev.mias.core.ui.components.BubbleType
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,7 +60,6 @@ sealed interface ChatEvent {
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val orchestrator: InferenceOrchestrator,
-    private val soulEngine: SoulEngine,
     private val hindsightMemory: HindsightMemory,
     private val intentExtractor: IntentExtractor,
     private val conversationRepository: ConversationRepository,
@@ -132,9 +130,6 @@ class ChatViewModel @Inject constructor(
         _messages.update { it + userMsg }
         _events.tryEmit(ChatEvent.ScrollToBottom)
 
-        // Process with Soul + ReAct
-        soulEngine.processUserMessage(cleanedText)
-
         viewModelScope.launch {
             // Store fact in Hindsight
             hindsightMemory.storeFact(
@@ -148,9 +143,7 @@ class ChatViewModel @Inject constructor(
                 ?.toPromptString()
                 ?: ""
 
-            val personalityPrompt = soulEngine.getPersonalityPrompt()
-            val systemPrompt = InferenceOrchestrator.DEFAULT_SYSTEM_PROMPT +
-                "\n\n" + personalityPrompt
+            val systemPrompt = InferenceOrchestrator.DEFAULT_SYSTEM_PROMPT
 
             val metadata = buildMap<String, String> {
                 put("intent_type", structuredIntent.intentType.value)

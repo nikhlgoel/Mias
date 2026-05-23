@@ -249,35 +249,24 @@ fun SplashScreen(
 
             // ── App name ─────────────────────────────────────────────────
             Text(
-                text = "{Mias}",
+                text = "Mias",
                 style = MiasTypography.DisplayMedium.copy(
                     fontSize = 48.sp,
                     fontWeight = FontWeight.Light,
-                    letterSpacing = 8.sp,
+                    letterSpacing = 6.sp,
                 ),
                 color = MiasColors.TextPrimary,
                 modifier = Modifier.alpha(textAlpha.value),
                 textAlign = TextAlign.Center,
             )
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
 
             // ── Tagline ───────────────────────────────────────────────────
             Text(
-                text = "Local AI. No cloud. Your data.",
+                text = "Your private AI assistant",
                 style = MiasTypography.LabelMedium,
-                color = MiasColors.NeonCyan.copy(alpha = 0.7f),
-                modifier = Modifier.alpha(taglineAlpha.value),
-                textAlign = TextAlign.Center,
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            // ── Boot status ───────────────────────────────────────────────
-            Text(
-                text = "All systems local · Zero cloud",
-                style = MiasTypography.LabelSmall,
-                color = MiasColors.TextSecondary.copy(alpha = 0.5f),
+                color = MiasColors.TextSecondary,
                 modifier = Modifier.alpha(taglineAlpha.value),
                 textAlign = TextAlign.Center,
             )

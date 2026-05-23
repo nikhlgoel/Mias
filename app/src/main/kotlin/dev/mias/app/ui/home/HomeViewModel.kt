@@ -1,66 +1,56 @@
-﻿package dev.mias.app.ui.home
+package dev.mias.app.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.mias.core.common.getOrDefault
 import dev.mias.core.common.model.BrainState
 import dev.mias.core.common.model.CognitionState
 import dev.mias.core.data.ConversationRepository
 import dev.mias.core.inference.orchestrator.InferenceOrchestrator
-import dev.mias.core.soul.SoulEngine
-import dev.mias.core.soul.model.Sentiment
+import dev.mias.core.modelhub.manager.ModelManager
+import dev.mias.core.modelhub.model.InstalledModel
 import dev.mias.core.thermal.TawsGovernor
-import dev.mias.core.ui.components.Nudge
-import dev.mias.core.ui.components.NudgeType
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
-import java.util.UUID
+import java.util.Calendar
 import javax.inject.Inject
 
 data class HomeUiState(
     val brainState: BrainState = BrainState.GEMMA_NPU,
     val cognitionState: CognitionState = CognitionState.IDLE,
-    val greeting: String = "Hey there",
-    val subtitle: String = "What's on your mind?",
-    val nudges: List<Nudge> = emptyList(),
+    val greeting: String = "Hi",
+    val subtitle: String = "Tap the orb to start",
+    val installedModels: List<InstalledModel> = emptyList(),
     val recentConversationCount: Int = 0,
-    val thermalTemp: Float = 32f,
-    val batteryLevel: Int = 100,
-    val sentiment: Sentiment = Sentiment.NEUTRAL,
+    val isReady: Boolean = false,
 )
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val orchestrator: InferenceOrchestrator,
-    private val soulEngine: SoulEngine,
     private val tawsGovernor: TawsGovernor,
     private val conversationRepository: ConversationRepository,
+    private val modelManager: ModelManager,
 ) : ViewModel() {
-
-    private val _nudges = MutableStateFlow(generateInitialNudges())
 
     val uiState: StateFlow<HomeUiState> = combine(
         orchestrator.brainState,
         orchestrator.cognitionState,
-        soulEngine.state,
-        _nudges,
-    ) { brain, cognition, soul, nudges ->
-        val thermal = tawsGovernor.latestSnapshot
+        modelManager.installedModels,
+        conversationRepository.getConversations().map { it.size },
+    ) { brain, cognition, installed, recentCount ->
+        val ready = installed.isNotEmpty()
         HomeUiState(
             brainState = brain,
             cognitionState = cognition,
-            greeting = buildGreeting(soul.detectedSentiment),
-            subtitle = buildSubtitle(brain, soul.detectedSentiment),
-            nudges = nudges,
-            thermalTemp = thermal?.socTempCelsius ?: 32f,
-            batteryLevel = thermal?.batteryLevel ?: 100,
-            sentiment = soul.detectedSentiment,
+            greeting = timeBasedGreeting(),
+            subtitle = buildSubtitle(ready, installed.size, recentCount),
+            installedModels = installed,
+            recentConversationCount = recentCount,
+            isReady = ready,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -68,43 +58,20 @@ class HomeViewModel @Inject constructor(
         initialValue = HomeUiState(),
     )
 
-    fun dismissNudge(id: String) {
-        _nudges.value = _nudges.value.filter { it.id != id }
-    }
+    private fun buildSubtitle(ready: Boolean, installedCount: Int, recentCount: Int): String =
+        when {
+            !ready -> "No model installed yet — open Models to download one"
+            recentCount == 0 -> "$installedCount model${if (installedCount == 1) "" else "s"} ready · tap to chat"
+            else -> "$installedCount model${if (installedCount == 1) "" else "s"} ready · $recentCount past chat${if (recentCount == 1) "" else "s"}"
+        }
 
-    private fun buildGreeting(sentiment: Sentiment): String = when (sentiment) {
-        Sentiment.HAPPY -> "Hey, looking good!"
-        Sentiment.EXCITED -> "Let's gooo!"
-        Sentiment.FRUSTRATED -> "I'm here for you"
-        Sentiment.SAD -> "Hey, I'm here"
-        Sentiment.STRESSED -> "Take a breath"
-        Sentiment.CURIOUS -> "Let's explore"
-        Sentiment.IN_FLOW -> "Flow mode"
-        Sentiment.NEUTRAL -> "Hey there"
+    private fun timeBasedGreeting(): String {
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        return when (hour) {
+            in 5..11 -> "Good morning"
+            in 12..16 -> "Good afternoon"
+            in 17..21 -> "Good evening"
+            else -> "Hi"
+        }
     }
-
-    private fun buildSubtitle(brain: BrainState, sentiment: Sentiment): String = when (brain) {
-        BrainState.GEMMA_NPU -> "Full power on NPU"
-        BrainState.MOBILELLM_SURVIVAL -> "Keeping it light"
-        BrainState.QWEN_DESKTOP -> "Connected to desktop"
-        BrainState.QWEN_WAKING -> "Waking up the big brain..."
-        BrainState.DEGRADED -> "Running minimal — plug in soon"
-    }
-
-    private fun generateInitialNudges(): List<Nudge> = listOf(
-        Nudge(
-            id = UUID.randomUUID().toString(),
-            type = NudgeType.GREETING,
-            title = "All systems online",
-            body = "Gemma NPU is warmed up and ready. Everything runs locally.",
-            priority = 0.9f,
-        ),
-        Nudge(
-            id = UUID.randomUUID().toString(),
-            type = NudgeType.INSIGHT,
-            title = "Zero cloud",
-            body = "Your data never leaves this device. Private by design.",
-            priority = 0.7f,
-        ),
-    )
 }

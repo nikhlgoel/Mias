@@ -63,11 +63,11 @@ fun StatusPill(
 }
 
 fun BrainState.displayName(): String = when (this) {
-    BrainState.GEMMA_NPU -> "Gemma NPU"
-    BrainState.MOBILELLM_SURVIVAL -> "Survival"
+    BrainState.GEMMA_NPU -> "On-device"
+    BrainState.MOBILELLM_SURVIVAL -> "On-device (light)"
     BrainState.QWEN_DESKTOP -> "Desktop"
-    BrainState.QWEN_WAKING -> "Waking PC"
-    BrainState.DEGRADED -> "Degraded"
+    BrainState.QWEN_WAKING -> "Connecting…"
+    BrainState.DEGRADED -> "Limited"
 }
 
 fun BrainState.displayColor(): Color = when (this) {

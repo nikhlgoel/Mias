@@ -1,5 +1,6 @@
 ﻿package dev.mias.core.inference.orchestrator
 
+import dev.mias.core.common.MiasResult
 import dev.mias.core.common.model.BrainState
 import dev.mias.core.common.model.CognitionState
 import dev.mias.core.common.model.Stimulus
@@ -82,7 +83,28 @@ class InferenceOrchestrator @Inject constructor(
 
         val (engine, newState) = selectEngine(tawsAction, stimulus.content)
         val previousState = _brainState.value
-        ensureModelLoaded(engine, newState)
+        when (val readiness = ensureModelLoaded(engine, newState)) {
+            is ModelReadiness.Ready -> Unit
+            is ModelReadiness.NoModelAssigned -> {
+                emit(
+                    ReActStep.FinalAnswer(
+                        "No model is set up yet. Open Models, download one " +
+                            "(Qwen2.5 0.5B is a good first pick — it's small and works on any phone), " +
+                            "then come back here.",
+                    ),
+                )
+                return@flow
+            }
+            is ModelReadiness.LoadFailed -> {
+                emit(
+                    ReActStep.FinalAnswer(
+                        "Couldn't load \"${readiness.modelName}\" — ${readiness.reason}. " +
+                            "Try opening Models and re-downloading it.",
+                    ),
+                )
+                return@flow
+            }
+        }
 
         reActEngine.execute(
             engine = engine,
@@ -137,17 +159,44 @@ class InferenceOrchestrator @Inject constructor(
             }
         }
 
-    private suspend fun ensureModelLoaded(engine: InferenceEngine, brainState: BrainState) {
-        if (engine.isModelLoaded()) return
+    private sealed interface ModelReadiness {
+        data object Ready : ModelReadiness
+        data object NoModelAssigned : ModelReadiness
+        data class LoadFailed(val modelName: String, val reason: String) : ModelReadiness
+    }
+
+    private suspend fun ensureModelLoaded(
+        engine: InferenceEngine,
+        brainState: BrainState,
+    ): ModelReadiness {
+        if (engine.isModelLoaded()) return ModelReadiness.Ready
+        if (brainState == BrainState.DEGRADED) return ModelReadiness.NoModelAssigned
+
         val role = when (brainState) {
             BrainState.MOBILELLM_SURVIVAL -> ModelRole.SURVIVAL
             BrainState.QWEN_DESKTOP, BrainState.QWEN_WAKING -> ModelRole.CODE
             BrainState.GEMMA_NPU -> ModelRole.CHAT
-            BrainState.DEGRADED -> return
+            BrainState.DEGRADED -> return ModelReadiness.NoModelAssigned
         }
-        val model = modelManager.getModelForRole(role) ?: modelManager.getModelForRole(ModelRole.CHAT) ?: return
-        engine.loadModel(model.localPath)
-        modelManager.markUsed(model.id)
+
+        // First try the role-specific model, then any CHAT model, then any
+        // model the user has installed at all — we'd rather degrade quality
+        // than tell the user "nothing works".
+        val model = modelManager.getModelForRole(role)
+            ?: modelManager.getModelForRole(ModelRole.CHAT)
+            ?: modelManager.getModelForRole(ModelRole.SURVIVAL)
+            ?: return ModelReadiness.NoModelAssigned
+
+        return when (val result = engine.loadModel(model.localPath)) {
+            is MiasResult.Success -> {
+                modelManager.markUsed(model.id)
+                ModelReadiness.Ready
+            }
+            is MiasResult.Error -> ModelReadiness.LoadFailed(
+                modelName = model.card.name,
+                reason = result.message,
+            )
+        }
     }
 
     private fun inferRole(prompt: String): ModelRole {
@@ -162,16 +211,17 @@ class InferenceOrchestrator @Inject constructor(
 
     companion object {
         /**
-         * Neutral baseline persona. User-facing personality (tone, language mix,
-         * relationship voice) belongs in `core/soul/` and should be passed in via
-         * the [process] `systemPrompt` parameter — do not hard-code locale or
-         * cultural traits here.
+         * Default persona. Warm and approachable without being performative.
+         * Anything user-specific (name, preferred language, custom tone) should
+         * be appended by the caller — keep this baseline universal.
          */
         val DEFAULT_SYSTEM_PROMPT = """
-            You are Mias, a private AI assistant that runs entirely on-device.
-            You have access to tools and can take actions on the user's behalf.
-            Always think step by step before acting.
-            Be concise unless the user asks for detail.
+            You are Mias, a personal AI assistant that runs entirely on the user's device.
+            Be helpful, clear, and honest. Talk like a knowledgeable friend — friendly but never sycophantic.
+            Think through problems step by step before answering.
+            Keep responses concise by default; expand only when the user asks for depth.
+            When you don't know something or can't do something, say so plainly.
+            You may use tools when they'll genuinely help; otherwise just answer directly.
         """.trimIndent()
     }
 }

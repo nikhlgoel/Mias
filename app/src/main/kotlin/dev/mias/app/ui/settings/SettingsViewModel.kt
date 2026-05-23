@@ -1,76 +1,74 @@
-﻿package dev.mias.app.ui.settings
+package dev.mias.app.ui.settings
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.mias.core.common.model.BrainState
 import dev.mias.core.inference.orchestrator.InferenceOrchestrator
+import dev.mias.core.modelhub.manager.ModelManager
+import dev.mias.core.modelhub.model.InstalledModel
+import dev.mias.core.modelhub.model.ModelRole
 import dev.mias.core.speech.SpeechEngine
 import dev.mias.core.speech.SpeechLanguage
-import dev.mias.core.soul.SoulEngine
-import dev.mias.core.soul.model.SoulTrait
 import dev.mias.core.thermal.TawsGovernor
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 data class SettingsUiState(
     val brainState: BrainState = BrainState.GEMMA_NPU,
-    val thermalTemp: Float = 32f,
-    val batteryLevel: Int = 100,
+    val thermalTempC: Float? = null,
+    val batteryLevel: Int? = null,
     val isDesktopReachable: Boolean = false,
-    val soulTraits: Map<SoulTrait, Float> = emptyMap(),
-    val showReActSteps: Boolean = false,
-    val desktopHostname: String = "desktop-g15",
-    val modelInfo: ModelInfo = ModelInfo(),
+    val installedModels: List<InstalledModel> = emptyList(),
+    val roleAssignments: Map<ModelRole, String?> = emptyMap(),
     val speechLanguage: SpeechLanguage = SpeechLanguage.ENGLISH_US,
     val speechAutoDetect: Boolean = true,
-)
-
-data class ModelInfo(
-    val primaryModel: String = "Gemma-4-e4b",
-    val survivalModel: String = "MobileLLM-R1.5",
-    val desktopModel: String = "Qwen3-Coder-Next",
-    val primaryQuant: String = "INT4",
-    val contextLength: String = "32K",
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val orchestrator: InferenceOrchestrator,
-    private val soulEngine: SoulEngine,
     private val tawsGovernor: TawsGovernor,
     private val speechEngine: SpeechEngine,
+    private val modelManager: ModelManager,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(loadCurrentState())
-    val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+    private val _speechAutoDetect = MutableStateFlow(true)
 
-    fun refreshState() {
-        _uiState.update { loadCurrentState() }
-    }
+    val uiState: StateFlow<SettingsUiState> = combine(
+        orchestrator.brainState,
+        modelManager.installedModels,
+        _speechAutoDetect,
+    ) { brain, installed, autoDetect ->
+        val snapshot = tawsGovernor.latestSnapshot
+        SettingsUiState(
+            brainState = brain,
+            thermalTempC = snapshot?.socTempCelsius,
+            batteryLevel = snapshot?.batteryLevel,
+            isDesktopReachable = orchestrator.desktopEngine != null,
+            installedModels = installed,
+            roleAssignments = ModelRole.entries.associateWith { role ->
+                installed.firstOrNull { it.assignedRole == role }?.id
+            },
+            speechLanguage = speechEngine.getCurrentLanguage(),
+            speechAutoDetect = autoDetect,
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = SettingsUiState(),
+    )
 
     fun setSpeechLanguage(language: SpeechLanguage) {
         speechEngine.setLanguage(language)
-        _uiState.update { it.copy(speechLanguage = language) }
     }
 
     fun setSpeechAutoDetect(enabled: Boolean) {
         speechEngine.setAutoDetect(enabled)
-        _uiState.update { it.copy(speechAutoDetect = enabled) }
-    }
-
-    private fun loadCurrentState(): SettingsUiState {
-        val thermal = tawsGovernor.latestSnapshot
-        return SettingsUiState(
-            brainState = orchestrator.brainState.value,
-            thermalTemp = thermal?.socTempCelsius ?: 32f,
-            batteryLevel = thermal?.batteryLevel ?: 100,
-            isDesktopReachable = orchestrator.desktopEngine != null,
-            soulTraits = soulEngine.state.value.blendCoefficients,
-            speechLanguage = speechEngine.getCurrentLanguage(),
-            speechAutoDetect = true,
-        )
+        _speechAutoDetect.value = enabled
     }
 }
