@@ -44,7 +44,7 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeLoadModel(JNIEnv *env, 
     }
     
     llama_model_params mparams = llama_model_default_params();
-    model = llama_load_model_from_file(path, mparams);
+    model = llama_model_load_from_file(path, mparams);
     
     if (model == nullptr) {
         LOGE("Failed to load model from %s", path);
@@ -57,7 +57,7 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeLoadModel(JNIEnv *env, 
     cparams.n_threads = 4;
     cparams.n_threads_batch = 4;
 
-    ctx = llama_new_context_with_model(model, cparams);
+    ctx = llama_init_from_model(model, cparams);
     
     if (ctx == nullptr) {
         LOGE("Failed to create context");
@@ -258,7 +258,7 @@ Java_dev_mias_core_inference_engine_EmbeddingEngine_nativeLoadEmbeddingModel(JNI
     }
     
     llama_model_params mparams = llama_model_default_params();
-    emb_model = llama_load_model_from_file(path, mparams);
+    emb_model = llama_model_load_from_file(path, mparams);
     
     env->ReleaseStringUTFChars(jpath, path);
     
@@ -273,7 +273,7 @@ Java_dev_mias_core_inference_engine_EmbeddingEngine_nativeLoadEmbeddingModel(JNI
     cparams.n_threads_batch = 4;
     cparams.embeddings = true; // Crucial for embedding extraction
 
-    emb_ctx = llama_new_context_with_model(emb_model, cparams);
+    emb_ctx = llama_init_from_model(emb_model, cparams);
     
     if (emb_ctx == nullptr) {
         LOGE("Failed to create embedding context");

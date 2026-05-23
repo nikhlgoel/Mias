@@ -29,6 +29,16 @@ add_library(
         mias_jni_bridge.cpp
 )
 
+# ── 16 KB page size support ─────────────────────────────────
+# Required for Play Store submissions targeting Android 15+ from
+# November 2025 onward, and for compatibility with Pixel 8+ and
+# other devices running with 16 KB memory pages.
+# https://developer.android.com/guide/practices/page-sizes
+target_link_options(mias_inference PRIVATE
+        "-Wl,-z,max-page-size=16384"
+        "-Wl,-z,common-page-size=16384"
+)
+
 # Connect libraries to our bridge
 target_link_libraries(
         mias_inference

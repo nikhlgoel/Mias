@@ -19,6 +19,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
@@ -69,9 +70,9 @@ class TailscaleMeshClient @Inject constructor(
                 peerMap.values.mapNotNull { peerElement ->
                     val peer = peerElement.jsonObject
                     val hostname = peer["HostName"]?.jsonPrimitive?.content ?: return@mapNotNull null
-                    val ips = peer["TailscaleIPs"]
-                    val ip = ips?.toString()?.removeSurrounding("[\"", "\"]")?.split("\",\"")
-                        ?.firstOrNull() ?: return@mapNotNull null
+                    val ip = peer["TailscaleIPs"]?.jsonArray
+                        ?.firstOrNull()?.jsonPrimitive?.content
+                        ?: return@mapNotNull null
                     val online = peer["Online"]?.jsonPrimitive?.content?.toBooleanStrictOrNull()
                         ?: false
 
@@ -82,7 +83,7 @@ class TailscaleMeshClient @Inject constructor(
                         isOnline = online,
                     )
                 }.also {
-                    connected = true
+                    connected = it.isNotEmpty()
                 }
             }
         }

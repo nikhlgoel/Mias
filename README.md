@@ -49,7 +49,7 @@ cd mias
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 # Launch
-adb shell am start -n dev.mias.app/.ui.MainActivity
+adb shell am start -n io.mias.app/dev.mias.app.ui.MainActivity
 ```
 
 On first launch:

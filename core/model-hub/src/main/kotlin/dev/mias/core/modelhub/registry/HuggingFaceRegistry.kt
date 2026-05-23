@@ -11,6 +11,7 @@ import dev.mias.core.modelhub.model.ModelRole
 import dev.mias.core.modelhub.model.ModelSource
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import kotlinx.coroutines.CoroutineDispatcher
@@ -95,7 +96,7 @@ class HuggingFaceRegistry @Inject constructor(
         )
     }
 
-    private fun io.ktor.client.request.HttpRequestBuilder.applyAuth() {
+    private fun HttpRequestBuilder.applyAuth() {
         val token = auth.token
         if (token.isNotBlank()) header("Authorization", "Bearer $token")
     }

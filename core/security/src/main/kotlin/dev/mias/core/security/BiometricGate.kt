@@ -1,6 +1,5 @@
 ﻿package dev.mias.core.security
 
-import android.os.Build
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.biometric.BiometricPrompt

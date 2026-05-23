@@ -8,10 +8,10 @@
 
 android {
     namespace = "dev.mias.core.soul"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
-        minSdk = 28
+        minSdk = 30
     }
 
     compileOptions {

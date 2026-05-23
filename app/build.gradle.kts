@@ -24,16 +24,34 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "dev.mias.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "io.mias.app"
-        minSdk = 28
-        targetSdk = 35
+        minSdk = 30
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // The on-device inference engine (llama.cpp JNI) is built for
+        // arm64-v8a only. Restricting all native libs to this ABI here
+        // strips ~38 MB of unused x86 / x86_64 / armeabi-v7a binaries
+        // pulled in by AndroidX and MediaPipe transitively.
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
+    }
+
+    // 16 KB page size compliance: tell AGP to use uncompressed JNI libs
+    // (required for the loader to honour the 16 KB alignment we set in
+    // CMake via -Wl,-z,max-page-size=16384). Default since AGP 4.2, made
+    // explicit here so a future flip can't silently re-break alignment.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
 
     signingConfigs {
