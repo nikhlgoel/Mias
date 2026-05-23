@@ -98,5 +98,8 @@ package-lock.json
 *.bak
 *~
 
+# === Claude Code local settings ===
+.claude/
+
 # === Local project tracking ===
 PROJECT_STAGES.md
