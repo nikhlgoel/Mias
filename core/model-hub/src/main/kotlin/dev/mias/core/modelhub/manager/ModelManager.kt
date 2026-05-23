@@ -179,6 +179,10 @@ class ModelManager @Inject constructor(
 
     /** Resume pending downloads on app start. */
     suspend fun resumePendingDownloads() = downloadManager.resumePendingDownloads()
+
+    /** Resume a single paused/failed download. */
+    suspend fun resumeDownload(modelId: String): MiasResult<Unit> =
+        downloadManager.resumeDownload(modelId)
 }
 
 /** A browsable model card with installation status. */

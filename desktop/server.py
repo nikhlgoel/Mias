@@ -118,19 +118,28 @@ async def handle_tools_list(params):
         ]
     }
 
+def _text_content(text: str, is_error: bool = False):
+    """Wrap a string result in the MCP tools/call content envelope."""
+    return {
+        "content": [{"type": "text", "text": text}],
+        "isError": is_error,
+    }
+
+
 async def handle_tools_call(params):
     name = params.get("name")
     args = params.get("arguments", {})
-    
+
     if name == "generate":
         prompt = args.get("prompt", "")
         max_tokens = int(args.get("max_tokens", "2048"))
-        
+
         llm = get_llm()
         if not llm:
-             # Just an echo/stub if model is not loaded for dev loop testing
-             return f"[DESKTOP-STUB] I received your prompt: '{prompt}'. Native LLM mapping is bypassed."
-             
+            return _text_content(
+                f"[DESKTOP-STUB] I received your prompt: '{prompt}'. Native LLM mapping is bypassed."
+            )
+
         start = time.perf_counter()
         output = llm(
             prompt,
@@ -141,9 +150,9 @@ async def handle_tools_call(params):
         elapsed = (time.perf_counter() - start) * 1000
         text = output["choices"][0]["text"]
         logger.info(f"Generated {output['usage']['completion_tokens']} tokens in {elapsed:.2f}ms")
-        return text
-        
-    return f"Error: Unknown tool '{name}'"
+        return _text_content(text)
+
+    return _text_content(f"Error: Unknown tool '{name}'", is_error=True)
 
 # ---------------------------------------------------------------------------
 # Routes

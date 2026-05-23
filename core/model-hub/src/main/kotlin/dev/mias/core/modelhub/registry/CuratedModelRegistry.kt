@@ -8,158 +8,127 @@ import dev.mias.core.modelhub.model.ModelSource
 
 object CuratedModelRegistry {
 
+    /**
+     * Curated, hand-verified model URLs.
+     *
+     * Rules for adding entries:
+     *  - The HuggingFace repo and exact filename must exist (check in a browser).
+     *  - Prefer official org repos (`Qwen/…`, `nomic-ai/…`) when they ship GGUF.
+     *    Otherwise use a long-standing community quantizer (`bartowski/…`).
+     *  - Leave `sha256 = ""` only if you've not yet recorded the digest.
+     *    When set, ModelDownloadManager will refuse the file if it doesn't match.
+     */
     val models: List<ModelCard> = listOf(
-        // ── Primary Brain — Best all-round on-device model ──────────
+        // ── Survival Brain — Tiny, always-available fallback ────────
         ModelCard(
-            id = "gemma-4-e4b-q4",
-            name = "Gemma 4 e4b",
-            author = "Google",
-            description = "4B effective parameter model optimized for NPU. " +
-                "Excellent at conversation, reasoning, and tool use.",
-            sizeBytes = 2_700_000_000L,
-            quantization = "Q4_K_M",
-            format = ModelFormat.GGUF,
-            roles = listOf(ModelRole.CHAT, ModelRole.REASONING, ModelRole.CODE),
-            contextLength = 32768,
-            parameterCount = "4B effective",
-            downloadUrl = "https://huggingface.co/google/gemma-4-e4b-GGUF/resolve/main/gemma-4-e4b-Q4_K_M.gguf",
-            sha256 = "",
-            license = "Apache-2.0",
-            tags = listOf("google", "npu", "primary"),
-            minRamMb = 3072,
-            npuCompatible = true,
-            runtime = ModelRuntime.GOOGLE_AI_EDGE,
-            defaultRolePriority = 80,
-        ),
-
-        // ── Survival Brain — Tiny but capable for thermal fallback ──
-        ModelCard(
-            id = "qwen3-0.6b-q8",
-            name = "Qwen3 0.6B",
+            id = "qwen2.5-0.5b-instruct-q8",
+            name = "Qwen2.5 0.5B Instruct",
             author = "Alibaba",
-            description = "Ultra-light 0.6B model for thermal survival mode. " +
-                "Minimal resource use, still capable of basic conversation.",
-            sizeBytes = 700_000_000L,
+            description = "Ultra-light 0.5B model for thermal-survival mode. " +
+                "Minimal resource use, still capable of basic conversation and tool calls.",
+            sizeBytes = 531_000_000L,
             quantization = "Q8_0",
             format = ModelFormat.GGUF,
             roles = listOf(ModelRole.CHAT, ModelRole.SURVIVAL),
-            contextLength = 4096,
-            parameterCount = "0.6B",
-            downloadUrl = "https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/main/qwen3-0.6b-q8_0.gguf",
+            contextLength = 32768,
+            parameterCount = "0.5B",
+            downloadUrl = "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q8_0.gguf",
             sha256 = "",
             license = "Apache-2.0",
-            tags = listOf("qwen", "survival", "tiny"),
+            tags = listOf("qwen", "survival", "tiny", "official"),
             minRamMb = 768,
             npuCompatible = false,
             isRecommendedDefault = true,
             defaultRolePriority = 100,
         ),
 
-        // ── Reasoning Brain — Deep thinking for complex tasks ───────
+        // ── Primary Brain — Balanced default for chat / reasoning ───
         ModelCard(
-            id = "qwen3-1.7b-q4",
-            name = "Qwen3 1.7B",
+            id = "qwen2.5-1.5b-instruct-q4",
+            name = "Qwen2.5 1.5B Instruct",
             author = "Alibaba",
-            description = "1.7B model with strong reasoning capability. " +
-                "Good balance of size and intelligence for on-device use.",
-            sizeBytes = 1_200_000_000L,
+            description = "1.5B parameter model with strong instruction following " +
+                "and reasoning. Good default for on-device chat on most phones.",
+            sizeBytes = 986_000_000L,
             quantization = "Q4_K_M",
             format = ModelFormat.GGUF,
-            roles = listOf(ModelRole.CHAT, ModelRole.REASONING, ModelRole.CODE),
+            roles = listOf(ModelRole.CHAT, ModelRole.REASONING, ModelRole.RESEARCH),
             contextLength = 32768,
-            parameterCount = "1.7B",
-            downloadUrl = "https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/qwen3-1.7b-q4_k_m.gguf",
+            parameterCount = "1.5B",
+            downloadUrl = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
             sha256 = "",
             license = "Apache-2.0",
-            tags = listOf("qwen", "reasoning", "balanced"),
+            tags = listOf("qwen", "primary", "balanced", "official"),
             minRamMb = 1536,
             npuCompatible = false,
             defaultRolePriority = 90,
         ),
 
-        // ── Code Brain — Specialized for programming tasks ──────────
+        // ── Code Brain — Programmer-tuned ───────────────────────────
         ModelCard(
-            id = "qwen3-4b-q4",
-            name = "Qwen3 4B",
+            id = "qwen2.5-coder-3b-instruct-q4",
+            name = "Qwen2.5 Coder 3B Instruct",
             author = "Alibaba",
-            description = "4B model excellent at code generation, debugging, " +
-                "and technical explanations. Strong reasoning chain.",
-            sizeBytes = 2_600_000_000L,
+            description = "Code-specialized 3B model. Strong at generation, " +
+                "debugging, and explanation across mainstream languages.",
+            sizeBytes = 1_930_000_000L,
             quantization = "Q4_K_M",
             format = ModelFormat.GGUF,
             roles = listOf(ModelRole.CODE, ModelRole.REASONING, ModelRole.CHAT),
             contextLength = 32768,
-            parameterCount = "4B",
-            downloadUrl = "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/qwen3-4b-q4_k_m.gguf",
+            parameterCount = "3B",
+            downloadUrl = "https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_k_m.gguf",
             sha256 = "",
             license = "Apache-2.0",
-            tags = listOf("qwen", "code", "large"),
-            minRamMb = 3072,
+            tags = listOf("qwen", "code", "official"),
+            minRamMb = 2560,
             npuCompatible = false,
             defaultRolePriority = 85,
         ),
 
-        // ── Research Brain — Large context for deep analysis ────────
-        ModelCard(
-            id = "gemma-3-4b-q4",
-            name = "Gemma 3 4B IT",
-            author = "Google",
-            description = "Instruction-tuned 4B model from Google. " +
-                "Strong at following complex instructions and research tasks.",
-            sizeBytes = 2_500_000_000L,
-            quantization = "Q4_K_M",
-            format = ModelFormat.GGUF,
-            roles = listOf(ModelRole.RESEARCH, ModelRole.CHAT, ModelRole.CREATIVE),
-            contextLength = 32768,
-            parameterCount = "4B",
-            downloadUrl = "https://huggingface.co/google/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q4_K_M.gguf",
-            sha256 = "",
-            license = "Apache-2.0",
-            tags = listOf("google", "research", "instruction-tuned"),
-            minRamMb = 3072,
-            npuCompatible = true,
-            defaultRolePriority = 75,
-        ),
+        // ── Vision-capable / multimodal placeholder ─────────────────
+        // (Curated vision entries pending verified GGUF builds. Users can
+        //  add others via HF search.)
 
-        // ── Creative Brain — For content generation ─────────────────
+        // ── Creative Brain — Writing-tuned ──────────────────────────
         ModelCard(
-            id = "phi-4-mini-q4",
-            name = "Phi-4 Mini",
-            author = "Microsoft",
-            description = "3.8B model from Microsoft excelling at creative " +
-                "writing, summarization, and content generation.",
-            sizeBytes = 2_300_000_000L,
+            id = "phi-3.5-mini-instruct-q4",
+            name = "Phi-3.5 Mini Instruct",
+            author = "Microsoft (community quant)",
+            description = "3.8B Microsoft model strong at creative writing, " +
+                "summarization, and long-form generation. Quantized by bartowski.",
+            sizeBytes = 2_390_000_000L,
             quantization = "Q4_K_M",
             format = ModelFormat.GGUF,
-            roles = listOf(ModelRole.CREATIVE, ModelRole.CHAT),
-            contextLength = 16384,
+            roles = listOf(ModelRole.CREATIVE, ModelRole.CHAT, ModelRole.RESEARCH),
+            contextLength = 128000,
             parameterCount = "3.8B",
-            downloadUrl = "https://huggingface.co/microsoft/Phi-4-mini-instruct-GGUF/resolve/main/Phi-4-mini-instruct-Q4_K_M.gguf",
+            downloadUrl = "https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf",
             sha256 = "",
             license = "MIT",
-            tags = listOf("microsoft", "creative", "writing"),
+            tags = listOf("microsoft", "creative", "long-context"),
             minRamMb = 2560,
             npuCompatible = false,
             defaultRolePriority = 70,
         ),
 
-        // ── Embedding Brain — For semantic search in Hindsight ──────
+        // ── Embedding Brain — Semantic search for Hindsight ─────────
         ModelCard(
-            id = "nomic-embed-v2-q8",
-            name = "Nomic Embed v2",
+            id = "nomic-embed-text-v1.5-q8",
+            name = "Nomic Embed Text v1.5",
             author = "Nomic AI",
-            description = "High-quality text embedding model for semantic " +
-                "search. Powers Hindsight Memory's similarity queries.",
-            sizeBytes = 300_000_000L,
+            description = "High-quality text embedding model (768-dim) for " +
+                "semantic search. Powers Hindsight Memory's similarity queries.",
+            sizeBytes = 146_000_000L,
             quantization = "Q8_0",
             format = ModelFormat.GGUF,
             roles = listOf(ModelRole.EMBEDDING),
             contextLength = 8192,
             parameterCount = "137M",
-            downloadUrl = "https://huggingface.co/nomic-ai/nomic-embed-text-v2-GGUF/resolve/main/nomic-embed-text-v2-Q8_0.gguf",
+            downloadUrl = "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/nomic-embed-text-v1.5.Q8_0.gguf",
             sha256 = "",
             license = "Apache-2.0",
-            tags = listOf("embedding", "search", "small"),
+            tags = listOf("embedding", "search", "small", "official"),
             minRamMb = 512,
             npuCompatible = false,
             runtime = ModelRuntime.EMBEDDING,

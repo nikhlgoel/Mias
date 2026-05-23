@@ -5,6 +5,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.mias.core.common.MiasResult
 import dev.mias.core.common.di.IoDispatcher
 import dev.mias.core.common.runCatchingMias
+import dev.mias.core.modelhub.auth.HuggingFaceAuth
 import dev.mias.core.modelhub.db.DownloadQueueEntity
 import dev.mias.core.modelhub.db.ModelDao
 import dev.mias.core.modelhub.di.ModelHubHttpClient
@@ -13,6 +14,7 @@ import dev.mias.core.modelhub.model.DownloadStatus
 import dev.mias.core.modelhub.model.ModelCard
 import dev.mias.core.modelhub.model.ModelFormat
 import dev.mias.core.modelhub.model.ModelStorageLayout
+import dev.mias.core.modelhub.registry.CuratedModelRegistry
 import dev.mias.core.modelhub.security.ModelSourcePolicy
 import dev.mias.core.modelhub.security.ModelValidationResult
 import io.ktor.client.HttpClient
@@ -24,8 +26,9 @@ import io.ktor.http.contentLength
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -52,10 +55,18 @@ class ModelDownloadManager @Inject constructor(
     @ModelHubHttpClient private val httpClient: HttpClient,
     private val modelDao: ModelDao,
     private val sourcePolicy: ModelSourcePolicy,
+    private val auth: HuggingFaceAuth,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
     private val _activeDownloads = MutableStateFlow<Map<String, DownloadState>>(emptyMap())
     val activeDownloads: StateFlow<Map<String, DownloadState>> = _activeDownloads.asStateFlow()
+
+    /**
+     * Long-lived scope owning the actual download jobs. We do NOT want to use
+     * the caller's coroutineScope — `installModel()` must return immediately
+     * after queuing, while the multi-GB transfer continues in the background.
+     */
+    private val downloadScope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
     private val downloadJobs = mutableMapOf<String, Job>()
     private val modelsRoot: File by lazy {
@@ -98,14 +109,22 @@ class ModelDownloadManager @Inject constructor(
 
             updateState(card.id, DownloadStatus.DOWNLOADING, startByte, card.sizeBytes)
 
-            // Launch the actual download
-            coroutineScope {
-                val job = launch {
-                    performDownload(card, tempFile, startByte)
-                }
-                downloadJobs[card.id] = job
+            // Fire-and-forget into the manager's own scope so installModel()
+            // returns immediately. Progress is observed via `activeDownloads`.
+            val job = downloadScope.launch {
+                performDownload(card, tempFile, startByte)
             }
+            downloadJobs[card.id] = job
         }
+    }
+
+    /** Resume a single previously-paused or failed download by id. */
+    suspend fun resumeDownload(modelId: String): MiasResult<Unit> {
+        val entity = modelDao.getDownload(modelId)
+            ?: return MiasResult.Error("No download record for $modelId")
+        val card = CuratedModelRegistry.getById(modelId)
+            ?: return MiasResult.Error("Unknown model: $modelId")
+        return startDownload(card)
     }
 
     /** Pause an active download. */
@@ -169,6 +188,10 @@ class ModelDownloadManager @Inject constructor(
             httpClient.prepareGet(card.downloadUrl) {
                 if (startByte > 0) {
                     header(HttpHeaders.Range, "bytes=$startByte-")
+                }
+                val token = auth.token
+                if (token.isNotBlank() && card.downloadUrl.contains("huggingface.co")) {
+                    header(HttpHeaders.Authorization, "Bearer $token")
                 }
             }.execute { response ->
                 if (!response.status.isSuccess()) {
@@ -296,7 +319,7 @@ class ModelDownloadManager @Inject constructor(
     }
 
     private fun buildCardFromEntity(entity: DownloadQueueEntity): ModelCard? {
-        return dev.mias.core.modelhub.registry.CuratedModelRegistry.getById(entity.modelId)
+        return CuratedModelRegistry.getById(entity.modelId)
     }
 
     companion object {

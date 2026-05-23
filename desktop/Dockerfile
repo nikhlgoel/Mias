@@ -13,7 +13,7 @@ LABEL description="Local-only desktop model server for Mias ecosystem"
 ENV DEBIAN_FRONTEND=noninteractive
 ENV MODEL_DIR=/models
 ENV HOST=0.0.0.0
-ENV PORT=8400
+ENV PORT=8401
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -41,4 +41,4 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
 ENTRYPOINT ["/app/venv/bin/python3", "server.py"]
-CMD ["--host", "0.0.0.0", "--port", "8400"]
+CMD ["--host", "0.0.0.0", "--port", "8401"]

@@ -3,6 +3,8 @@
 import dev.mias.core.common.MiasResult
 import dev.mias.core.common.di.IoDispatcher
 import dev.mias.core.common.runCatchingMias
+import dev.mias.core.modelhub.auth.HuggingFaceAuth
+import dev.mias.core.modelhub.di.ModelHubHttpClient
 import dev.mias.core.modelhub.model.ModelCard
 import dev.mias.core.modelhub.model.ModelFormat
 import dev.mias.core.modelhub.model.ModelRole
@@ -10,7 +12,11 @@ import dev.mias.core.modelhub.model.ModelSource
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -25,7 +31,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class HuggingFaceRegistry @Inject constructor(
-    private val httpClient: HttpClient,
+    @ModelHubHttpClient private val httpClient: HttpClient,
+    private val auth: HuggingFaceAuth,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -36,78 +43,66 @@ class HuggingFaceRegistry @Inject constructor(
      */
     suspend fun search(
         query: String,
-        limit: Int = 20,
+        limit: Int = 12,
     ): MiasResult<List<ModelCard>> = withContext(ioDispatcher) {
         runCatchingMias {
-            val url = "$HF_API_BASE/models?search=$query&filter=gguf&sort=downloads&direction=-1&limit=$limit"
-            val responseStr: String = httpClient.get(url).body()
-            val hfModels = json.decodeFromString<List<HfModelInfo>>(responseStr)
+            // /api/models?search=… doesn't include `siblings`, so the search
+            // pass only gives us repo ids. Then resolve each in parallel to
+            // pull the actual GGUF filename + size.
+            val searchUrl = "$HF_API_BASE/models?search=$query&filter=gguf&sort=downloads&direction=-1&limit=$limit"
+            val searchBody: String = httpClient.get(searchUrl) { applyAuth() }.body()
+            val searchResults = json.decodeFromString<List<HfModelInfo>>(searchBody)
 
-            hfModels.mapNotNull { hf ->
-                // Only include models with GGUF files
-                val ggufSibling = hf.siblings?.find { it.rfilename?.endsWith(".gguf") == true }
-                if (ggufSibling == null) return@mapNotNull null
-
-                val filename = ggufSibling.rfilename ?: return@mapNotNull null
-                val quant = inferQuantization(filename)
-
-                ModelCard(
-                    id = hf.id.replace("/", "--"),
-                    name = hf.id.substringAfter("/"),
-                    author = hf.author ?: hf.id.substringBefore("/"),
-                    description = hf.description ?: "Model from HuggingFace",
-                    sizeBytes = ggufSibling.size ?: 0L,
-                    quantization = quant,
-                    format = ModelFormat.GGUF,
-                    roles = inferRoles(hf.tags ?: emptyList(), hf.id),
-                    contextLength = 4096,
-                    parameterCount = inferParamCount(hf.id),
-                    downloadUrl = "$HF_BASE/${hf.id}/resolve/main/$filename",
-                    sha256 = "",
-                    license = hf.license ?: "unknown",
-                    tags = hf.tags ?: emptyList(),
-                    minRamMb = estimateRamNeeded(ggufSibling.size ?: 0L),
-                    source = ModelSource.HUGGING_FACE,
-                )
+            coroutineScope {
+                searchResults.map { hit ->
+                    async { runCatching { resolveCard(hit.id) }.getOrNull() }
+                }.awaitAll().filterNotNull()
             }
         }
     }
 
+    private suspend fun resolveCard(repoId: String): ModelCard? {
+        val infoUrl = "$HF_API_BASE/models/$repoId"
+        val body: String = httpClient.get(infoUrl) { applyAuth() }.body()
+        val hf = json.decodeFromString<HfModelInfo>(body)
+
+        val ggufFiles = hf.siblings?.filter { it.rfilename?.endsWith(".gguf") == true }
+            ?: return null
+        val bestFile = ggufFiles
+            .sortedByDescending { it.size ?: 0L }
+            .find { inferQuantization(it.rfilename ?: "") in PREFERRED_QUANTS }
+            ?: ggufFiles.firstOrNull()
+            ?: return null
+
+        val filename = bestFile.rfilename ?: return null
+        return ModelCard(
+            id = hf.id.replace("/", "--"),
+            name = hf.id.substringAfter("/"),
+            author = hf.author ?: hf.id.substringBefore("/"),
+            description = hf.description ?: "Model from HuggingFace",
+            sizeBytes = bestFile.size ?: 0L,
+            quantization = inferQuantization(filename),
+            format = ModelFormat.GGUF,
+            roles = inferRoles(hf.tags ?: emptyList(), hf.id),
+            contextLength = 4096,
+            parameterCount = inferParamCount(hf.id),
+            downloadUrl = "$HF_BASE/${hf.id}/resolve/main/$filename",
+            sha256 = "",
+            license = hf.license ?: "unknown",
+            tags = hf.tags ?: emptyList(),
+            minRamMb = estimateRamNeeded(bestFile.size ?: 0L),
+            source = ModelSource.HUGGING_FACE,
+        )
+    }
+
+    private fun io.ktor.client.request.HttpRequestBuilder.applyAuth() {
+        val token = auth.token
+        if (token.isNotBlank()) header("Authorization", "Bearer $token")
+    }
+
     /** Get details for a specific model repo. */
     suspend fun getModelInfo(repoId: String): MiasResult<ModelCard?> = withContext(ioDispatcher) {
-        runCatchingMias {
-            val url = "$HF_API_BASE/models/$repoId"
-            val responseStr: String = httpClient.get(url).body()
-            val hf = json.decodeFromString<HfModelInfo>(responseStr)
-
-            val ggufFiles = hf.siblings?.filter { it.rfilename?.endsWith(".gguf") == true }
-            val bestFile = ggufFiles
-                ?.sortedByDescending { it.size ?: 0L }
-                ?.find { inferQuantization(it.rfilename ?: "") in PREFERRED_QUANTS }
-                ?: ggufFiles?.firstOrNull()
-                ?: return@runCatchingMias null
-
-            val filename = bestFile.rfilename ?: return@runCatchingMias null
-
-            ModelCard(
-                id = hf.id.replace("/", "--"),
-                name = hf.id.substringAfter("/"),
-                author = hf.author ?: hf.id.substringBefore("/"),
-                description = hf.description ?: "",
-                sizeBytes = bestFile.size ?: 0L,
-                quantization = inferQuantization(filename),
-                format = ModelFormat.GGUF,
-                roles = inferRoles(hf.tags ?: emptyList(), hf.id),
-                contextLength = 4096,
-                parameterCount = inferParamCount(hf.id),
-                downloadUrl = "$HF_BASE/${hf.id}/resolve/main/$filename",
-                sha256 = "",
-                license = hf.license ?: "unknown",
-                tags = hf.tags ?: emptyList(),
-                minRamMb = estimateRamNeeded(bestFile.size ?: 0L),
-                source = ModelSource.HUGGING_FACE,
-            )
-        }
+        runCatchingMias { resolveCard(repoId) }
     }
 
     private fun inferQuantization(filename: String): String {

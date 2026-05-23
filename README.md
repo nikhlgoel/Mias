@@ -49,7 +49,7 @@ cd mias
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 # Launch
-adb shell am start -n dev.Mias/.app.MainActivity
+adb shell am start -n dev.mias.app/.ui.MainActivity
 ```
 
 On first launch:
@@ -74,10 +74,10 @@ pip install huggingface-hub
 huggingface-cli download Qwen/Qwen3-Coder-Next-GGUF Qwen3-Coder-Next-32B-Q4_K_M.gguf
 
 # Run the server
-docker run --gpus all -p 8400:8400 mias-desktop:latest
+docker run --gpus all -p 8401:8401 mias-desktop:latest
 
 # Verify it's running
-curl http://localhost:8400/health
+curl http://localhost:8401/health
 # → {"status":"ready","device":"cuda"}
 ```
 

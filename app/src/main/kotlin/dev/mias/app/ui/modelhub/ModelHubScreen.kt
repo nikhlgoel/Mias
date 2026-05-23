@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.item
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -185,6 +186,43 @@ fun ModelHubScreen(
                             }
                         },
                     )
+                }
+
+                if (state.isSearchingRemote) {
+                    item(key = "remote-loading") {
+                        Text(
+                            "Searching HuggingFace…",
+                            style = MiasTypography.LabelSmall,
+                            color = MiasColors.TextSecondary,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+
+                if (state.remoteResults.isNotEmpty()) {
+                    item(key = "remote-header") {
+                        Text(
+                            "From HuggingFace",
+                            style = MiasTypography.LabelMedium,
+                            color = MiasColors.TextSecondary,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                        )
+                    }
+                    items(state.remoteResults, key = { "hf-${it.id}" }) { card ->
+                        val dlState = state.downloadStates[card.id]
+                        ModelCard(
+                            modelCard = card,
+                            downloadState = dlState,
+                            isActive = false,
+                            onAction = {
+                                when {
+                                    dlState?.status == DownloadStatus.DOWNLOADING -> viewModel.pauseDownload(card.id)
+                                    dlState?.status == DownloadStatus.PAUSED -> viewModel.resumeDownload(card.id)
+                                    else -> viewModel.downloadModel(card)
+                                }
+                            },
+                        )
+                    }
                 }
             }
         }

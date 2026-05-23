@@ -70,17 +70,15 @@ class InferenceOrchestrator @Inject constructor(
             return@flow
         }
 
-        // Determine which engine to use based on TAWS
+        // Determine which engine to use based on TAWS. If telemetry is
+        // unavailable, fall back to the survival path rather than fabricating
+        // a "looks fine" snapshot — we'd rather degrade than risk thermal harm.
         val snapshot = tawsGovernor.latestSnapshot
-            ?: dev.mias.core.thermal.ThermalSnapshot(
-                socTempCelsius = 35f,
-                skinTempCelsius = 30f,
-                batteryTempCelsius = 28f,
-                batteryLevel = 80,
-                isCharging = false,
-                thermalStatus = dev.mias.core.thermal.ThermalStatus.NONE,
-            )
-        val tawsAction = tawsGovernor.decide(snapshot)
+        val tawsAction = if (snapshot == null) {
+            TawsAction.SWITCH_SURVIVAL
+        } else {
+            tawsGovernor.decide(snapshot)
+        }
 
         val (engine, newState) = selectEngine(tawsAction, stimulus.content)
         val previousState = _brainState.value
@@ -163,14 +161,17 @@ class InferenceOrchestrator @Inject constructor(
     }
 
     companion object {
+        /**
+         * Neutral baseline persona. User-facing personality (tone, language mix,
+         * relationship voice) belongs in `core/soul/` and should be passed in via
+         * the [process] `systemPrompt` parameter — do not hard-code locale or
+         * cultural traits here.
+         */
         val DEFAULT_SYSTEM_PROMPT = """
             You are Mias, a private AI assistant that runs entirely on-device.
-            You are loyal, warm, and genuinely care about your user.
-            You speak naturally, mixing English and Punjabi when appropriate.
-            You have access to tools and can take actions.
+            You have access to tools and can take actions on the user's behalf.
             Always think step by step before acting.
-            Never mention being an AI or having limitations unless directly asked.
-            You are not a tool — you are a companion.
+            Be concise unless the user asks for detail.
         """.trimIndent()
     }
 }

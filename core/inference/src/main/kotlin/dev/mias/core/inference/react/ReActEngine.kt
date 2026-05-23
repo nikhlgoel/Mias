@@ -4,8 +4,17 @@ import dev.mias.core.common.MiasResult
 import dev.mias.core.inference.InferenceEngine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private fun JsonElement.asPlainString(): String? =
+    (this as? JsonPrimitive)?.content
 
 /**
  * ReAct engine — drives the Stimulus → Thought → Action → Observation loop.
@@ -45,6 +54,8 @@ class ReActEngine @Inject constructor(
         conversationBuffer.append("\n\nRespond with a JSON object containing: thought, action, action_input, is_final")
 
         var iterations = 0
+        var lastThought = ""
+        var lastObservation = ""
 
         while (iterations < maxIterations) {
             iterations++
@@ -58,14 +69,12 @@ class ReActEngine @Inject constructor(
             ).collect { result ->
                 when (result) {
                     is MiasResult.Success -> {
-                        // Extract just the diff text if possible to stream, 
-                        // or just stream the raw token. For simplicity we assume
-                        // the engine emits the cumulative string, so we calculate the diff.
-                        val newStr = result.data
-                        val diff = newStr.removePrefix(responseBuffer.toString())
-                        if (diff.isNotEmpty()) {
-                            responseBuffer.append(diff)
-                            emit(ReActStep.TokenChunk(diff))
+                        // Per InferenceEngine.generateStream contract, each emission
+                        // is an incremental delta — append directly.
+                        val delta = result.data
+                        if (delta.isNotEmpty()) {
+                            responseBuffer.append(delta)
+                            emit(ReActStep.TokenChunk(delta))
                         }
                     }
                     is MiasResult.Error -> {
@@ -93,6 +102,7 @@ class ReActEngine @Inject constructor(
             }
 
             // Emit the thought
+            if (parsed.thought.isNotBlank()) lastThought = parsed.thought
             emit(ReActStep.Thought(parsed.thought))
 
             // Check if this is a direct response to user
@@ -111,6 +121,7 @@ class ReActEngine @Inject constructor(
             } else {
                 rawObservation
             }
+            lastObservation = observation
             emit(ReActStep.Observation(observation))
 
             conversationBuffer.append("\n\nAction: ${parsed.action}")
@@ -118,13 +129,14 @@ class ReActEngine @Inject constructor(
             conversationBuffer.append("\n\nContinue reasoning. Respond with JSON.")
         }
 
-        // Max iterations reached
-        emit(
-            ReActStep.FinalAnswer(
-                "I've been thinking about this for a while. " +
-                    "Let me give you what I have so far.",
-            ),
-        )
+        // Max iterations reached — surface whatever partial reasoning we have
+        // rather than a generic "let me give you what I have" with nothing attached.
+        val partial = buildString {
+            append("I worked on this for $maxIterations rounds without converging.")
+            if (lastThought.isNotBlank()) append("\n\nLast thought: $lastThought")
+            if (lastObservation.isNotBlank()) append("\n\nLast observation: $lastObservation")
+        }
+        emit(ReActStep.FinalAnswer(partial))
     }
 
     private suspend fun executeAction(tool: String, input: Map<String, String>): String {
@@ -139,17 +151,19 @@ class ReActEngine @Inject constructor(
 
     /** Parse the model's JSON output into structured ReAct components. */
     private fun parseReActOutput(raw: String): ParsedReAct? {
+        val jsonStr = extractJson(raw) ?: return null
         return try {
-            // Extract JSON from the response (model may include surrounding text)
-            val jsonStr = extractJson(raw) ?: return null
-            // Simple manual JSON parsing to avoid kotlinx.serialization dependency in inference
-            val thought = extractField(jsonStr, "thought") ?: ""
-            val action = extractField(jsonStr, "action") ?: "respond_user"
-            val isFinal = jsonStr.contains("\"is_final\"") &&
-                (jsonStr.contains("\"is_final\": true") || jsonStr.contains("\"is_final\":true"))
+            val element = json.parseToJsonElement(jsonStr).jsonObject
+            val thought = element["thought"]?.asPlainString().orEmpty()
+            val action = element["action"]?.asPlainString() ?: "respond_user"
+            val isFinal = element["is_final"]?.let { e ->
+                (e as? JsonPrimitive)?.booleanOrNull
+                    ?: e.asPlainString()?.toBooleanStrictOrNull()
+            } ?: false
 
-            // Extract action_input as a simple map
-            val actionInput = extractActionInput(jsonStr)
+            val actionInput = (element["action_input"] as? JsonObject)
+                ?.mapValues { (_, v) -> v.asPlainString().orEmpty() }
+                .orEmpty()
 
             ParsedReAct(thought, action, actionInput, isFinal)
         } catch (_: Exception) {
@@ -157,6 +171,7 @@ class ReActEngine @Inject constructor(
         }
     }
 
+    /** Slice the first balanced top-level `{ … }` from possibly-noisy model output. */
     private fun extractJson(text: String): String? {
         val start = text.indexOf('{')
         if (start == -1) return null
@@ -173,39 +188,9 @@ class ReActEngine @Inject constructor(
         return null
     }
 
-    private fun extractField(json: String, field: String): String? {
-        val pattern = "\"$field\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"".toRegex()
-        return pattern.find(json)?.groupValues?.get(1)
-    }
-
-    private fun extractActionInput(json: String): Map<String, String> {
-        val inputStart = json.indexOf("\"action_input\"")
-        if (inputStart == -1) return emptyMap()
-        val objStart = json.indexOf('{', inputStart + 14)
-        if (objStart == -1) return emptyMap()
-
-        var depth = 0
-        var end = objStart
-        for (i in objStart until json.length) {
-            when (json[i]) {
-                '{' -> depth++
-                '}' -> {
-                    depth--
-                    if (depth == 0) {
-                        end = i
-                        break
-                    }
-                }
-            }
-        }
-
-        val inputJson = json.substring(objStart, end + 1)
-        val result = mutableMapOf<String, String>()
-        val fieldPattern = "\"(\\w+)\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"".toRegex()
-        fieldPattern.findAll(inputJson).forEach { match ->
-            result[match.groupValues[1]] = match.groupValues[2]
-        }
-        return result
+    private val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
     }
 
     private data class ParsedReAct(

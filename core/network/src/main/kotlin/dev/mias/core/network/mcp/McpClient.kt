@@ -5,6 +5,7 @@ import dev.mias.core.common.di.IoDispatcher
 import dev.mias.core.common.runCatchingMias
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -46,6 +47,10 @@ class McpClient @Inject constructor(
     var serverUrl: String = ""
         private set
 
+    /** Shared-secret token sent as X-Mias-Token. Empty disables auth header. */
+    @Volatile
+    private var apiToken: String = ""
+
     /** Server info received during initialization. */
     @Volatile
     var serverInfo: McpServerInfo? = null
@@ -61,12 +66,14 @@ class McpClient @Inject constructor(
     var isInitialized: Boolean = false
         private set
 
-    fun configure(desktopIp: String, port: Int = DEFAULT_PORT) {
+    fun configure(desktopIp: String, port: Int = DEFAULT_PORT, token: String = "") {
         serverUrl = "http://$desktopIp:$port/rpc"
+        apiToken = token
         // Reset initialization state when reconfigured
         isInitialized = false
         serverInfo = null
         serverCapabilities = null
+        negotiatedProtocolVersion = null
     }
 
     val isConfigured: Boolean get() = serverUrl.isNotBlank()
@@ -112,6 +119,7 @@ class McpClient @Inject constructor(
 
             serverInfo = initResult.serverInfo
             serverCapabilities = initResult.capabilities
+            negotiatedProtocolVersion = initResult.protocolVersion
 
             // Step 3: Send notifications/initialized to complete handshake
             val notification = McpNotification(
@@ -120,6 +128,7 @@ class McpClient @Inject constructor(
             val notifBody = json.encodeToString(McpNotification.serializer(), notification)
             httpClient.post(serverUrl) {
                 contentType(ContentType.Application.Json)
+                if (apiToken.isNotEmpty()) header("X-Mias-Token", apiToken)
                 setBody(notifBody)
             }
 
@@ -184,10 +193,32 @@ class McpClient @Inject constructor(
                 if (response.error != null) {
                     McpToolResult(name, response.error.message, isError = true)
                 } else {
-                    McpToolResult(name, response.result?.toString() ?: "")
+                    unwrapToolResult(name, response.result)
                 }
             }
         }
+
+    /**
+     * Unwrap an MCP `tools/call` result.
+     *
+     * Spec shape: `{ content: [{ type: "text", text: "..." }], isError: bool }`.
+     * Falls back to the raw JSON string if the envelope is missing (older servers).
+     */
+    private fun unwrapToolResult(name: String, result: JsonElement?): McpToolResult {
+        if (result == null) return McpToolResult(name, "", isError = true)
+        val obj = runCatching { result.jsonObject }.getOrNull()
+            ?: return McpToolResult(name, result.toString())
+
+        val isError = obj["isError"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: false
+        val content = obj["content"]?.jsonArray
+        if (content.isNullOrEmpty()) {
+            return McpToolResult(name, result.toString(), isError = isError)
+        }
+        val text = content
+            .mapNotNull { it.jsonObject["text"]?.jsonPrimitive?.content }
+            .joinToString("\n")
+        return McpToolResult(name, text, isError = isError)
+    }
 
     /** Generate text using the desktop Qwen3-Coder-Next model. */
     suspend fun generate(prompt: String, maxTokens: Int = 2048): MiasResult<String> =
@@ -226,14 +257,21 @@ class McpClient @Inject constructor(
         val body = json.encodeToString(McpRequest.serializer(), request)
         val response = httpClient.post(serverUrl) {
             contentType(ContentType.Application.Json)
+            if (apiToken.isNotEmpty()) header("X-Mias-Token", apiToken)
             setBody(body)
         }
         return response.body<String>()
     }
 
+    /** Server-negotiated MCP protocol version, set after successful initialize handshake. */
+    @Volatile
+    var negotiatedProtocolVersion: String? = null
+        private set
+
     companion object {
         const val DEFAULT_PORT = 8401
-        private const val PROTOCOL_VERSION = "2024-11-26" // Correct MCP protocol version
+        /** Highest MCP protocol version this client supports. Server may downgrade. */
+        const val PROTOCOL_VERSION = "2025-03-26"
         private const val CLIENT_VERSION = "0.1.0"
     }
 }

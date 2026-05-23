@@ -1,6 +1,7 @@
 ﻿plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.ktlint)
 }
@@ -46,6 +47,7 @@ dependencies {
 
     // On-device inference powered by llama.cpp JNI
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.serialization.json)
 
     // Google AI Edge SDK (MediaPipe GenAI) for NPU-accelerated Gemma inference
     implementation(libs.mediapipe.tasks.genai)
