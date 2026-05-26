@@ -81,7 +81,7 @@ class InferenceOrchestrator @Inject constructor(
             tawsGovernor.decide(snapshot)
         }
 
-        val (engine, newState) = selectEngine(tawsAction, stimulus.content)
+        val (engine, newState) = selectEngine(tawsAction, stimulus)
         val previousState = _brainState.value
         when (val readiness = ensureModelLoaded(engine, newState)) {
             is ModelReadiness.Ready -> Unit
@@ -132,10 +132,10 @@ class InferenceOrchestrator @Inject constructor(
         }.collect { } // Terminal operator
     }
 
-    private fun selectEngine(tawsAction: TawsAction, prompt: String): Pair<InferenceEngine, BrainState> =
+    private fun selectEngine(tawsAction: TawsAction, stimulus: Stimulus): Pair<InferenceEngine, BrainState> =
         when (tawsAction) {
             TawsAction.CONTINUE_PRIMARY, TawsAction.THROTTLE_PRIMARY -> {
-                val role = inferRole(prompt)
+                val role = inferRole(stimulus)
                 val npu = npuEngine
                 if (role != ModelRole.CODE && npu != null && npu.isAvailable()) {
                     npu to BrainState.GEMMA_NPU
@@ -200,7 +200,36 @@ class InferenceOrchestrator @Inject constructor(
         }
     }
 
-    private fun inferRole(prompt: String): ModelRole {
+    /**
+     * Decide which [ModelRole] should handle this stimulus.
+     *
+     * Prefers the structured intent that [dev.mias.core.language.IntentExtractor]
+     * already produced in the app layer (passed through `stimulus.metadata`).
+     * Falls back to keyword matching only for CHAT-classified or low-confidence
+     * inputs — the cases where the intent extractor itself wasn't confident.
+     *
+     * TODO(#6 phase 2): when an EMBEDDING-role model is installed, replace the
+     * keyword fallback with cosine-similarity classification against role
+     * exemplars. Keep the intent-extractor short-circuit on top of it.
+     */
+    private fun inferRole(stimulus: Stimulus): ModelRole {
+        val intentType = stimulus.metadata["intent_type"]
+        val confidence = stimulus.metadata["intent_confidence"]?.toFloatOrNull() ?: 0f
+        if (intentType != null && confidence >= INTENT_CONFIDENCE_THRESHOLD) {
+            roleForIntent(intentType)?.let { return it }
+        }
+        return inferRoleByKeywords(stimulus.content)
+    }
+
+    private fun roleForIntent(intentType: String): ModelRole? = when (intentType) {
+        "web_fetch", "web_research" -> ModelRole.RESEARCH
+        "file_generation", "filesystem" -> ModelRole.CODE
+        "calculator" -> ModelRole.REASONING
+        "app_launch" -> ModelRole.CHAT
+        else -> null
+    }
+
+    private fun inferRoleByKeywords(prompt: String): ModelRole {
         val p = prompt.lowercase()
         return when {
             listOf("code", "kotlin", "python", "debug", "compile", "function", "class").any { it in p } -> ModelRole.CODE
@@ -211,6 +240,14 @@ class InferenceOrchestrator @Inject constructor(
     }
 
     companion object {
+        /**
+         * Minimum intent-extractor confidence required to trust its
+         * classification for role routing. Below this we fall back to the
+         * orchestrator's own keyword heuristic. The regex extractor's CHAT
+         * default returns 0.65, so 0.7 effectively means "ignore the default".
+         */
+        private const val INTENT_CONFIDENCE_THRESHOLD: Float = 0.7f
+
         /**
          * Default persona. Warm and approachable without being performative.
          * Anything user-specific (name, preferred language, custom tone) should
