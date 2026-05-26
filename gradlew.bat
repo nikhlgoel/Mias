@@ -1,12 +1,12 @@
-﻿@rem Gradle wrapper script for Windows.
+@rem gradlew.bat
+@rem Gradle wrapper script for Windows.
 @rem Generated for Project {Mias} — Gradle 8.12
 @rem
 @rem NOTE: gradle-wrapper.jar must be present in gradle\wrapper\ for this script to work.
 @rem Run `gradle wrapper` from Android Studio terminal to generate it.
 
 @if "%DEBUG%"=="" @echo off
-@rem Set local scope for the variables with windows NT shell
-if "%OS%"=="Windows_NT" setlocal
+@if "%OS%"=="Windows_NT" setlocal
 
 set DIRNAME=%~dp0
 if "%DIRNAME%"=="" set DIRNAME=.
@@ -27,7 +27,7 @@ goto fail
 
 :findJavaFromJavaHome
 set JAVA_HOME=%JAVA_HOME:"=%
-set JAVA_EXE=%JAVA_HOME%/bin/java.exe
+set JAVA_EXE=%JAVA_HOME%\bin\java.exe
 
 if exist "%JAVA_EXE%" goto execute
 
@@ -42,9 +42,7 @@ goto fail
 if "%ERRORLEVEL%"=="0" goto mainEnd
 
 :fail
-rem Set variable GRADLE_EXIT_CONSOLE if you need the _script_ return code instead of
-rem the _cmd.exe errorlevel .SET_ and do NOT set GRADLE_EXIT_CONSOLE.
-if  not "" == "%GRADLE_EXIT_CONSOLE%" exit 1
+if not "" == "%GRADLE_EXIT_CONSOLE%" exit 1
 exit /b 1
 
 :mainEnd

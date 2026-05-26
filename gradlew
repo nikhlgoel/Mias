@@ -1,6 +1,7 @@
 #!/bin/sh
+# gradlew
 # Gradle wrapper script for Unix-like systems.
-# Generated for Project {Kid} — Gradle 8.12
+# Generated for Project {Mias} — Gradle 8.12
 #
 # NOTE: gradle-wrapper.jar must be present in gradle/wrapper/ for this script to work.
 # Run `gradle wrapper` from Android Studio terminal to generate it, or copy from any
