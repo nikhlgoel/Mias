@@ -78,7 +78,7 @@ class ModelManager @Inject constructor(
             format = card.format.name,
             quantization = card.quantization,
             sizeBytes = card.sizeBytes,
-            localPath = downloadManager.getModelPath(card.id),
+            localPath = downloadManager.getModelPath(card),
             downloadUrl = card.downloadUrl,
             sha256 = card.sha256,
             roles = card.roles.joinToString(",") { it.name },

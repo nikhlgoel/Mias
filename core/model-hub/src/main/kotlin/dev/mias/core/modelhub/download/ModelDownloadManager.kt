@@ -164,9 +164,7 @@ class ModelDownloadManager @Inject constructor(
     }
 
     /** Get the final path where a model will be stored after download. */
-    fun getModelPath(modelId: String): String {
-        return File(modelsRoot, "$modelId.gguf").absolutePath
-    }
+    fun getModelPath(card: ModelCard): String = getStorageLayout(card).modelPath
 
     fun getStorageLayout(card: ModelCard): ModelStorageLayout {
         val ext = when (card.format) {
