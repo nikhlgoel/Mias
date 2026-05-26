@@ -264,7 +264,7 @@ fun SplashScreen(
 
             // ── Tagline ───────────────────────────────────────────────────
             Text(
-                text = "Your private AI assistant",
+                text = "Your personal assistant, kept entirely on your device",
                 style = MiasTypography.LabelMedium,
                 color = MiasColors.TextSecondary,
                 modifier = Modifier.alpha(taglineAlpha.value),

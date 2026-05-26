@@ -40,7 +40,7 @@ fun ModernInputBar(
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
     modifier: Modifier = Modifier,
-    hint: String = "Type a message...",
+    hint: String = "Write a message",
     enabled: Boolean = true,
     leadingIcon: @Composable (() -> Unit)? = null,
     trailingIcon: @Composable (() -> Unit)? = null,

@@ -33,9 +33,8 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material.icons.rounded.Videocam
-import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Keyboard
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -167,47 +166,37 @@ fun HomeScreen(
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
-                
-                // Multimodal Suggestion Chips
+
+                // Quick entry points — keep the surface focused on what
+                // actually works today (voice and text). Vision/video will
+                // join here once that pipeline is wired end-to-end.
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     AssistChip(
                         onClick = onNavigateToVoice,
-                        label = { Text("Voice") },
-                        leadingIcon = { Icon(Icons.Rounded.Mic, contentDescription = "Voice") },
+                        label = { Text("Speak") },
+                        leadingIcon = { Icon(Icons.Rounded.Mic, contentDescription = null) },
                         colors = AssistChipDefaults.assistChipColors(
                             containerColor = MiasColors.SurfaceGlassStroke.copy(alpha = 0.2f),
                             labelColor = MiasColors.TextPrimary,
-                            leadingIconContentColor = MiasColors.TextSecondary
+                            leadingIconContentColor = MiasColors.TextSecondary,
                         ),
-                        border = BorderStroke(1.dp, MiasColors.GlassBorder)
+                        border = BorderStroke(1.dp, MiasColors.GlassBorder),
                     )
                     Spacer(modifier = Modifier.size(12.dp))
                     AssistChip(
                         onClick = { onNavigateToChat(null) },
-                        label = { Text("Video") },
-                        leadingIcon = { Icon(Icons.Rounded.Videocam, contentDescription = "Video") },
+                        label = { Text("Type") },
+                        leadingIcon = { Icon(Icons.Rounded.Keyboard, contentDescription = null) },
                         colors = AssistChipDefaults.assistChipColors(
                             containerColor = MiasColors.SurfaceGlassStroke.copy(alpha = 0.2f),
                             labelColor = MiasColors.TextPrimary,
-                            leadingIconContentColor = MiasColors.TextSecondary
+                            leadingIconContentColor = MiasColors.TextSecondary,
                         ),
-                        border = BorderStroke(1.dp, MiasColors.GlassBorder)
-                    )
-                    Spacer(modifier = Modifier.size(12.dp))
-                    AssistChip(
-                        onClick = { onNavigateToChat(null) },
-                        label = { Text("Chat") },
-                        leadingIcon = { Icon(Icons.Rounded.Keyboard, contentDescription = "Chat") },
-                        colors = AssistChipDefaults.assistChipColors(
-                            containerColor = MiasColors.SurfaceGlassStroke.copy(alpha = 0.2f),
-                            labelColor = MiasColors.TextPrimary,
-                            leadingIconContentColor = MiasColors.TextSecondary
-                        ),
-                        border = BorderStroke(1.dp, MiasColors.GlassBorder)
+                        border = BorderStroke(1.dp, MiasColors.GlassBorder),
                     )
                 }
             }

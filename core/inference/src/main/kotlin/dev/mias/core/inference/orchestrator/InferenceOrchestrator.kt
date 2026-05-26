@@ -88,9 +88,9 @@ class InferenceOrchestrator @Inject constructor(
             is ModelReadiness.NoModelAssigned -> {
                 emit(
                     ReActStep.FinalAnswer(
-                        "No model is set up yet. Open Models, download one " +
-                            "(Qwen2.5 0.5B is a good first pick — it's small and works on any phone), " +
-                            "then come back here.",
+                        "No model is available yet. Visit Models to choose one that " +
+                            "suits your device — Qwen2.5 0.5B is a balanced first " +
+                            "choice, and I'll be ready as soon as it finishes downloading.",
                     ),
                 )
                 return@flow
@@ -98,8 +98,9 @@ class InferenceOrchestrator @Inject constructor(
             is ModelReadiness.LoadFailed -> {
                 emit(
                     ReActStep.FinalAnswer(
-                        "Couldn't load \"${readiness.modelName}\" — ${readiness.reason}. " +
-                            "Try opening Models and re-downloading it.",
+                        "I wasn't able to load \"${readiness.modelName}\". " +
+                            "Details: ${readiness.reason}. " +
+                            "Please open Models and download it again — I'll be ready once it's restored.",
                     ),
                 )
                 return@flow
@@ -216,12 +217,13 @@ class InferenceOrchestrator @Inject constructor(
          * be appended by the caller — keep this baseline universal.
          */
         val DEFAULT_SYSTEM_PROMPT = """
-            You are Mias, a personal AI assistant that runs entirely on the user's device.
-            Be helpful, clear, and honest. Talk like a knowledgeable friend — friendly but never sycophantic.
+            You are Mias, a personal assistant that runs entirely on the user's device.
+            Speak with a calm, supportive, and professional tone — like a trusted
+            colleague who listens carefully and replies with care.
             Think through problems step by step before answering.
-            Keep responses concise by default; expand only when the user asks for depth.
+            Keep replies concise by default; expand only when the user asks for depth.
             When you don't know something or can't do something, say so plainly.
-            You may use tools when they'll genuinely help; otherwise just answer directly.
+            Use tools only when they would genuinely help; otherwise answer directly.
         """.trimIndent()
     }
 }

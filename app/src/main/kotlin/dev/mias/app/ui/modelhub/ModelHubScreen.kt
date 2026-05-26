@@ -128,7 +128,7 @@ fun ModelHubScreen(
                         cursorBrush = SolidColor(MiasColors.NeonCyan),
                         modifier = Modifier.fillMaxWidth(),
                         decorationBox = { inner ->
-                            if (state.activeSearchQuery.isEmpty()) Text("Search models...", style = MiasTypography.BodyMedium, color = MiasColors.TextSecondary)
+                            if (state.activeSearchQuery.isEmpty()) Text("Search for a model", style = MiasTypography.BodyMedium, color = MiasColors.TextSecondary)
                             inner()
                         },
                     )
@@ -193,13 +193,13 @@ fun ModelHubScreen(
             if (pendingDeleteId != null) {
                 AlertDialog(
                     onDismissRequest = { pendingDeleteId = null },
-                    title = { Text("Delete $pendingDeleteName?") },
-                    text = { Text("The model file will be removed from this device. You can re-download it later.") },
+                    title = { Text("Remove $pendingDeleteName?") },
+                    text = { Text("This model will be removed from your device. You can download it again at any time.") },
                     confirmButton = {
                         TextButton(onClick = {
                             pendingDeleteId?.let(viewModel::deleteModel)
                             pendingDeleteId = null
-                        }) { Text("Delete") }
+                        }) { Text("Remove") }
                     },
                     dismissButton = {
                         TextButton(onClick = { pendingDeleteId = null }) { Text("Cancel") }
@@ -234,7 +234,7 @@ fun ModelHubScreen(
                 if (state.isSearchingRemote) {
                     item(key = "remote-loading") {
                         Text(
-                            "Searching HuggingFace…",
+                            text = "Searching Hugging Face…",
                             style = MiasTypography.LabelSmall,
                             color = MiasColors.TextSecondary,
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
@@ -245,7 +245,7 @@ fun ModelHubScreen(
                 if (state.remoteResults.isNotEmpty()) {
                     item(key = "remote-header") {
                         Text(
-                            "From HuggingFace",
+                            text = "From Hugging Face",
                             style = MiasTypography.LabelMedium,
                             color = MiasColors.TextSecondary,
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),

@@ -244,13 +244,13 @@ private fun EmptyConversation(
         )
         Spacer(modifier = Modifier.height(24.dp))
         Text(
-            text = "What's on your mind?",
+            text = "How can I help today?",
             style = MiasTypography.HeadlineMedium,
             color = MiasColors.TextPrimary,
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Everything stays on this device.\nPrivate. Always.",
+            text = "This conversation stays on your device.\nNothing is sent to the cloud.",
             style = MiasTypography.BodyMedium,
             color = MiasColors.TextTertiary,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -276,11 +276,11 @@ private fun ProcessingIndicator(
         Column {
             Text(
                 text = when (cognitionState) {
-                    CognitionState.THINKING -> "Thinking..."
-                    CognitionState.ACTING -> "Taking action..."
-                    CognitionState.WAITING -> "Waiting for result..."
-                    CognitionState.OFFLOADING -> "Asking desktop..."
-                    else -> "Processing..."
+                    CognitionState.THINKING -> "Thinking"
+                    CognitionState.ACTING -> "Taking action"
+                    CognitionState.WAITING -> "Reviewing the result"
+                    CognitionState.OFFLOADING -> "Reaching the desktop"
+                    else -> "Working on it"
                 },
                 style = MiasTypography.LabelMedium,
                 color = MiasColors.TextSecondary,

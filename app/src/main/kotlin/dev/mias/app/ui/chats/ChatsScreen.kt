@@ -96,9 +96,10 @@ fun ChatsScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        "No conversations yet.\nTap + to start one.",
+                        text = "No conversations yet.\nTap the plus button below to begin one.",
                         style = MiasTypography.BodyMedium,
                         color = MiasColors.TextSecondary,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     )
                 }
             } else {
@@ -133,13 +134,13 @@ fun ChatsScreen(
         if (pendingDeleteId != null) {
             AlertDialog(
                 onDismissRequest = { pendingDeleteId = null },
-                title = { Text("Delete this chat?") },
-                text = { Text("The conversation history will be removed from this device.") },
+                title = { Text("Remove this conversation?") },
+                text = { Text("This will permanently remove the conversation from your device. This cannot be undone.") },
                 confirmButton = {
                     TextButton(onClick = {
                         pendingDeleteId?.let(viewModel::deleteConversation)
                         pendingDeleteId = null
-                    }) { Text("Delete") }
+                    }) { Text("Remove") }
                 },
                 dismissButton = {
                     TextButton(onClick = { pendingDeleteId = null }) { Text("Cancel") }
@@ -167,9 +168,10 @@ private fun ConversationRow(
                     color = MiasColors.TextPrimary,
                 )
                 Spacer(Modifier.height(2.dp))
+                val messageCount = conv.messages.size
+                val messageLabel = if (messageCount == 1) "1 message" else "$messageCount messages"
                 Text(
-                    text = relativeTime(conv.updatedAt) +
-                        " · ${conv.messages.size} message${if (conv.messages.size == 1) "" else "s"}",
+                    text = "${relativeTime(conv.updatedAt)} · $messageLabel",
                     style = MiasTypography.BodySmall,
                     color = MiasColors.TextSecondary,
                 )
@@ -187,13 +189,21 @@ private fun ConversationRow(
 }
 
 private fun relativeTime(timestamp: Long): String {
-    val now = System.currentTimeMillis()
-    val diff = now - timestamp
+    val diff = System.currentTimeMillis() - timestamp
     return when {
-        diff < 60_000 -> "just now"
-        diff < 3_600_000 -> "${diff / 60_000} min ago"
-        diff < 86_400_000 -> "${diff / 3_600_000} hr ago"
-        diff < 7 * 86_400_000L -> "${diff / 86_400_000} day${if (diff / 86_400_000 == 1L) "" else "s"} ago"
+        diff < 60_000L -> "just now"
+        diff < 3_600_000L -> {
+            val minutes = diff / 60_000L
+            if (minutes == 1L) "1 minute ago" else "$minutes minutes ago"
+        }
+        diff < 86_400_000L -> {
+            val hours = diff / 3_600_000L
+            if (hours == 1L) "1 hour ago" else "$hours hours ago"
+        }
+        diff < 7 * 86_400_000L -> {
+            val days = diff / 86_400_000L
+            if (days == 1L) "Yesterday" else "$days days ago"
+        }
         else -> DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(timestamp))
     }
 }

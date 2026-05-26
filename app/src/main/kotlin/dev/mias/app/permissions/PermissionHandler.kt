@@ -43,16 +43,18 @@ fun getRequiredAppPermissions(): List<PermissionRequest> = buildList {
     add(
         PermissionRequest(
             permission = Manifest.permission.RECORD_AUDIO,
-            title = "🎤 Microphone Access",
-            description = "Enables real-time voice transcription for hands-free interaction",
+            title = "Microphone access",
+            description = "Allow Mias to transcribe your voice on-device so you can " +
+                "speak instead of type. Audio never leaves your phone.",
             isRequired = true,
         ),
     )
     add(
         PermissionRequest(
             permission = Manifest.permission.CAMERA,
-            title = "📷 Camera Access",
-            description = "Enables visual context understanding for richer conversations",
+            title = "Camera access",
+            description = "Optional. Enables visual context — for example, asking " +
+                "Mias about a photo or scene — once the vision pipeline is enabled.",
             isRequired = false,
         ),
     )
@@ -60,8 +62,9 @@ fun getRequiredAppPermissions(): List<PermissionRequest> = buildList {
         add(
             PermissionRequest(
                 permission = Manifest.permission.POST_NOTIFICATIONS,
-                title = "🔔 Notifications",
-                description = "Shows progress during background memory consolidation",
+                title = "Notifications",
+                description = "Optional. Lets Mias keep you informed about background " +
+                    "model downloads and routine memory upkeep.",
                 isRequired = false,
             ),
         )
@@ -98,18 +101,12 @@ fun PermissionRequestDialog(
                     requestPermissionLauncher.launch(permissionRequest.permission)
                 },
             ) {
-                Text(if (permissionRequest.isRequired) "Allow" else "Maybe Later")
+                Text(if (permissionRequest.isRequired) "Continue" else "Allow")
             }
         },
         dismissButton = {
-            if (!permissionRequest.isRequired) {
-                Button(onClick = onDenied) {
-                    Text("Skip")
-                }
-            } else {
-                Button(onClick = onDenied) {
-                    Text("Cancel")
-                }
+            Button(onClick = onDenied) {
+                Text(if (permissionRequest.isRequired) "Not now" else "Not now")
             }
         },
     )

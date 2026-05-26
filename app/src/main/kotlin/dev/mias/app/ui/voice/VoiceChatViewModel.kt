@@ -38,6 +38,10 @@ class VoiceChatViewModel @Inject constructor(
     private val _aiResponse = MutableStateFlow("")
     val aiResponse: StateFlow<String> = _aiResponse.asStateFlow()
 
+    /** True while a model is generating a reply; drives the screen's status label. */
+    private val _isProcessing = MutableStateFlow(false)
+    val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
+
     init {
         // Observe SpeechEngine result directly since StateFlow casting blocked .value
         viewModelScope.launch {
@@ -99,35 +103,32 @@ class VoiceChatViewModel @Inject constructor(
 
     private fun processUserSpeech(text: String) {
         _transcript.value = text
-        _aiResponse.value = "Thinking..."
+        _aiResponse.value = ""
+        _isProcessing.value = true
 
         viewModelScope.launch {
             val responseBuilder = StringBuilder()
             val stimulus = Stimulus(
                 type = StimulusType.USER_MESSAGE,
-                content = text
+                content = text,
             )
-            orchestrator.process(stimulus).collect { step ->
-                if (step is ReActStep.FinalAnswer) {
-                    // Send to TTS
-                    responseBuilder.append(step.response)
-                    _aiResponse.value = responseBuilder.toString()
-                    ttsEngine.speak(step.response, flush = true)
-                } else if (step is ReActStep.TokenChunk) {
-                    // For ultra-low latency, we could accumulate sentences and stream to TTS Queue.
-                    // But for phase 4 baseline, speaking on FinalAnswer or punctuation is safest.
-                    responseBuilder.append(step.text)
-                    _aiResponse.value = responseBuilder.toString()
-
-                    // Simple sentence streaming logic:
-                    val currentText = responseBuilder.toString()
-                    if (currentText.endsWith(". ") || currentText.endsWith("? ") || currentText.endsWith("! ")) {
-                        val sentenceToSpeak = currentText.substringAfterLast(". ", currentText)
-                            .substringAfterLast("? ")
-                            .substringAfterLast("! ") // highly naive substring for prototype
-                        // In reality, keep track of last spoken word index.
+            try {
+                orchestrator.process(stimulus).collect { step ->
+                    when (step) {
+                        is ReActStep.FinalAnswer -> {
+                            responseBuilder.append(step.response)
+                            _aiResponse.value = responseBuilder.toString()
+                            ttsEngine.speak(step.response, flush = true)
+                        }
+                        is ReActStep.TokenChunk -> {
+                            responseBuilder.append(step.text)
+                            _aiResponse.value = responseBuilder.toString()
+                        }
+                        else -> Unit
                     }
                 }
+            } finally {
+                _isProcessing.value = false
             }
         }
     }

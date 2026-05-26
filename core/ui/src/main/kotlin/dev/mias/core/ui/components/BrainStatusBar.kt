@@ -75,7 +75,7 @@ fun BrainStatusBar(
                     color = MiasColors.TextPrimary,
                 )
                 Text(
-                    text = "Active Brain",
+                    text = "Active model",
                     style = MiasTypography.LabelSmall,
                     color = MiasColors.TextTertiary,
                 )
@@ -92,7 +92,7 @@ fun BrainStatusBar(
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
-                text = "${thermalTemp.toInt()}°C",
+                text = "${thermalTemp.toInt()} °C",
                 style = MiasTypography.LabelMedium,
                 color = thermalColor,
             )

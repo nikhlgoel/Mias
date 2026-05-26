@@ -40,7 +40,7 @@ fun MiasInputBar(
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
     modifier: Modifier = Modifier,
-    placeholder: String = "Talk to Mias...",
+    placeholder: String = "Write to Mias",
     enabled: Boolean = true,
     isProcessing: Boolean = false,
 ) {

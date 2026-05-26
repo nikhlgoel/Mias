@@ -90,12 +90,12 @@ fun SettingsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     StatusRow(
                         label = "Temperature",
-                        value = state.thermalTempC?.let { "${"%.0f".format(it)}°C" }
-                            ?: "Not reporting yet",
+                        value = state.thermalTempC?.let { "${"%.0f".format(it)} °C" }
+                            ?: "Awaiting first reading",
                     )
                     StatusRow(
                         label = "Battery",
-                        value = state.batteryLevel?.let { "$it%" } ?: "Not reporting yet",
+                        value = state.batteryLevel?.let { "$it%" } ?: "Awaiting first reading",
                     )
                     StatusRow(
                         label = "Desktop offload",
@@ -114,14 +114,15 @@ fun SettingsScreen(
                 GlassCard(accentColor = MiasColors.SurfaceGlass) {
                     Column {
                         Text(
-                            "No models installed yet.",
+                            text = "No models are installed yet.",
                             style = MiasTypography.BodyMedium,
                             color = MiasColors.TextPrimary,
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            "Open Models from the Home screen and pick one " +
-                                "(Qwen2.5 0.5B is a good first download).",
+                            text = "Visit Models to choose one that suits your device. " +
+                                "Qwen2.5 0.5B is a balanced first choice — compact and " +
+                                "supported on most phones.",
                             style = MiasTypography.BodySmall,
                             color = MiasColors.TextSecondary,
                         )
@@ -134,7 +135,7 @@ fun SettingsScreen(
                                 .padding(horizontal = 16.dp, vertical = 10.dp),
                         ) {
                             Text(
-                                "Open Models",
+                                text = "Browse models",
                                 style = MiasTypography.LabelMedium,
                                 color = MiasColors.TextPrimary,
                             )
@@ -156,12 +157,12 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             // ── Speech ───────────────────────────────────────────
-            SectionHeader("Voice input")
+            SectionHeader("Voice")
             Spacer(modifier = Modifier.height(8.dp))
             GlassCard(accentColor = MiasColors.Primary) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = "Language: ${state.speechLanguage.displayName}",
+                        text = "Recognition language: ${state.speechLanguage.displayName}",
                         style = MiasTypography.LabelLarge,
                         color = MiasColors.TextPrimary,
                     )
@@ -171,7 +172,7 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
-                            text = "Auto-detect language",
+                            text = "Detect language automatically",
                             style = MiasTypography.BodyMedium,
                             color = MiasColors.TextSecondary,
                         )
@@ -216,13 +217,14 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "On-device only",
+                            text = "Private by design",
                             style = MiasTypography.LabelLarge,
                             color = MiasColors.TextPrimary,
                         )
                         Text(
-                            text = "Inference runs locally. The only outbound traffic " +
-                                "is model downloads from huggingface.co.",
+                            text = "Every reply is generated on this device. " +
+                                "The only network requests Mias makes are for downloading " +
+                                "the models you choose from huggingface.co.",
                             style = MiasTypography.BodySmall,
                             color = MiasColors.TextSecondary,
                         )

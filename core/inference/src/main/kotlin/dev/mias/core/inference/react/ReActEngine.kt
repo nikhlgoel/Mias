@@ -86,8 +86,9 @@ class ReActEngine @Inject constructor(
             if (errorResult != null) {
                 emit(
                     ReActStep.FinalAnswer(
-                        "I'm having trouble thinking right now. Error: $errorResult"
-                    )
+                        "I'm not able to respond right now. Details: $errorResult. " +
+                            "Please try again in a moment.",
+                    ),
                 )
                 return@flow
             }
@@ -129,12 +130,14 @@ class ReActEngine @Inject constructor(
             conversationBuffer.append("\n\nContinue reasoning. Respond with JSON.")
         }
 
-        // Max iterations reached — surface whatever partial reasoning we have
-        // rather than a generic "let me give you what I have" with nothing attached.
+        // Max iterations reached — share the partial reasoning rather than
+        // disappearing into silence. The wording stays calm and informative,
+        // not apologetic theatre.
         val partial = buildString {
-            append("I worked on this for $maxIterations rounds without converging.")
-            if (lastThought.isNotBlank()) append("\n\nLast thought: $lastThought")
-            if (lastObservation.isNotBlank()) append("\n\nLast observation: $lastObservation")
+            append("I considered this carefully but couldn't reach a complete answer ")
+            append("in the time available. Here is what I had so far:")
+            if (lastThought.isNotBlank()) append("\n\nLine of thought: $lastThought")
+            if (lastObservation.isNotBlank()) append("\n\nLast finding: $lastObservation")
         }
         emit(ReActStep.FinalAnswer(partial))
     }

@@ -21,8 +21,8 @@ import javax.inject.Inject
 data class HomeUiState(
     val brainState: BrainState = BrainState.GEMMA_NPU,
     val cognitionState: CognitionState = CognitionState.IDLE,
-    val greeting: String = "Hi",
-    val subtitle: String = "Tap the orb to start",
+    val greeting: String = "Welcome",
+    val subtitle: String = "Tap the orb when you're ready to begin",
     val installedModels: List<InstalledModel> = emptyList(),
     val recentConversationCount: Int = 0,
     val isReady: Boolean = false,
@@ -58,12 +58,17 @@ class HomeViewModel @Inject constructor(
         initialValue = HomeUiState(),
     )
 
-    private fun buildSubtitle(ready: Boolean, installedCount: Int, recentCount: Int): String =
-        when {
-            !ready -> "No model installed yet — open Models to download one"
-            recentCount == 0 -> "$installedCount model${if (installedCount == 1) "" else "s"} ready · tap to chat"
-            else -> "$installedCount model${if (installedCount == 1) "" else "s"} ready · $recentCount past chat${if (recentCount == 1) "" else "s"}"
+    private fun buildSubtitle(ready: Boolean, installedCount: Int, recentCount: Int): String {
+        if (!ready) {
+            return "No model is installed yet. Visit Models to choose one that suits your device."
         }
+        val modelLabel = if (installedCount == 1) "1 model ready" else "$installedCount models ready"
+        if (recentCount == 0) {
+            return "$modelLabel. Tap the orb to start a conversation."
+        }
+        val chatLabel = if (recentCount == 1) "1 past conversation" else "$recentCount past conversations"
+        return "$modelLabel · $chatLabel"
+    }
 
     private fun timeBasedGreeting(): String {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)

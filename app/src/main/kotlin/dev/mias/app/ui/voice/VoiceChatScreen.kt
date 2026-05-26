@@ -73,8 +73,7 @@ fun VoiceChatScreen(
     val isListening by viewModel.isListening.collectAsStateWithLifecycle()
     val transcript by viewModel.transcript.collectAsStateWithLifecycle()
     val aiResponse by viewModel.aiResponse.collectAsStateWithLifecycle()
-
-    val isProcessing = aiResponse == "Thinking..."
+    val isProcessing by viewModel.isProcessing.collectAsStateWithLifecycle()
 
     // Pulsing animation for mic button when listening
     val infiniteTransition = rememberInfiniteTransition(label = "mic_pulse")
@@ -128,9 +127,9 @@ fun VoiceChatScreen(
                 // Status label
                 Text(
                     text = when {
-                        isProcessing -> "Processing…"
-                        isListening -> "Listening…"
-                        else -> "Tap the mic to speak"
+                        isProcessing -> "Composing a reply"
+                        isListening -> "Listening"
+                        else -> "Tap the microphone to begin"
                     },
                     style = MiasTypography.LabelMedium,
                     color = when {
@@ -212,7 +211,7 @@ fun VoiceChatScreen(
                     // Empty state
                     if (transcript.isBlank() && aiResponse.isBlank()) {
                         Text(
-                            text = "Start speaking and your conversation will appear here",
+                            text = "Your conversation will appear here once you begin speaking.",
                             style = MiasTypography.BodyMedium,
                             color = MiasColors.TextTertiary,
                             textAlign = TextAlign.Center,
