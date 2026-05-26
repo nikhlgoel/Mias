@@ -1,26 +1,32 @@
+# .github/workflows/ci.yml
 name: CI Build Verification
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout Codebase
-      uses: actions/checkout@v4
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
 
-    - name: Setup Java Development Kit
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17' # Adjust to your current project target JVM version
+      - name: Setup Java Development Kit
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
 
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v4
+      # Fixes the 'Permission Denied' boot failure caused by pushing from Windows
+      - name: Ensure Gradle Wrapper Executable
+        run: chmod +x gradlew
 
-    - name: Run Compilation and Verification Tests
-      run: ./gradlew build
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Appends standard flags to bypass local environment daemon/cache friction
+      - name: Run Compilation and Verification Tests
+        run: ./gradlew build --no-daemon --stacktrace
