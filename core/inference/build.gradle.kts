@@ -49,7 +49,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
 
-    // Google AI Edge SDK (MediaPipe GenAI) for NPU-accelerated Gemma inference
+    // Google AI Edge SDK (MediaPipe GenAI) for NPU-accelerated Gemma inference.
+    // 0.10.29+ bundles the framework image types (MPImage, BitmapImageBuilder)
+    // required for the multimodal/vision path used by Gemma 3n.
     implementation(libs.mediapipe.tasks.genai)
 
     // Hilt
