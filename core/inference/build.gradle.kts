@@ -50,9 +50,12 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     // Google AI Edge SDK (MediaPipe GenAI) for NPU-accelerated Gemma inference.
-    // 0.10.29+ bundles the framework image types (MPImage, BitmapImageBuilder)
-    // required for the multimodal/vision path used by Gemma 3n.
     implementation(libs.mediapipe.tasks.genai)
+    // MediaPipe tasks-vision ships com.google.mediapipe.framework.image.MPImage
+    // and BitmapImageBuilder — required by LlmInferenceSession.addImage(...)
+    // on the multimodal/vision path. tasks-genai references these types but
+    // does not pull them in transitively.
+    implementation(libs.mediapipe.tasks.vision)
 
     // Hilt
     implementation(libs.hilt.android)
