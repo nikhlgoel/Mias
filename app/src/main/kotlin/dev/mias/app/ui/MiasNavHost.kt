@@ -12,10 +12,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import dev.mias.app.ui.agent.AgentScreen
 import dev.mias.app.ui.chat.ChatScreen
 import dev.mias.app.ui.chats.ChatsScreen
-import dev.mias.app.ui.evolution.EvolutionScreen
 import dev.mias.app.ui.home.HomeScreen
 import dev.mias.app.ui.modelhub.ModelHubScreen
 import dev.mias.app.ui.settings.SettingsScreen
@@ -29,8 +27,6 @@ object MiasRoutes {
     const val CHATS = "chats"
     const val SETTINGS = "settings"
     const val MODEL_HUB = "modelhub"
-    const val AGENT = "agent"
-    const val EVOLUTION = "evolution"
     const val VOICE = "voice"
 
     fun chatRoute(conversationId: String? = null): String =
@@ -111,14 +107,6 @@ fun MiasNavHost(modifier: Modifier = Modifier) {
 
         composable(MiasRoutes.MODEL_HUB) {
             ModelHubScreen(onNavigateBack = { navController.popBackStack() })
-        }
-
-        composable(MiasRoutes.AGENT) {
-            AgentScreen(onNavigateBack = { navController.popBackStack() })
-        }
-
-        composable(MiasRoutes.EVOLUTION) {
-            EvolutionScreen(onNavigateBack = { navController.popBackStack() })
         }
 
         composable(MiasRoutes.VOICE) {

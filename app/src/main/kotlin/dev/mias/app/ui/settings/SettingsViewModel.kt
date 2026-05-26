@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.mias.core.common.model.BrainState
+import dev.mias.core.data.preferences.MiasPreferences
+import dev.mias.core.data.preferences.MiasPrefs
 import dev.mias.core.inference.orchestrator.InferenceOrchestrator
 import dev.mias.core.modelhub.manager.ModelManager
 import dev.mias.core.modelhub.model.InstalledModel
@@ -16,6 +18,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class SettingsUiState(
@@ -27,6 +30,10 @@ data class SettingsUiState(
     val roleAssignments: Map<ModelRole, String?> = emptyMap(),
     val speechLanguage: SpeechLanguage = SpeechLanguage.ENGLISH_US,
     val speechAutoDetect: Boolean = true,
+    val huggingFaceToken: String = "",
+    val desktopHost: String = "",
+    val desktopPort: Int = MiasPrefs.DEFAULT_DESKTOP_PORT,
+    val desktopToken: String = "",
 )
 
 @HiltViewModel
@@ -35,6 +42,7 @@ class SettingsViewModel @Inject constructor(
     private val tawsGovernor: TawsGovernor,
     private val speechEngine: SpeechEngine,
     private val modelManager: ModelManager,
+    private val preferences: MiasPreferences,
 ) : ViewModel() {
 
     private val _speechAutoDetect = MutableStateFlow(true)
@@ -43,7 +51,8 @@ class SettingsViewModel @Inject constructor(
         orchestrator.brainState,
         modelManager.installedModels,
         _speechAutoDetect,
-    ) { brain, installed, autoDetect ->
+        preferences.prefsFlow,
+    ) { brain, installed, autoDetect, prefs ->
         val snapshot = tawsGovernor.latestSnapshot
         SettingsUiState(
             brainState = brain,
@@ -56,6 +65,10 @@ class SettingsViewModel @Inject constructor(
             },
             speechLanguage = speechEngine.getCurrentLanguage(),
             speechAutoDetect = autoDetect,
+            huggingFaceToken = prefs.huggingFaceToken,
+            desktopHost = prefs.desktopHost,
+            desktopPort = prefs.desktopPort,
+            desktopToken = prefs.desktopToken,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -70,5 +83,13 @@ class SettingsViewModel @Inject constructor(
     fun setSpeechAutoDetect(enabled: Boolean) {
         speechEngine.setAutoDetect(enabled)
         _speechAutoDetect.value = enabled
+    }
+
+    fun setHuggingFaceToken(token: String) {
+        viewModelScope.launch { preferences.setHuggingFaceToken(token) }
+    }
+
+    fun setDesktopEndpoint(host: String, port: Int, token: String) {
+        viewModelScope.launch { preferences.setDesktopEndpoint(host, port, token) }
     }
 }

@@ -25,16 +25,26 @@ import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mias.core.data.preferences.MiasPrefs
 import dev.mias.core.modelhub.model.InstalledModel
 import dev.mias.core.modelhub.model.ModelRole
 import dev.mias.core.speech.SpeechLanguage
@@ -152,6 +162,42 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ── Hugging Face ─────────────────────────────────────
+            SectionHeader("Hugging Face")
+            Spacer(modifier = Modifier.height(8.dp))
+            GlassCard(accentColor = MiasColors.SurfaceGlass) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Optional. A personal access token is required to " +
+                            "download gated models (most official Google and Meta " +
+                            "releases). Public models work without it.",
+                        style = MiasTypography.BodySmall,
+                        color = MiasColors.TextSecondary,
+                    )
+                    SecretField(
+                        label = "Access token",
+                        value = state.huggingFaceToken,
+                        onValueChange = viewModel::setHuggingFaceToken,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ── Desktop offload ──────────────────────────────────
+            SectionHeader("Desktop offload")
+            Spacer(modifier = Modifier.height(8.dp))
+            GlassCard(accentColor = MiasColors.SurfaceGlass) {
+                DesktopOffloadEditor(
+                    host = state.desktopHost,
+                    port = state.desktopPort,
+                    token = state.desktopToken,
+                    onSave = viewModel::setDesktopEndpoint,
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -335,4 +381,107 @@ private fun SectionHeader(title: String) {
 private fun formatMb(bytes: Long): String {
     val mb = bytes / 1_000_000.0
     return if (mb >= 1000) "${"%.1f".format(mb / 1000)} GB" else "${mb.toInt()} MB"
+}
+
+@Composable
+private fun SecretField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+) {
+    var revealed by remember { mutableStateOf(false) }
+    var draft by remember { mutableStateOf(value) }
+
+    OutlinedTextField(
+        value = draft,
+        onValueChange = {
+            draft = it
+            onValueChange(it)
+        },
+        label = { Text(label, color = MiasColors.TextSecondary) },
+        singleLine = true,
+        visualTransformation = if (revealed) VisualTransformation.None
+        else PasswordVisualTransformation(),
+        trailingIcon = {
+            Text(
+                text = if (revealed) "Hide" else "Show",
+                style = MiasTypography.LabelSmall,
+                color = MiasColors.Primary,
+                modifier = Modifier
+                    .clickable { revealed = !revealed }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+        },
+        modifier = Modifier.fillMaxWidth(),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = MiasColors.TextPrimary,
+            unfocusedTextColor = MiasColors.TextPrimary,
+        ),
+    )
+}
+
+@Composable
+private fun DesktopOffloadEditor(
+    host: String,
+    port: Int,
+    token: String,
+    onSave: (host: String, port: Int, token: String) -> Unit,
+) {
+    var hostDraft by remember { mutableStateOf(host) }
+    var portDraft by remember { mutableStateOf(port.toString()) }
+    var tokenDraft by remember { mutableStateOf(token) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = "Route long-context or coding tasks to a desktop running the " +
+                "Mias MCP server on your local network. Leave blank to keep " +
+                "everything on this device.",
+            style = MiasTypography.BodySmall,
+            color = MiasColors.TextSecondary,
+        )
+        OutlinedTextField(
+            value = hostDraft,
+            onValueChange = { hostDraft = it },
+            label = { Text("Host or IP", color = MiasColors.TextSecondary) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = MiasColors.TextPrimary,
+                unfocusedTextColor = MiasColors.TextPrimary,
+            ),
+        )
+        OutlinedTextField(
+            value = portDraft,
+            onValueChange = { portDraft = it.filter(Char::isDigit).take(5) },
+            label = { Text("Port", color = MiasColors.TextSecondary) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = MiasColors.TextPrimary,
+                unfocusedTextColor = MiasColors.TextPrimary,
+            ),
+        )
+        SecretField(
+            label = "Shared secret",
+            value = tokenDraft,
+            onValueChange = { tokenDraft = it },
+        )
+        Box(
+            modifier = Modifier
+                .clip(MiasShapes.Card)
+                .background(MiasColors.Primary.copy(alpha = 0.22f))
+                .clickable {
+                    val portNum = portDraft.toIntOrNull() ?: MiasPrefs.DEFAULT_DESKTOP_PORT
+                    onSave(hostDraft, portNum, tokenDraft)
+                }
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+        ) {
+            Text(
+                text = "Save",
+                style = MiasTypography.LabelMedium,
+                color = MiasColors.TextPrimary,
+            )
+        }
+    }
 }

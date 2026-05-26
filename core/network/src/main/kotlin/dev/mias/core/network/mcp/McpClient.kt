@@ -3,6 +3,7 @@
 import dev.mias.core.common.MiasResult
 import dev.mias.core.common.di.IoDispatcher
 import dev.mias.core.common.runCatchingMias
+import dev.mias.core.network.auth.DesktopOffloadAuth
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.header
@@ -38,6 +39,7 @@ import javax.inject.Singleton
 @Singleton
 class McpClient @Inject constructor(
     private val httpClient: HttpClient,
+    private val auth: DesktopOffloadAuth,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
     private val requestId = AtomicInteger(0)
@@ -46,10 +48,6 @@ class McpClient @Inject constructor(
     @Volatile
     var serverUrl: String = ""
         private set
-
-    /** Shared-secret token sent as X-Mias-Token. Empty disables auth header. */
-    @Volatile
-    private var apiToken: String = ""
 
     /** Server info received during initialization. */
     @Volatile
@@ -66,9 +64,12 @@ class McpClient @Inject constructor(
     var isInitialized: Boolean = false
         private set
 
-    fun configure(desktopIp: String, port: Int = DEFAULT_PORT, token: String = "") {
+    /**
+     * Configure the desktop endpoint. The shared-secret token is read from
+     * [DesktopOffloadAuth] — set it separately via that holder.
+     */
+    fun configure(desktopIp: String, port: Int = DEFAULT_PORT) {
         serverUrl = "http://$desktopIp:$port/rpc"
-        apiToken = token
         // Reset initialization state when reconfigured
         isInitialized = false
         serverInfo = null
@@ -128,7 +129,8 @@ class McpClient @Inject constructor(
             val notifBody = json.encodeToString(McpNotification.serializer(), notification)
             httpClient.post(serverUrl) {
                 contentType(ContentType.Application.Json)
-                if (apiToken.isNotEmpty()) header("X-Mias-Token", apiToken)
+                val token = auth.token
+                if (token.isNotEmpty()) header("X-Mias-Token", token)
                 setBody(notifBody)
             }
 
@@ -257,7 +259,8 @@ class McpClient @Inject constructor(
         val body = json.encodeToString(McpRequest.serializer(), request)
         val response = httpClient.post(serverUrl) {
             contentType(ContentType.Application.Json)
-            if (apiToken.isNotEmpty()) header("X-Mias-Token", apiToken)
+            val token = auth.token
+            if (token.isNotEmpty()) header("X-Mias-Token", token)
             setBody(body)
         }
         return response.body<String>()

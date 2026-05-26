@@ -8,9 +8,11 @@ import dev.mias.core.common.di.IoDispatcher
 import dev.mias.core.common.runCatchingMias
 import dev.mias.core.network.MeshClient
 import dev.mias.core.network.PeerNode
+import dev.mias.core.network.auth.DesktopOffloadAuth
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -35,6 +37,7 @@ import javax.inject.Singleton
 class TailscaleMeshClient @Inject constructor(
     @ApplicationContext private val context: Context,
     private val httpClient: HttpClient,
+    private val auth: DesktopOffloadAuth,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : MeshClient {
 
@@ -100,6 +103,8 @@ class TailscaleMeshClient @Inject constructor(
                     "http://${peer.tailscaleIp}:8401/rpc",
                 ) {
                     contentType(ContentType.Application.Json)
+                    val token = auth.token
+                    if (token.isNotEmpty()) header("X-Mias-Token", token)
                     setBody(payload)
                 }.body()
 

@@ -22,7 +22,7 @@ object DataModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MiasDatabase =
         Room.databaseBuilder(context, MiasDatabase::class.java, "mias-db")
-            .fallbackToDestructiveMigration(dropAllTables = true)
+            .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
             .build()
 
     @Provides

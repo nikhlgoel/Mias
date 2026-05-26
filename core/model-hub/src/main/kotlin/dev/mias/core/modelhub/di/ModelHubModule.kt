@@ -33,7 +33,7 @@ object ModelHubModule {
         context,
         ModelHubDatabase::class.java,
         "mias_model_hub.db",
-    ).fallbackToDestructiveMigration(dropAllTables = true)
+    ).fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
         .build()
 
     @Provides

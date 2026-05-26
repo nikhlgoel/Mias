@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
+import dev.mias.app.bootstrap.PreferencesBootstrapper
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -13,6 +14,14 @@ class MiasApplication : Application(), Configuration.Provider {
 
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
+
+    @Inject
+    lateinit var preferencesBootstrapper: PreferencesBootstrapper
+
+    override fun onCreate() {
+        super.onCreate()
+        preferencesBootstrapper.start()
+    }
 
     // WorkManager queries this property at init time. If Hilt has not
     // yet injected workerFactory, accessing the lateinit will crash.

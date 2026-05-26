@@ -247,7 +247,7 @@ class ChatViewModel @Inject constructor(
                             val streamMsg = ChatMessage(
                                 id = streamingMsgId!!,
                                 text = step.text,
-                                type = BubbleType.ACTION,
+                                type = BubbleType.Mias,
                                 timestamp = formatTime(System.currentTimeMillis()),
                                 isStreaming = true,
                             )
