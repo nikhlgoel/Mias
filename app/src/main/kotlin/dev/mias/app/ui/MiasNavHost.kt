@@ -18,6 +18,7 @@ import dev.mias.app.ui.home.HomeScreen
 import dev.mias.app.ui.modelhub.ModelHubScreen
 import dev.mias.app.ui.settings.SettingsScreen
 import dev.mias.app.ui.splash.SplashScreen
+import dev.mias.app.ui.vision.VisionChatScreen
 import dev.mias.app.ui.voice.VoiceChatScreen
 
 object MiasRoutes {
@@ -28,6 +29,7 @@ object MiasRoutes {
     const val SETTINGS = "settings"
     const val MODEL_HUB = "modelhub"
     const val VOICE = "voice"
+    const val VISION = "vision"
 
     fun chatRoute(conversationId: String? = null): String =
         if (conversationId != null) "chat?conversationId=$conversationId" else "chat"
@@ -73,6 +75,7 @@ fun MiasNavHost(modifier: Modifier = Modifier) {
                 onNavigateToModelHub = { navController.navigate(MiasRoutes.MODEL_HUB) },
                 onNavigateToChats = { navController.navigate(MiasRoutes.CHATS) },
                 onNavigateToVoice = { navController.navigate(MiasRoutes.VOICE) },
+                onNavigateToVision = { navController.navigate(MiasRoutes.VISION) },
             )
         }
 
@@ -111,6 +114,13 @@ fun MiasNavHost(modifier: Modifier = Modifier) {
 
         composable(MiasRoutes.VOICE) {
             VoiceChatScreen(onBack = { navController.navigateUp() })
+        }
+
+        composable(MiasRoutes.VISION) {
+            VisionChatScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToModels = { navController.navigate(MiasRoutes.MODEL_HUB) },
+            )
         }
     }
 }

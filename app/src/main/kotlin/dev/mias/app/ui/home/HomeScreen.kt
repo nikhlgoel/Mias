@@ -35,6 +35,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -57,6 +58,7 @@ fun HomeScreen(
     onNavigateToModelHub: () -> Unit = {},
     onNavigateToChats: () -> Unit = {},
     onNavigateToVoice: () -> Unit = {},
+    onNavigateToVision: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
@@ -167,9 +169,8 @@ fun HomeScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Quick entry points — keep the surface focused on what
-                // actually works today (voice and text). Vision/video will
-                // join here once that pipeline is wired end-to-end.
+                // Quick entry points — voice, text, and (when a vision
+                // model is installed) image Q&A.
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
@@ -191,6 +192,18 @@ fun HomeScreen(
                         onClick = { onNavigateToChat(null) },
                         label = { Text("Type") },
                         leadingIcon = { Icon(Icons.Rounded.Keyboard, contentDescription = null) },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = MiasColors.SurfaceGlassStroke.copy(alpha = 0.2f),
+                            labelColor = MiasColors.TextPrimary,
+                            leadingIconContentColor = MiasColors.TextSecondary,
+                        ),
+                        border = BorderStroke(1.dp, MiasColors.GlassBorder),
+                    )
+                    Spacer(modifier = Modifier.size(12.dp))
+                    AssistChip(
+                        onClick = onNavigateToVision,
+                        label = { Text("See") },
+                        leadingIcon = { Icon(Icons.Rounded.PhotoCamera, contentDescription = null) },
                         colors = AssistChipDefaults.assistChipColors(
                             containerColor = MiasColors.SurfaceGlassStroke.copy(alpha = 0.2f),
                             labelColor = MiasColors.TextPrimary,
