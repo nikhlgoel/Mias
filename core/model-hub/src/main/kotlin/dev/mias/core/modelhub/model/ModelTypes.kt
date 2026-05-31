@@ -63,7 +63,14 @@ enum class ModelRole {
     EMBEDDING,
 }
 
-/** A model that has been downloaded and is available locally. */
+/**
+ * A model that has been downloaded and is available locally.
+ *
+ * Note: role assignment is *not* a property of the model — multiple roles
+ * can be served by the same model. Query [dev.mias.core.modelhub.manager.ModelManager.roleAssignments]
+ * separately and join against the model id when you need to display
+ * "which roles is this model assigned to?".
+ */
 data class InstalledModel(
     val id: String,
     val card: ModelCard,
@@ -72,7 +79,6 @@ data class InstalledModel(
     val lastUsedAt: Long,
     val sizeOnDisk: Long,
     val isActive: Boolean = false,
-    val assignedRole: ModelRole? = null,
 )
 
 /** Current download state for a model. */

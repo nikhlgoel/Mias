@@ -50,9 +50,10 @@ class SettingsViewModel @Inject constructor(
     val uiState: StateFlow<SettingsUiState> = combine(
         orchestrator.brainState,
         modelManager.installedModels,
+        modelManager.roleAssignments,
         _speechAutoDetect,
         preferences.prefsFlow,
-    ) { brain, installed, autoDetect, prefs ->
+    ) { brain, installed, assignments, autoDetect, prefs ->
         val snapshot = tawsGovernor.latestSnapshot
         SettingsUiState(
             brainState = brain,
@@ -60,9 +61,7 @@ class SettingsViewModel @Inject constructor(
             batteryLevel = snapshot?.batteryLevel,
             isDesktopReachable = orchestrator.desktopEngine != null,
             installedModels = installed,
-            roleAssignments = ModelRole.entries.associateWith { role ->
-                installed.firstOrNull { it.assignedRole == role }?.id
-            },
+            roleAssignments = ModelRole.entries.associateWith { role -> assignments[role] },
             speechLanguage = speechEngine.getCurrentLanguage(),
             speechAutoDetect = autoDetect,
             huggingFaceToken = prefs.huggingFaceToken,

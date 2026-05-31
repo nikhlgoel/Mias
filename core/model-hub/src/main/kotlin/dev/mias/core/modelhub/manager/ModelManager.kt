@@ -1,10 +1,11 @@
-﻿package dev.mias.core.modelhub.manager
+package dev.mias.core.modelhub.manager
 
 import dev.mias.core.common.MiasResult
 import dev.mias.core.common.di.IoDispatcher
 import dev.mias.core.common.runCatchingMias
 import dev.mias.core.modelhub.db.InstalledModelEntity
 import dev.mias.core.modelhub.db.ModelDao
+import dev.mias.core.modelhub.db.RoleAssignmentEntity
 import dev.mias.core.modelhub.download.ModelDownloadManager
 import dev.mias.core.modelhub.model.DownloadState
 import dev.mias.core.modelhub.model.InstalledModel
@@ -44,6 +45,22 @@ class ModelManager @Inject constructor(
     val installedModels: Flow<List<InstalledModel>> =
         modelDao.observeAll().map { entities -> entities.map { it.toDomain() } }
 
+    /**
+     * Observe role assignments reactively as a `role → modelId` map.
+     *
+     * Backed by the normalized `role_assignments` table. A model capable of
+     * multiple roles will appear multiple times here (different keys, same
+     * value), which is exactly what the old `installed_models.assignedRole`
+     * single-string column could not express.
+     */
+    val roleAssignments: Flow<Map<ModelRole, String>> =
+        modelDao.observeRoleAssignments().map { rows ->
+            rows.mapNotNull { row ->
+                val role = runCatching { ModelRole.valueOf(row.role) }.getOrNull()
+                role?.let { it to row.modelId }
+            }.toMap()
+        }
+
     /** Observe active downloads. */
     val activeDownloads: StateFlow<Map<String, DownloadState>> =
         downloadManager.activeDownloads
@@ -52,7 +69,6 @@ class ModelManager @Inject constructor(
 
     /** Get all curated models, marking which are already installed. */
     suspend fun browseCurated(): List<BrowseItem> = withContext(ioDispatcher) {
-        val installed = modelDao.observeAll().map { it.map { e -> e.id } }
         CuratedModelRegistry.models.map { card ->
             BrowseItem(card = card, isInstalled = modelDao.getById(card.id) != null)
         }
@@ -92,84 +108,126 @@ class ModelManager @Inject constructor(
             defaultRolePriority = card.defaultRolePriority,
             installedAt = System.currentTimeMillis(),
             lastUsedAt = System.currentTimeMillis(),
-            assignedRole = null,
+            assignedRole = null, // Legacy column — no longer the source of truth.
         )
         modelDao.upsert(entity)
     }
 
     // ── Uninstall ───────────────────────────────────────────────────
 
-    /** Delete a model from disk and database. */
+    /** Delete a model from disk and database, plus any role assignments. */
     suspend fun uninstallModel(modelId: String): MiasResult<Unit> = withContext(ioDispatcher) {
         runCatchingMias {
             val entity = modelDao.getById(modelId) ?: throw IllegalStateException("Model not found")
             File(entity.localPath).delete()
+            modelDao.clearAllAssignmentsForModel(modelId)
             modelDao.deleteById(modelId)
         }
     }
 
     // ── Role Assignment ─────────────────────────────────────────────
 
-    /** Manually assign a model to a brain role. */
+    /**
+     * Manually assign a model to a brain role. Marks the assignment as
+     * user-pinned so [autoAssignRoles] won't overwrite it.
+     */
     suspend fun assignRole(modelId: String, role: ModelRole): MiasResult<Unit> =
         withContext(ioDispatcher) {
             runCatchingMias {
-                // Clear any existing assignment for this role
-                modelDao.clearRole(role.name)
-                modelDao.assignRole(modelId, role.name)
+                modelDao.upsertRoleAssignment(
+                    RoleAssignmentEntity(
+                        role = role.name,
+                        modelId = modelId,
+                        isUserPinned = true,
+                        assignedAt = System.currentTimeMillis(),
+                    ),
+                )
             }
         }
 
-    /** Auto-assign best available models to all roles based on device capabilities. */
+    /** Clear a role's assignment (e.g. user reset). */
+    suspend fun clearRoleAssignment(role: ModelRole): MiasResult<Unit> =
+        withContext(ioDispatcher) {
+            runCatchingMias { modelDao.clearRoleAssignment(role.name) }
+        }
+
+    /**
+     * Auto-assign best available models to all roles based on device
+     * capabilities. **Respects user pins** — a role explicitly pinned via
+     * [assignRole] is never overwritten by auto-assignment.
+     */
     suspend fun autoAssignRoles(): MiasResult<Map<ModelRole, String>> = withContext(ioDispatcher) {
         runCatchingMias {
             val health = healthMonitor.refresh()
+            val pinnedRoles = modelDao.getUserPinnedAssignments().map { it.role }.toSet()
             val assignments = mutableMapOf<ModelRole, String>()
+            val now = System.currentTimeMillis()
 
             for (role in ModelRole.entries) {
-                val candidates = modelDao.getCapableOfRole(role.name)
+                if (role.name in pinnedRoles) {
+                    // User has pinned this role — record current pin and move on.
+                    modelDao.getRoleAssignment(role.name)?.let { existing ->
+                        assignments[role] = existing.modelId
+                    }
+                    continue
+                }
+                val best = modelDao.getCapableOfRole(role.name)
                     .filter { it.minRamMb <= health.availableRamMb }
-                    .sortedWith(compareByDescending<InstalledModelEntity> { it.defaultRolePriority }.thenByDescending { it.contextLength })
-
-                val best = candidates.firstOrNull() ?: continue
-                modelDao.clearRole(role.name)
-                modelDao.assignRole(best.id, role.name)
+                    .sortedWith(
+                        compareByDescending<InstalledModelEntity> { it.defaultRolePriority }
+                            .thenByDescending { it.contextLength },
+                    )
+                    .firstOrNull()
+                if (best == null) {
+                    // No capable model for this role anymore — drop any stale auto-assignment.
+                    modelDao.clearRoleAssignment(role.name)
+                    continue
+                }
+                modelDao.upsertRoleAssignment(
+                    RoleAssignmentEntity(
+                        role = role.name,
+                        modelId = best.id,
+                        isUserPinned = false,
+                        assignedAt = now,
+                    ),
+                )
                 assignments[role] = best.id
             }
-
             assignments
         }
     }
 
-    /** Get current role assignments. */
+    /** Get current role assignments (one entry per role, even if unassigned). */
     suspend fun getRoleAssignments(): List<RoleAssignment> = withContext(ioDispatcher) {
         ModelRole.entries.map { role ->
-            val assigned = modelDao.getByRole(role.name)
+            val assigned = modelDao.getRoleAssignment(role.name)
             RoleAssignment(
                 role = role,
-                modelId = assigned?.id,
-                isAutoSelected = true,
+                modelId = assigned?.modelId,
+                isAutoSelected = assigned?.isUserPinned != true,
             )
         }
     }
 
     /**
-     * Get the model path for a given role (for inference engine).
+     * Get the model path for a given role.
      *
-     * First tries an explicit assignment (`assignedRole = role`); if none,
-     * falls back to any installed model whose declared `roles` capability
-     * list includes this role. The fallback is necessary because
-     * `assignedRole` is a single-valued field — one model can only be
-     * "assigned" to one role at a time even when it's capable of several,
-     * so role lookup can't depend on assignment alone.
+     * Resolution order:
+     *   1. Explicit assignment in `role_assignments` (user-pinned or auto).
+     *   2. Any installed model whose declared `roles` capability includes
+     *      this role — picked by `defaultRolePriority` then `contextLength`.
+     *
+     * The fallback exists so freshly-installed-but-not-yet-assigned models
+     * still serve the moment a request comes in, without the user having
+     * to wait for `autoAssignRoles` to fire.
      */
     suspend fun getModelPathForRole(role: ModelRole): String? = withContext(ioDispatcher) {
-        modelDao.getByRole(role.name)?.localPath
+        modelDao.getByAssignedRole(role.name)?.localPath
             ?: modelDao.getCapableOfRole(role.name).firstOrNull()?.localPath
     }
 
     suspend fun getModelForRole(role: ModelRole): InstalledModel? = withContext(ioDispatcher) {
-        (modelDao.getByRole(role.name) ?: modelDao.getCapableOfRole(role.name).firstOrNull())
+        (modelDao.getByAssignedRole(role.name) ?: modelDao.getCapableOfRole(role.name).firstOrNull())
             ?.toDomain()
     }
 
@@ -233,9 +291,8 @@ private fun InstalledModelEntity.toDomain(): InstalledModel {
         installedAt = installedAt,
         lastUsedAt = lastUsedAt,
         sizeOnDisk = sizeBytes,
-        isActive = assignedRole != null,
-        assignedRole = assignedRole?.let {
-            try { ModelRole.valueOf(it) } catch (_: Exception) { null }
-        },
+        // `isActive` is no longer derived from the legacy column — it's
+        // computed externally by joining InstalledModel with roleAssignments.
+        isActive = false,
     )
 }

@@ -29,6 +29,23 @@ data class InstalledModelEntity(
     val assignedRole: String?,
 )
 
+/**
+ * One row per [dev.mias.core.modelhub.model.ModelRole] (PK = role name).
+ * Replaces the single-valued `installed_models.assignedRole` column so a
+ * model capable of multiple roles can actually be assigned to all of them.
+ *
+ * `isUserPinned` distinguishes a deliberate user choice (Settings → "Use
+ * this model for CHAT") from the auto-selected default. Auto-assignment
+ * may overwrite an unpinned row; it must not overwrite a pinned one.
+ */
+@Entity(tableName = "role_assignments")
+data class RoleAssignmentEntity(
+    @PrimaryKey val role: String,
+    val modelId: String,
+    val isUserPinned: Boolean,
+    val assignedAt: Long,
+)
+
 @Entity(tableName = "download_queue")
 data class DownloadQueueEntity(
     @PrimaryKey val modelId: String,

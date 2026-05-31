@@ -18,6 +18,9 @@ import dev.mias.core.data.hindsight.HindsightMemory
 import dev.mias.core.inference.orchestrator.InferenceOrchestrator
 import dev.mias.core.inference.react.ReActStep
 import dev.mias.core.language.IntentExtractor
+import dev.mias.core.modelhub.manager.ModelManager
+import dev.mias.core.modelhub.model.InstalledModel
+import dev.mias.core.modelhub.model.ModelRole
 import dev.mias.core.ui.components.BubbleType
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,6 +54,8 @@ data class ChatUiState(
     val cognitionState: CognitionState = CognitionState.IDLE,
     val conversationTitle: String = "New Conversation",
     val showReActSteps: Boolean = false,
+    val chatModels: List<InstalledModel> = emptyList(),
+    val activeChatModelId: String? = null,
 )
 
 sealed interface ChatEvent {
@@ -63,6 +68,7 @@ class ChatViewModel @Inject constructor(
     private val hindsightMemory: HindsightMemory,
     private val intentExtractor: IntentExtractor,
     private val conversationRepository: ConversationRepository,
+    private val modelManager: ModelManager,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -77,20 +83,28 @@ class ChatViewModel @Inject constructor(
     private val _events = MutableSharedFlow<ChatEvent>(extraBufferCapacity = 8)
     val events = _events.asSharedFlow()
 
+    private val chatModelSelection: kotlinx.coroutines.flow.Flow<Pair<List<InstalledModel>, String?>> =
+        combine(modelManager.installedModels, modelManager.roleAssignments) { installed, assignments ->
+            val capable = installed.filter { ModelRole.CHAT in it.card.roles }
+            capable to assignments[ModelRole.CHAT]
+        }
+
     val uiState: StateFlow<ChatUiState> = combine(
         _messages,
         _inputText,
         _isProcessing,
-        orchestrator.brainState,
-        orchestrator.cognitionState,
-    ) { messages, input, processing, brain, cognition ->
+        combine(orchestrator.brainState, orchestrator.cognitionState) { b, c -> b to c },
+        chatModelSelection,
+    ) { messages, input, processing, brainCog, selection ->
         ChatUiState(
             messages = messages,
             inputText = input,
             isProcessing = processing,
-            brainState = brain,
-            cognitionState = cognition,
+            brainState = brainCog.first,
+            cognitionState = brainCog.second,
             showReActSteps = _showReActSteps.value,
+            chatModels = selection.first,
+            activeChatModelId = selection.second,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -286,6 +300,14 @@ class ChatViewModel @Inject constructor(
 
     fun toggleReActSteps() {
         _showReActSteps.update { !it }
+    }
+
+    fun selectChatModel(modelId: String) {
+        viewModelScope.launch { modelManager.assignRole(modelId, ModelRole.CHAT) }
+    }
+
+    fun useSuggestion(text: String) {
+        _inputText.value = text
     }
 
     private fun loadExistingConversation() {

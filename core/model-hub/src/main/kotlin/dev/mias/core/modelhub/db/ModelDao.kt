@@ -19,9 +19,6 @@ interface ModelDao {
     @Query("SELECT * FROM installed_models WHERE id = :id")
     suspend fun getById(id: String): InstalledModelEntity?
 
-    @Query("SELECT * FROM installed_models WHERE assignedRole = :role LIMIT 1")
-    suspend fun getByRole(role: String): InstalledModelEntity?
-
     @Query("SELECT * FROM installed_models WHERE roles LIKE '%' || :role || '%' ORDER BY defaultRolePriority DESC, contextLength DESC")
     suspend fun getCapableOfRole(role: String): List<InstalledModelEntity>
 
@@ -34,14 +31,35 @@ interface ModelDao {
     @Query("UPDATE installed_models SET lastUsedAt = :timestamp WHERE id = :id")
     suspend fun updateLastUsed(id: String, timestamp: Long)
 
-    @Query("UPDATE installed_models SET assignedRole = :role WHERE id = :id")
-    suspend fun assignRole(id: String, role: String?)
-
-    @Query("UPDATE installed_models SET assignedRole = NULL WHERE assignedRole = :role")
-    suspend fun clearRole(role: String)
-
     @Query("SELECT SUM(sizeBytes) FROM installed_models")
     suspend fun totalStorageUsed(): Long?
+
+    // ── Role assignments (role_assignments table) ──────────────────
+
+    @Query("SELECT * FROM role_assignments")
+    fun observeRoleAssignments(): Flow<List<RoleAssignmentEntity>>
+
+    @Query("SELECT * FROM role_assignments WHERE role = :role LIMIT 1")
+    suspend fun getRoleAssignment(role: String): RoleAssignmentEntity?
+
+    @Query(
+        "SELECT m.* FROM installed_models m " +
+            "INNER JOIN role_assignments r ON r.modelId = m.id " +
+            "WHERE r.role = :role LIMIT 1",
+    )
+    suspend fun getByAssignedRole(role: String): InstalledModelEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertRoleAssignment(assignment: RoleAssignmentEntity)
+
+    @Query("DELETE FROM role_assignments WHERE role = :role")
+    suspend fun clearRoleAssignment(role: String)
+
+    @Query("DELETE FROM role_assignments WHERE modelId = :modelId")
+    suspend fun clearAllAssignmentsForModel(modelId: String)
+
+    @Query("SELECT * FROM role_assignments WHERE isUserPinned = 1")
+    suspend fun getUserPinnedAssignments(): List<RoleAssignmentEntity>
 
     // ── Download Queue ────────────────────────────────────────────
 
