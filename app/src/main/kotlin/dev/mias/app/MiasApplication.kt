@@ -7,6 +7,11 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
 import dev.mias.app.bootstrap.PreferencesBootstrapper
+import dev.mias.core.modelhub.bootstrap.ModelBootstrapper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -18,9 +23,20 @@ class MiasApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var preferencesBootstrapper: PreferencesBootstrapper
 
+    @Inject
+    lateinit var modelBootstrapper: ModelBootstrapper
+
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
     override fun onCreate() {
         super.onCreate()
         preferencesBootstrapper.start()
+        // Reassign roles for already-installed models on every cold start.
+        // This catches models that were installed before the role-assignment
+        // bug was fixed, and any future cases where assignment was skipped.
+        appScope.launch {
+            modelBootstrapper.prepareFirstRunModels(autoDownload = false)
+        }
     }
 
     // WorkManager queries this property at init time. If Hilt has not

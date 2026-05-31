@@ -58,6 +58,15 @@ class InferenceOrchestrator @Inject constructor(
     /** MCP engine for desktop offload — set by NetworkModule when available. */
     var desktopEngine: InferenceEngine? = null
 
+    /**
+     * Per-engine model-id bookkeeping. Without this, once any model has been
+     * loaded into an engine, [InferenceEngine.isModelLoaded] returns true
+     * forever and the orchestrator never picks up a newly-installed or
+     * newly-assigned model in the same process. Maps engine identity → the
+     * model id currently bound to that engine.
+     */
+    private val loadedModelByEngine = mutableMapOf<InferenceEngine, String>()
+
     /** Process a stimulus through the appropriate brain. */
     fun process(
         stimulus: Stimulus,
@@ -170,7 +179,6 @@ class InferenceOrchestrator @Inject constructor(
         engine: InferenceEngine,
         brainState: BrainState,
     ): ModelReadiness {
-        if (engine.isModelLoaded()) return ModelReadiness.Ready
         if (brainState == BrainState.DEGRADED) return ModelReadiness.NoModelAssigned
 
         val role = when (brainState) {
@@ -188,8 +196,25 @@ class InferenceOrchestrator @Inject constructor(
             ?: modelManager.getModelForRole(ModelRole.SURVIVAL)
             ?: return ModelReadiness.NoModelAssigned
 
+        // If the *same* model is already bound to this engine, skip the
+        // reload — InferenceEngine.isModelLoaded alone is not enough because
+        // we need to detect "user installed and assigned a different model
+        // since last call".
+        val currentlyLoaded = loadedModelByEngine[engine]
+        if (currentlyLoaded == model.id && engine.isModelLoaded()) {
+            return ModelReadiness.Ready
+        }
+
+        // A different model needs to be loaded — unload first so the engine
+        // doesn't sit on two sets of weights.
+        if (currentlyLoaded != null) {
+            engine.unloadModel()
+            loadedModelByEngine.remove(engine)
+        }
+
         return when (val result = engine.loadModel(model.localPath)) {
             is MiasResult.Success -> {
+                loadedModelByEngine[engine] = model.id
                 modelManager.markUsed(model.id)
                 ModelReadiness.Ready
             }

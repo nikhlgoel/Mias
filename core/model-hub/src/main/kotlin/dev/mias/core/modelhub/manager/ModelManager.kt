@@ -153,13 +153,24 @@ class ModelManager @Inject constructor(
         }
     }
 
-    /** Get the model path for a given role (for inference engine). */
+    /**
+     * Get the model path for a given role (for inference engine).
+     *
+     * First tries an explicit assignment (`assignedRole = role`); if none,
+     * falls back to any installed model whose declared `roles` capability
+     * list includes this role. The fallback is necessary because
+     * `assignedRole` is a single-valued field — one model can only be
+     * "assigned" to one role at a time even when it's capable of several,
+     * so role lookup can't depend on assignment alone.
+     */
     suspend fun getModelPathForRole(role: ModelRole): String? = withContext(ioDispatcher) {
         modelDao.getByRole(role.name)?.localPath
+            ?: modelDao.getCapableOfRole(role.name).firstOrNull()?.localPath
     }
 
     suspend fun getModelForRole(role: ModelRole): InstalledModel? = withContext(ioDispatcher) {
-        modelDao.getByRole(role.name)?.toDomain()
+        (modelDao.getByRole(role.name) ?: modelDao.getCapableOfRole(role.name).firstOrNull())
+            ?.toDomain()
     }
 
     suspend fun markUsed(modelId: String) = withContext(ioDispatcher) {

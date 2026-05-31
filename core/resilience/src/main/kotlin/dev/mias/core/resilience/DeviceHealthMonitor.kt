@@ -1,5 +1,6 @@
 ﻿package dev.mias.core.resilience
 
+import android.app.ActivityManager
 import android.content.Context
 import android.os.Process
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -18,6 +19,9 @@ import javax.inject.Singleton
 class DeviceHealthMonitor @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
+    private val activityManager: ActivityManager =
+        context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+
     private val _health = MutableStateFlow(snapshot())
     val health: StateFlow<DeviceHealth> = _health.asStateFlow()
 
@@ -29,9 +33,13 @@ class DeviceHealthMonitor @Inject constructor(
     }
 
     private fun snapshot(): DeviceHealth {
-        val runtime = Runtime.getRuntime()
-        val availableRamMb = (runtime.freeMemory() / (1024 * 1024)).toInt()
-        val totalRamMb = (runtime.maxMemory() / (1024 * 1024)).toInt()
+        // Use ActivityManager.MemoryInfo for *device* RAM, not JVM heap.
+        // Models are mmap'd via native code, so what matters is system RAM
+        // headroom, not the app's small Dalvik heap quota.
+        val memInfo = ActivityManager.MemoryInfo()
+        activityManager.getMemoryInfo(memInfo)
+        val totalRamMb = (memInfo.totalMem / (1024 * 1024)).toInt()
+        val availableRamMb = (memInfo.availMem / (1024 * 1024)).toInt()
 
         val modelsDir = File(context.filesDir, "models")
         val storageFreeBytes = context.filesDir.usableSpace
@@ -46,8 +54,9 @@ class DeviceHealthMonitor @Inject constructor(
             totalRamMb = totalRamMb,
             storageFreeBytes = storageFreeBytes,
             storageUsedByModelsBytes = storageUsedByModels,
-            cpuCores = runtime.availableProcessors(),
+            cpuCores = Runtime.getRuntime().availableProcessors(),
             processId = Process.myPid(),
+            isLowMemory = memInfo.lowMemory,
         )
     }
 
@@ -73,4 +82,5 @@ data class DeviceHealth(
     val storageUsedByModelsBytes: Long,
     val cpuCores: Int,
     val processId: Int,
+    val isLowMemory: Boolean = false,
 )
