@@ -1,9 +1,14 @@
 ﻿package dev.mias.app.ui.chat
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.mias.core.common.getOrDefault
 import dev.mias.core.common.getOrNull
 import dev.mias.core.common.model.BrainState
@@ -15,8 +20,10 @@ import dev.mias.core.data.ConversationRepository
 import dev.mias.core.data.Message
 import dev.mias.core.data.Role
 import dev.mias.core.data.hindsight.HindsightMemory
+import dev.mias.core.common.MiasResult
 import dev.mias.core.inference.orchestrator.InferenceOrchestrator
 import dev.mias.core.inference.react.ReActStep
+import dev.mias.core.inference.vision.MediaPipeVisionEngine
 import dev.mias.core.language.IntentExtractor
 import dev.mias.core.modelhub.manager.ModelManager
 import dev.mias.core.modelhub.model.InstalledModel
@@ -44,6 +51,7 @@ data class ChatMessage(
     val type: BubbleType,
     val timestamp: String,
     val isStreaming: Boolean = false,
+    val image: Bitmap? = null,
 )
 
 data class ChatUiState(
@@ -56,6 +64,8 @@ data class ChatUiState(
     val showReActSteps: Boolean = false,
     val chatModels: List<InstalledModel> = emptyList(),
     val activeChatModelId: String? = null,
+    val attachedImage: Bitmap? = null,
+    val hasVisionModel: Boolean = false,
 )
 
 sealed interface ChatEvent {
@@ -64,11 +74,13 @@ sealed interface ChatEvent {
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val orchestrator: InferenceOrchestrator,
     private val hindsightMemory: HindsightMemory,
     private val intentExtractor: IntentExtractor,
     private val conversationRepository: ConversationRepository,
     private val modelManager: ModelManager,
+    private val visionEngine: MediaPipeVisionEngine,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -79,32 +91,44 @@ class ChatViewModel @Inject constructor(
     private val _inputText = MutableStateFlow("")
     private val _isProcessing = MutableStateFlow(false)
     private val _showReActSteps = MutableStateFlow(false)
+    private val _attachedImage = MutableStateFlow<Bitmap?>(null)
 
     private val _events = MutableSharedFlow<ChatEvent>(extraBufferCapacity = 8)
     val events = _events.asSharedFlow()
 
-    private val chatModelSelection: kotlinx.coroutines.flow.Flow<Pair<List<InstalledModel>, String?>> =
+    private data class ChatModelInfo(
+        val chatModels: List<InstalledModel>,
+        val activeChatModelId: String?,
+        val hasVisionModel: Boolean,
+    )
+
+    private val chatModelSelection: kotlinx.coroutines.flow.Flow<ChatModelInfo> =
         combine(modelManager.installedModels, modelManager.roleAssignments) { installed, assignments ->
-            val capable = installed.filter { ModelRole.CHAT in it.card.roles }
-            capable to assignments[ModelRole.CHAT]
+            ChatModelInfo(
+                chatModels = installed.filter { ModelRole.CHAT in it.card.roles },
+                activeChatModelId = assignments[ModelRole.CHAT],
+                hasVisionModel = installed.any { ModelRole.VISION in it.card.roles },
+            )
         }
 
     val uiState: StateFlow<ChatUiState> = combine(
-        _messages,
+        combine(_messages, _attachedImage) { msgs, img -> msgs to img },
         _inputText,
         _isProcessing,
         combine(orchestrator.brainState, orchestrator.cognitionState) { b, c -> b to c },
         chatModelSelection,
-    ) { messages, input, processing, brainCog, selection ->
+    ) { messagesAndImage, input, processing, brainCog, info ->
         ChatUiState(
-            messages = messages,
+            messages = messagesAndImage.first,
             inputText = input,
             isProcessing = processing,
             brainState = brainCog.first,
             cognitionState = brainCog.second,
             showReActSteps = _showReActSteps.value,
-            chatModels = selection.first,
-            activeChatModelId = selection.second,
+            chatModels = info.chatModels,
+            activeChatModelId = info.activeChatModelId,
+            attachedImage = messagesAndImage.second,
+            hasVisionModel = info.hasVisionModel,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -126,7 +150,17 @@ class ChatViewModel @Inject constructor(
 
     fun onSend() {
         val text = _inputText.value.trim()
-        if (text.isBlank() || _isProcessing.value) return
+        val attachedBitmap = _attachedImage.value
+        if (attachedBitmap == null && text.isBlank()) return
+        if (_isProcessing.value) return
+
+        // Vision branch: if an image is attached, dispatch to the vision
+        // engine directly. Falls back through the standard chat path when
+        // no vision model is installed.
+        if (attachedBitmap != null) {
+            sendWithImage(attachedBitmap, text)
+            return
+        }
 
         val structuredIntent = intentExtractor.extract(text)
         val cleanedText = structuredIntent.cleanedText.ifBlank { text }
@@ -310,6 +344,120 @@ class ChatViewModel @Inject constructor(
         _inputText.value = text
     }
 
+    fun attachImage(uri: Uri?) {
+        if (uri == null) return
+        viewModelScope.launch {
+            val bitmap = runCatching {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    BitmapFactory.decodeStream(stream)?.let { resizeBitmap(it, MAX_ATTACH_DIM) }
+                }
+            }.getOrNull()
+            _attachedImage.value = bitmap
+        }
+    }
+
+    fun clearAttachment() {
+        _attachedImage.value = null
+    }
+
+    private fun resizeBitmap(source: Bitmap, maxDim: Int): Bitmap {
+        val largest = maxOf(source.width, source.height)
+        if (largest <= maxDim) return source
+        val scale = maxDim.toFloat() / largest
+        return Bitmap.createScaledBitmap(
+            source,
+            (source.width * scale).toInt().coerceAtLeast(1),
+            (source.height * scale).toInt().coerceAtLeast(1),
+            true,
+        )
+    }
+
+    private fun sendWithImage(image: Bitmap, prompt: String) {
+        val effectivePrompt = prompt.ifBlank { "What's in this image?" }
+        val userMsg = ChatMessage(
+            id = UUID.randomUUID().toString(),
+            text = effectivePrompt,
+            type = BubbleType.USER,
+            timestamp = formatTime(System.currentTimeMillis()),
+            image = image,
+        )
+        _messages.update { it + userMsg }
+        _inputText.value = ""
+        _attachedImage.value = null
+        _events.tryEmit(ChatEvent.ScrollToBottom)
+
+        viewModelScope.launch {
+            val visionModel = modelManager.getModelForRole(ModelRole.VISION)
+            if (visionModel == null) {
+                _messages.update {
+                    it + ChatMessage(
+                        id = UUID.randomUUID().toString(),
+                        text = "No vision model is installed yet. Open Models, switch the " +
+                            "Hugging Face filter to \"Vision (.task)\", and download a " +
+                            "Gemma 3n bundle. I'll be ready as soon as it's installed.",
+                        type = BubbleType.Mias,
+                        timestamp = formatTime(System.currentTimeMillis()),
+                    )
+                }
+                _events.tryEmit(ChatEvent.ScrollToBottom)
+                return@launch
+            }
+
+            _isProcessing.value = true
+            val streamingId = UUID.randomUUID().toString()
+            _messages.update {
+                it + ChatMessage(
+                    id = streamingId,
+                    text = "",
+                    type = BubbleType.Mias,
+                    timestamp = formatTime(System.currentTimeMillis()),
+                    isStreaming = true,
+                )
+            }
+
+            try {
+                visionEngine.processStream(visionModel.localPath, image, effectivePrompt)
+                    .collect { chunk ->
+                        when (chunk) {
+                            is MiasResult.Success -> _messages.update { list ->
+                                val idx = list.indexOfFirst { it.id == streamingId }
+                                if (idx >= 0) {
+                                    val updated = list.toMutableList()
+                                    val old = updated[idx]
+                                    updated[idx] = old.copy(text = old.text + chunk.data)
+                                    updated
+                                } else list
+                            }
+                            is MiasResult.Error -> _messages.update { list ->
+                                val idx = list.indexOfFirst { it.id == streamingId }
+                                if (idx >= 0) {
+                                    val updated = list.toMutableList()
+                                    updated[idx] = updated[idx].copy(
+                                        text = chunk.message,
+                                        isStreaming = false,
+                                        type = BubbleType.ERROR,
+                                    )
+                                    updated
+                                } else list
+                            }
+                        }
+                        _events.tryEmit(ChatEvent.ScrollToBottom)
+                    }
+            } finally {
+                _messages.update { list ->
+                    val idx = list.indexOfFirst { it.id == streamingId }
+                    if (idx >= 0) {
+                        val updated = list.toMutableList()
+                        updated[idx] = updated[idx].copy(isStreaming = false)
+                        updated
+                    } else list
+                }
+                _isProcessing.value = false
+                saveConversation()
+            }
+        }
+    }
+
     private fun loadExistingConversation() {
         viewModelScope.launch {
             val result = conversationRepository.getConversation(conversationId)
@@ -351,5 +499,9 @@ class ChatViewModel @Inject constructor(
     private fun formatTime(timestamp: Long): String {
         val formatter = SimpleDateFormat("HH:mm", Locale.getDefault())
         return formatter.format(Date(timestamp))
+    }
+
+    companion object {
+        private const val MAX_ATTACH_DIM: Int = 1024
     }
 }

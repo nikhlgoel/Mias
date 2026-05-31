@@ -8,6 +8,7 @@ import dev.mias.core.modelhub.di.ModelHubHttpClient
 import dev.mias.core.modelhub.model.ModelCard
 import dev.mias.core.modelhub.model.ModelFormat
 import dev.mias.core.modelhub.model.ModelRole
+import dev.mias.core.modelhub.model.ModelRuntime
 import dev.mias.core.modelhub.model.ModelSource
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -39,34 +40,52 @@ class HuggingFaceRegistry @Inject constructor(
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     /**
-     * Search HuggingFace for GGUF models matching a query.
+     * What artifact family the user is searching for. Text/GGUF flows through
+     * llama.cpp; Vision/Task flows through MediaPipe GenAI.
+     */
+    enum class Kind { GGUF, TASK }
+
+    /**
+     * Search HuggingFace for models of the given [kind].
      * Results are transformed into [ModelCard] objects.
      */
     suspend fun search(
         query: String,
         limit: Int = 12,
+        kind: Kind = Kind.GGUF,
     ): MiasResult<List<ModelCard>> = withContext(ioDispatcher) {
         runCatchingMias {
             // /api/models?search=… doesn't include `siblings`, so the search
             // pass only gives us repo ids. Then resolve each in parallel to
-            // pull the actual GGUF filename + size.
-            val searchUrl = "$HF_API_BASE/models?search=$query&filter=gguf&sort=downloads&direction=-1&limit=$limit"
+            // pull the actual filename + size.
+            val filter = when (kind) {
+                Kind.GGUF -> "&filter=gguf"
+                Kind.TASK -> "" // No HF-side filter; we'll match on siblings client-side.
+            }
+            val searchUrl = "$HF_API_BASE/models?search=$query$filter&sort=downloads&direction=-1&limit=$limit"
             val searchBody: String = httpClient.get(searchUrl) { applyAuth() }.body()
             val searchResults = json.decodeFromString<List<HfModelInfo>>(searchBody)
 
             coroutineScope {
                 searchResults.map { hit ->
-                    async { runCatching { resolveCard(hit.id) }.getOrNull() }
+                    async { runCatching { resolveCard(hit.id, kind) }.getOrNull() }
                 }.awaitAll().filterNotNull()
             }
         }
     }
 
-    private suspend fun resolveCard(repoId: String): ModelCard? {
+    private suspend fun resolveCard(repoId: String, kind: Kind = Kind.GGUF): ModelCard? {
         val infoUrl = "$HF_API_BASE/models/$repoId"
         val body: String = httpClient.get(infoUrl) { applyAuth() }.body()
         val hf = json.decodeFromString<HfModelInfo>(body)
 
+        return when (kind) {
+            Kind.GGUF -> resolveGguf(hf)
+            Kind.TASK -> resolveTask(hf)
+        }
+    }
+
+    private fun resolveGguf(hf: HfModelInfo): ModelCard? {
         val ggufFiles = hf.siblings?.filter { it.rfilename?.endsWith(".gguf") == true }
             ?: return null
         val bestFile = ggufFiles
@@ -93,6 +112,35 @@ class HuggingFaceRegistry @Inject constructor(
             tags = hf.tags ?: emptyList(),
             minRamMb = estimateRamNeeded(bestFile.size ?: 0L),
             source = ModelSource.HUGGING_FACE,
+            runtime = ModelRuntime.LLAMA_CPP,
+        )
+    }
+
+    private fun resolveTask(hf: HfModelInfo): ModelCard? {
+        val taskFiles = hf.siblings?.filter { it.rfilename?.endsWith(".task") == true }
+            ?: return null
+        val bestFile = taskFiles.sortedByDescending { it.size ?: 0L }.firstOrNull() ?: return null
+        val filename = bestFile.rfilename ?: return null
+        // Task bundles for Gemma 3n are vision-capable.
+        val roles = mutableListOf(ModelRole.VISION, ModelRole.CHAT)
+        return ModelCard(
+            id = hf.id.replace("/", "--"),
+            name = hf.id.substringAfter("/"),
+            author = hf.author ?: hf.id.substringBefore("/"),
+            description = hf.description ?: "Vision model from HuggingFace",
+            sizeBytes = bestFile.size ?: 0L,
+            quantization = "TASK",
+            format = ModelFormat.LITERT,
+            roles = roles,
+            contextLength = 4096,
+            parameterCount = inferParamCount(hf.id),
+            downloadUrl = "$HF_BASE/${hf.id}/resolve/main/$filename",
+            sha256 = "",
+            license = hf.license ?: "unknown",
+            tags = hf.tags ?: emptyList(),
+            minRamMb = estimateRamNeeded(bestFile.size ?: 0L),
+            source = ModelSource.HUGGING_FACE,
+            runtime = ModelRuntime.GOOGLE_AI_EDGE,
         )
     }
 

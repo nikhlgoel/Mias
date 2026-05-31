@@ -41,6 +41,7 @@ class InferenceOrchestrator @Inject constructor(
     private val tawsGovernor: TawsGovernor,
     private val guardrailProcessor: GuardrailProcessor,
     private val modelManager: ModelManager,
+    private val roleClassifier: RoleClassifier,
 ) {
     private val _brainState = MutableStateFlow(BrainState.GEMMA_NPU)
     val brainState: StateFlow<BrainState> = _brainState.asStateFlow()
@@ -141,7 +142,7 @@ class InferenceOrchestrator @Inject constructor(
         }.collect { } // Terminal operator
     }
 
-    private fun selectEngine(tawsAction: TawsAction, stimulus: Stimulus): Pair<InferenceEngine, BrainState> =
+    private suspend fun selectEngine(tawsAction: TawsAction, stimulus: Stimulus): Pair<InferenceEngine, BrainState> =
         when (tawsAction) {
             TawsAction.CONTINUE_PRIMARY, TawsAction.THROTTLE_PRIMARY -> {
                 val role = inferRole(stimulus)
@@ -233,16 +234,19 @@ class InferenceOrchestrator @Inject constructor(
      * Falls back to keyword matching only for CHAT-classified or low-confidence
      * inputs — the cases where the intent extractor itself wasn't confident.
      *
-     * TODO(#6 phase 2): when an EMBEDDING-role model is installed, replace the
-     * keyword fallback with cosine-similarity classification against role
-     * exemplars. Keep the intent-extractor short-circuit on top of it.
+     * Layering:
+     *   1. IntentExtractor classification (cheap, deterministic).
+     *   2. Embedding-cosine vs role exemplars (when an EMBEDDING model
+     *      is installed — see [RoleClassifier]).
+     *   3. Keyword heuristic (final fallback, always available).
      */
-    private fun inferRole(stimulus: Stimulus): ModelRole {
+    private suspend fun inferRole(stimulus: Stimulus): ModelRole {
         val intentType = stimulus.metadata["intent_type"]
         val confidence = stimulus.metadata["intent_confidence"]?.toFloatOrNull() ?: 0f
         if (intentType != null && confidence >= INTENT_CONFIDENCE_THRESHOLD) {
             roleForIntent(intentType)?.let { return it }
         }
+        roleClassifier.classify(stimulus.content)?.let { return it }
         return inferRoleByKeywords(stimulus.content)
     }
 

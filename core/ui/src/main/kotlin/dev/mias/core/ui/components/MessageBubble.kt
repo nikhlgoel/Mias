@@ -1,5 +1,6 @@
 package dev.mias.core.ui.components
 
+import android.graphics.Bitmap
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -7,6 +8,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,10 +16,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -52,6 +57,7 @@ fun MessageBubble(
     timestamp: String? = null,
     isStreaming: Boolean = false,
     assistantLabel: String? = null,
+    image: Bitmap? = null,
 ) {
     val alignment = if (type == BubbleType.USER) Alignment.CenterEnd else Alignment.CenterStart
 
@@ -91,22 +97,45 @@ fun MessageBubble(
                 modifier = Modifier
                     .clip(bubbleShape)
                     .background(background)
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .padding(
+                        start = if (image != null) 6.dp else 14.dp,
+                        end = if (image != null) 6.dp else 14.dp,
+                        top = if (image != null) 6.dp else 10.dp,
+                        bottom = 10.dp,
+                    )
                     .animateContentSize(),
             ) {
+                if (image != null) {
+                    Image(
+                        bitmap = image.asImageBitmap(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .clip(MiasShapes.Medium)
+                            .heightIn(max = 220.dp)
+                            .widthIn(max = 320.dp),
+                    )
+                    if (text.isNotBlank()) Spacer(modifier = Modifier.height(8.dp))
+                }
+
                 if (type == BubbleType.THOUGHT || type == BubbleType.ACTION) {
                     StepLabel(type)
                     Spacer(modifier = Modifier.height(4.dp))
                 }
 
-                if (isStreaming && type == BubbleType.Mias) {
-                    StreamingText(text = text, textColor = textColor)
-                } else {
-                    Text(
-                        text = text,
-                        style = MiasTypography.BodyLarge,
-                        color = textColor,
-                    )
+                if (text.isNotBlank() || isStreaming) {
+                    val effectiveStartPadding = if (image != null) 8.dp else 0.dp
+                    Box(modifier = Modifier.padding(horizontal = effectiveStartPadding)) {
+                        if (isStreaming && type == BubbleType.Mias) {
+                            StreamingText(text = text, textColor = textColor)
+                        } else {
+                            Text(
+                                text = text,
+                                style = MiasTypography.BodyLarge,
+                                color = textColor,
+                            )
+                        }
+                    }
                 }
             }
 

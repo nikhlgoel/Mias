@@ -33,6 +33,7 @@ data class ModelHubUiState(
     val downloadStates: Map<String, DownloadState> = emptyMap(),
     val activeSearchQuery: String = "",
     val selectedRole: ModelRole? = null,
+    val searchKind: HuggingFaceRegistry.Kind = HuggingFaceRegistry.Kind.GGUF,
     val statusMessage: String? = null,
     val errorMessage: String? = null,
     val storageUsedBytes: Long = 0L,
@@ -47,6 +48,7 @@ class ModelHubViewModel @Inject constructor(
 
     private val _searchQuery = MutableStateFlow("")
     private val _selectedRole = MutableStateFlow<ModelRole?>(null)
+    private val _searchKind = MutableStateFlow(HuggingFaceRegistry.Kind.GGUF)
     private val _statusMessage = MutableStateFlow<String?>(null)
     private val _errorMessage = MutableStateFlow<String?>(null)
     private val _remoteResults = MutableStateFlow<List<ModelCard>>(emptyList())
@@ -56,27 +58,28 @@ class ModelHubViewModel @Inject constructor(
 
     init {
         // Debounce remote search; fire when the user has typed at least 3 chars.
+        // Refire when either the query or the kind changes.
         viewModelScope.launch {
-            _searchQuery
+            combine(_searchQuery, _searchKind) { q, kind -> q to kind }
                 .debounce(350L)
                 .distinctUntilChanged()
-                .onEach { q ->
+                .onEach { (q, _) ->
                     if (q.length < 3) {
                         _remoteResults.value = emptyList()
                         _isSearchingRemote.value = false
                         remoteSearchJob?.cancel()
                     }
                 }
-                .filter { it.length >= 3 }
-                .collect { q -> launchRemoteSearch(q) }
+                .filter { (q, _) -> q.length >= 3 }
+                .collect { (q, kind) -> launchRemoteSearch(q, kind) }
         }
     }
 
-    private fun launchRemoteSearch(query: String) {
+    private fun launchRemoteSearch(query: String, kind: HuggingFaceRegistry.Kind) {
         remoteSearchJob?.cancel()
         remoteSearchJob = viewModelScope.launch {
             _isSearchingRemote.value = true
-            when (val r = hfRegistry.search(query, limit = 8)) {
+            when (val r = hfRegistry.search(query, limit = 8, kind = kind)) {
                 is MiasResult.Success -> _remoteResults.value = r.data
                 is MiasResult.Error -> {
                     _remoteResults.value = emptyList()
@@ -91,9 +94,10 @@ class ModelHubViewModel @Inject constructor(
         modelManager.installedModels,
         modelManager.activeDownloads,
         _searchQuery,
-        _selectedRole,
+        combine(_selectedRole, _searchKind) { role, kind -> role to kind },
         combine(_remoteResults, _isSearchingRemote) { results, loading -> results to loading },
-    ) { installed, downloads, query, role, remote ->
+    ) { installed, downloads, query, roleAndKind, remote ->
+        val (role, kind) = roleAndKind
         val (remoteResults, isSearching) = remote
         val catalog = modelManager.browseCurated()
         ModelHubUiState(
@@ -107,6 +111,7 @@ class ModelHubViewModel @Inject constructor(
             downloadStates = downloads,
             activeSearchQuery = query,
             selectedRole = role,
+            searchKind = kind,
             storageUsedBytes = installed.sumOf { it.sizeOnDisk },
         )
     }.stateIn(
@@ -117,6 +122,7 @@ class ModelHubViewModel @Inject constructor(
 
     fun onSearchQuery(query: String) { _searchQuery.value = query }
     fun onRoleFilter(role: ModelRole?) { _selectedRole.value = role }
+    fun onSearchKind(kind: HuggingFaceRegistry.Kind) { _searchKind.value = kind }
 
     fun downloadModel(card: ModelCard) {
         _statusMessage.value = "Starting download: ${card.name}..."

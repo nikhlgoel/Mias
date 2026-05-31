@@ -242,6 +242,13 @@ fun ModelHubScreen(
                     }
                 }
 
+                item(key = "kind-filter") {
+                    HuggingFaceKindFilter(
+                        active = state.searchKind,
+                        onPick = viewModel::onSearchKind,
+                    )
+                }
+
                 if (state.remoteResults.isNotEmpty()) {
                     item(key = "remote-header") {
                         Text(
@@ -282,6 +289,52 @@ fun ModelHubScreen(
 @Composable
 private fun SectionLabel(title: String) {
     Text(title, style = MiasTypography.LabelMedium, color = MiasColors.TextSecondary, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+}
+
+@Composable
+private fun HuggingFaceKindFilter(
+    active: dev.mias.core.modelhub.registry.HuggingFaceRegistry.Kind,
+    onPick: (dev.mias.core.modelhub.registry.HuggingFaceRegistry.Kind) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        KindChip(
+            label = "Text (GGUF)",
+            selected = active == dev.mias.core.modelhub.registry.HuggingFaceRegistry.Kind.GGUF,
+            onClick = { onPick(dev.mias.core.modelhub.registry.HuggingFaceRegistry.Kind.GGUF) },
+        )
+        KindChip(
+            label = "Vision (.task)",
+            selected = active == dev.mias.core.modelhub.registry.HuggingFaceRegistry.Kind.TASK,
+            onClick = { onPick(dev.mias.core.modelhub.registry.HuggingFaceRegistry.Kind.TASK) },
+        )
+    }
+}
+
+@Composable
+private fun KindChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(if (selected) MiasColors.Heather.copy(alpha = 0.22f) else MiasColors.Surface2)
+            .border(
+                1.dp,
+                if (selected) MiasColors.Heather else MiasColors.OutlineSoft,
+                CircleShape,
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+    ) {
+        Text(
+            text = label,
+            style = MiasTypography.LabelMedium,
+            color = if (selected) MiasColors.TextHi else MiasColors.TextLo,
+        )
+    }
 }
 
 @Composable

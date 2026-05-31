@@ -62,6 +62,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.mias.core.modelhub.model.InstalledModel
 import dev.mias.core.ui.theme.MiasShapes
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.material.icons.rounded.Close
 import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -157,6 +164,7 @@ fun ChatScreen(
                                 type = message.type,
                                 timestamp = message.timestamp,
                                 isStreaming = message.isStreaming,
+                                image = message.image,
                             )
                         }
                     }
@@ -176,14 +184,26 @@ fun ChatScreen(
             }
         }
 
+        // ── Image pick launcher ──
+        val pickImage = rememberLauncherForActivityResult(
+            ActivityResultContracts.PickVisualMedia(),
+        ) { uri -> viewModel.attachImage(uri) }
+
         // ── Input Bar ──
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
                 .windowInsetsPadding(WindowInsets.ime)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
+            if (state.attachedImage != null) {
+                AttachedImageStrip(
+                    image = state.attachedImage!!,
+                    onRemove = viewModel::clearAttachment,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Bottom,
@@ -195,6 +215,15 @@ fun ChatScreen(
                         onSend = viewModel::onSend,
                         isProcessing = state.isProcessing,
                         enabled = !state.isProcessing,
+                        onAttach = if (state.hasVisionModel) {
+                            {
+                                pickImage.launch(
+                                    PickVisualMediaRequest(
+                                        ActivityResultContracts.PickVisualMedia.ImageOnly,
+                                    ),
+                                )
+                            }
+                        } else null,
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
@@ -458,6 +487,49 @@ private val SUGGESTIONS = listOf(
         icon = Icons.Rounded.AutoAwesome,
     ),
 )
+
+@Composable
+private fun AttachedImageStrip(
+    image: android.graphics.Bitmap,
+    onRemove: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(MiasShapes.Medium)
+                .background(MiasColors.Surface3),
+        ) {
+            Image(
+                bitmap = image.asImageBitmap(),
+                contentDescription = "Attached image",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = "Image attached · sent to vision model",
+            style = MiasTypography.LabelMedium,
+            color = MiasColors.TextLo,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(
+            onClick = onRemove,
+            modifier = Modifier.size(32.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = "Remove image",
+                tint = MiasColors.TextLo,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
 
 @Composable
 private fun SuggestionCard(

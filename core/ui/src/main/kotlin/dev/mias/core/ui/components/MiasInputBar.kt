@@ -15,6 +15,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Icon
@@ -51,6 +52,7 @@ fun MiasInputBar(
     enabled: Boolean = true,
     isProcessing: Boolean = false,
     onStop: (() -> Unit)? = null,
+    onAttach: (() -> Unit)? = null,
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -63,6 +65,18 @@ fun MiasInputBar(
             .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
+        if (onAttach != null) {
+            IconButton(
+                onClick = onAttach,
+                modifier = Modifier.size(40.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Add,
+                    contentDescription = "Attach image",
+                    tint = MiasColors.TextLo,
+                )
+            }
+        }
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
