@@ -33,9 +33,13 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Today
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -375,67 +379,116 @@ private fun EmptyConversation(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.padding(horizontal = 24.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         AnimatedOrb(
             cognitionState = cognitionState,
-            size = 80.dp,
+            size = 64.dp,
         )
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
         Text(
             text = "How can I help today?",
             style = MiasTypography.HeadlineMedium,
-            color = MiasColors.TextPrimary,
+            color = MiasColors.TextHi,
             textAlign = TextAlign.Center,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = "This conversation stays on your device.",
+            text = "Everything stays on your device.",
             style = MiasTypography.BodyMedium,
-            color = MiasColors.TextTertiary,
+            color = MiasColors.TextLo,
             textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.height(28.dp))
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp),
-        ) {
-            items(items = SUGGESTIONS, key = { it.label }) { suggestion ->
-                SuggestionChip(
-                    label = suggestion.label,
-                    onClick = { onSuggestion(suggestion.prompt) },
-                )
+
+        // 2x2 grid of suggestion cards.
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SUGGESTIONS.chunked(2).forEach { pair ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    pair.forEach { suggestion ->
+                        SuggestionCard(
+                            suggestion = suggestion,
+                            onClick = { onSuggestion(suggestion.prompt) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
+                }
             }
         }
     }
 }
 
-private data class Suggestion(val label: String, val prompt: String)
+private data class Suggestion(
+    val label: String,
+    val hint: String,
+    val prompt: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+)
 
 private val SUGGESTIONS = listOf(
-    Suggestion("Summarize a note", "Summarize this text for me: "),
-    Suggestion("Plan my day", "Help me plan a productive day. Ask me what I'm working on first."),
-    Suggestion("Explain something", "Explain "),
-    Suggestion("Brainstorm ideas", "Help me brainstorm ideas for "),
+    Suggestion(
+        label = "Summarize",
+        hint = "long notes, transcripts",
+        prompt = "Summarize this for me: ",
+        icon = Icons.Rounded.Description,
+    ),
+    Suggestion(
+        label = "Plan my day",
+        hint = "task list from a few notes",
+        prompt = "Help me plan a productive day. Ask me what I'm working on first.",
+        icon = Icons.Rounded.Today,
+    ),
+    Suggestion(
+        label = "Explain",
+        hint = "a concept in plain words",
+        prompt = "Explain ",
+        icon = Icons.Rounded.MenuBook,
+    ),
+    Suggestion(
+        label = "Brainstorm",
+        hint = "ideas, names, angles",
+        prompt = "Help me brainstorm ideas for ",
+        icon = Icons.Rounded.AutoAwesome,
+    ),
 )
 
 @Composable
-private fun SuggestionChip(label: String, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .heightIn(min = 36.dp)
-            .clip(CircleShape)
-            .background(MiasColors.SurfaceGlass)
-            .border(1.dp, MiasColors.GlassBorder, CircleShape)
+private fun SuggestionCard(
+    suggestion: Suggestion,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .clip(MiasShapes.Card)
+            .background(MiasColors.Surface2)
+            .border(1.dp, MiasColors.OutlineSoft, MiasShapes.Card)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        Icon(
+            imageVector = suggestion.icon,
+            contentDescription = null,
+            tint = MiasColors.Heather,
+            modifier = Modifier.size(20.dp),
+        )
         Text(
-            text = label,
-            style = MiasTypography.LabelMedium,
-            color = MiasColors.TextPrimary,
+            text = suggestion.label,
+            style = MiasTypography.LabelLarge,
+            color = MiasColors.TextHi,
+        )
+        Text(
+            text = suggestion.hint,
+            style = MiasTypography.LabelSmall,
+            color = MiasColors.TextLo,
         )
     }
 }

@@ -1,8 +1,5 @@
-﻿package dev.mias.core.ui.components
+package dev.mias.core.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -19,6 +16,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -34,6 +32,15 @@ import dev.mias.core.ui.theme.MiasColors
 import dev.mias.core.ui.theme.MiasShapes
 import dev.mias.core.ui.theme.MiasTypography
 
+/**
+ * Composer pill for the chat / vision screens.
+ *
+ * - Background: Surface3 with a hairline OutlineSoft border, fully pilled.
+ * - Trailing button morphs:
+ *     blank, idle      → mic (low-emphasis on SurfaceGlass)
+ *     has text, idle   → send (Heather circle, HeatherInk icon)
+ *     processing       → stop (Heather circle, HeatherInk icon)
+ */
 @Composable
 fun MiasInputBar(
     value: String,
@@ -43,16 +50,17 @@ fun MiasInputBar(
     placeholder: String = "Write to Mias",
     enabled: Boolean = true,
     isProcessing: Boolean = false,
+    onStop: (() -> Unit)? = null,
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(MiasShapes.ExtraLarge)
-            .background(MiasColors.SurfaceElevated.copy(alpha = 0.8f))
-            .border(0.5.dp, MiasColors.GlassBorder, MiasShapes.ExtraLarge)
-            .padding(horizontal = 6.dp, vertical = 4.dp),
+            .clip(MiasShapes.Full)
+            .background(MiasColors.Surface3)
+            .border(1.dp, MiasColors.OutlineSoft, MiasShapes.Full)
+            .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
         BasicTextField(
@@ -61,10 +69,10 @@ fun MiasInputBar(
             modifier = Modifier
                 .weight(1f)
                 .heightIn(min = 40.dp, max = 160.dp)
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             enabled = enabled,
-            textStyle = MiasTypography.BodyLarge.copy(color = MiasColors.TextPrimary),
-            cursorBrush = SolidColor(MiasColors.Primary),
+            textStyle = MiasTypography.BodyLarge.copy(color = MiasColors.TextHi),
+            cursorBrush = SolidColor(MiasColors.Heather),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
             keyboardActions = KeyboardActions(
                 onSend = {
@@ -80,7 +88,7 @@ fun MiasInputBar(
                         Text(
                             text = placeholder,
                             style = MiasTypography.BodyLarge,
-                            color = MiasColors.TextTertiary,
+                            color = MiasColors.TextMuted,
                         )
                     }
                     innerTextField()
@@ -88,45 +96,62 @@ fun MiasInputBar(
             },
         )
 
-        AnimatedVisibility(visible = isProcessing) {
-            Box(modifier = Modifier.padding(8.dp)) {
-                ThinkingDots(color = MiasColors.Primary)
-            }
-        }
+        Spacer(modifier = Modifier.width(4.dp))
 
-        AnimatedVisibility(
-            visible = value.isNotBlank() && !isProcessing,
-            enter = fadeIn(),
-            exit = fadeOut(),
-        ) {
-            IconButton(
-                onClick = onSend,
-                enabled = value.isNotBlank() && enabled,
-                modifier = Modifier.size(40.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.Send,
-                    contentDescription = "Send",
-                    tint = MiasColors.Primary,
-                )
-            }
-        }
-
-        AnimatedVisibility(
-            visible = value.isBlank() && !isProcessing,
-            enter = fadeIn(),
-            exit = fadeOut(),
-        ) {
-            IconButton(
-                onClick = { /* Voice input — future */ },
+        // Trailing affordance — stop / send / mic. Only one is visible at a time.
+        when {
+            isProcessing -> AccentCircleButton(
+                icon = Icons.Rounded.Stop,
+                contentDescription = "Stop",
+                onClick = { onStop?.invoke() },
+                enabled = onStop != null,
+            )
+            value.isNotBlank() -> AccentCircleButton(
+                icon = Icons.AutoMirrored.Rounded.Send,
+                contentDescription = "Send",
+                onClick = {
+                    onSend()
+                    keyboardController?.hide()
+                },
+                enabled = enabled,
+            )
+            else -> IconButton(
+                onClick = { /* Voice handled by the screen-level mic button */ },
                 modifier = Modifier.size(40.dp),
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Mic,
                     contentDescription = "Voice",
-                    tint = MiasColors.TextSecondary,
+                    tint = MiasColors.TextLo,
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun AccentCircleButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    enabled: Boolean,
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .size(40.dp)
+            .clip(MiasShapes.Full)
+            .background(
+                if (enabled) MiasColors.Heather
+                else MiasColors.HeatherDim,
+            ),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = MiasColors.HeatherInk,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }

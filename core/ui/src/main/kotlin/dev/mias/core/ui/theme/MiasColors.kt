@@ -1,95 +1,138 @@
-﻿package dev.mias.core.ui.theme
+package dev.mias.core.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
 /**
- * Mias Color System — Modern dark theme with vibrant accents.
+ * Mias Color System — Warm Dim + Heather.
  *
- * Inspired by cutting-edge AI application interfaces with:
- * - Deep space blacks with subtle blue undertones
- * - Vibrant gradient accents for intelligence states
- * - Glassmorphism support with translucent surfaces
- * - Cognition state colors that pulse with energy
+ * "A quiet evening, not a black void." Surfaces are a five-tone ladder of
+ * warm brown-charcoal (hue ~55°, very low chroma). The single accent is
+ * Heather — a dusty mauve that reads intimate and clearly its own (not a
+ * Claude amber clone). Success and error stay palette-aware (muted, never
+ * raw RGB green/red).
+ *
+ * Source of truth: `Color System v1.html` design handoff. Heather and the
+ * surface ladder are locked; deviations should be deliberate.
+ *
+ * Field names are kept stable so older composables that referenced
+ * `MiasColors.Primary` etc. don't need wholesale rewrites — only the
+ * values changed.
  */
 object MiasColors {
 
-    // ── Surface System (Deep Space) ──
-    val Background = Color(0xFF050507)        // Nearly black with subtle blue
-    val Surface = Color(0xFF0C0C12)         // Slightly lighter for elevation
-    val SurfaceElevated = Color(0xFF14141E)   // Cards, dialogs
-    val SurfaceOverlay = Color(0xFF1A1A28)    // Hover states
-    val Card = SurfaceElevated
-    val SurfaceGlass = Color(0x140A0F1F)    // 8% white for glass effect
-    val SurfaceGlassStroke = Color(0x260A0F1F) // 15% white border
-    val SurfaceDim = Color(0xFF030305)
+    // ── Surface ladder (warm brown-charcoal, hue ~55°) ──
+    val Surface0 = Color(0xFF1A1612)            // Scrim, system bars
+    val Surface1 = Color(0xFF231D18)            // App background
+    val Surface2 = Color(0xFF2C2520)            // Cards, list items, inactive composer
+    val Surface3 = Color(0xFF372F29)            // Assistant bubbles, chips, focused field
+    val Surface4 = Color(0xFF463C34)            // Modal sheets, model picker
 
-    // ── Primary (Electric Blue) ──
-    val Primary = Color(0xFF00D4FF)           // Electric cyan-blue
-    val PrimaryLight = Color(0xFF33DDFF)
-    val PrimaryDark = Color(0xFF0099CC)
-    val PrimaryGlow = Color(0x4000D4FF)      // 25% for glow effects
-    val PrimarySurface = Color(0x1A00D4FF)   // 10% primary on surface
+    // Stable aliases for older call sites.
+    val Background = Surface1
+    val Surface = Surface2
+    val SurfaceElevated = Surface3
+    val SurfaceOverlay = Surface4
+    val SurfaceDim = Surface0
+    val Card = Surface3
 
-    // ── Secondary (Vibrant Purple) ──
-    val Secondary = Color(0xFF8B5CF6)
-    val SecondaryLight = Color(0xFFA78BFA)
-    val SecondaryDark = Color(0xFF6D28D9)
-    val SecondaryGlow = Color(0x408B5CF6)
-
-    // ── Cognition State Colors (Energy States) ──
-    val CognitionIdle = Color(0xFF00D4FF)        // Electric blue — ready
-    val CognitionThinking = Color(0xFFA78BFA)    // Purple — processing
-    val CognitionActing = Color(0xFF10B981)       // Emerald — executing
-    val CognitionOffloading = Color(0xFFF59E0B)  // Amber — desktop offload
-    val CognitionStressed = Color(0xFFEF4444)     // Red — thermal stress
-    val CognitionListening = Color(0xFF06B6D4)    // Cyan — voice active
-    val CognitionSpeaking = Color(0xFFEC4899)     // Pink — voice output
-
-    // ── Sentiment Accents ──
-    val SentimentHappy = Color(0xFFFBBF24)
-    val SentimentSad = Color(0xFF60A5FA)
-    val SentimentExcited = Color(0xFFF472B6)
-    val SentimentFrustrated = Color(0xFFF87171)
-    val SentimentNeutral = Color(0xFF94A3B8)
-    val SentimentCurious = Color(0xFF34D399)
-    val SentimentInFlow = Color(0xFF818CF8)
+    // ── Outlines ──
+    val OutlineSoft = Color(0xFF4A3F38)         // Hairline dividers
+    val OutlineStrong = Color(0xFF6B5C50)       // Focus rings, strong dividers
 
     // ── Text ──
-    val TextPrimary = Color(0xFFF8FAFC)        // Nearly white
-    val TextSecondary = Color(0xFF94A3B8)      // Slate-400
-    val TextTertiary = Color(0xFF64748B)        // Slate-500
-    val TextOnPrimary = Color(0xFF050507)
-    val TextAccent = Color(0xFF00D4FF)
+    val TextHi = Color(0xFFEFE5D3)              // Body, titles
+    val TextLo = Color(0xFFA99A86)              // Labels, captions, secondary icons
+    val TextMuted = Color(0xFF7A6D5E)           // Tertiary — timestamps, placeholders
 
-    // ── Gradient Colors ──
-    val GradientStart = Color(0xFF00D4FF)
-    val GradientMid = Color(0xFF8B5CF6)
-    val GradientEnd = Color(0xFFEC4899)
+    // Stable aliases.
+    val TextPrimary = TextHi
+    val TextSecondary = TextLo
+    val TextTertiary = TextMuted
 
-    // ── Thermal System ──
-    val ThermalCool = Color(0xFF10B981)
-    val ThermalWarm = Color(0xFFFBBF24)
-    val ThermalHot = Color(0xFFF87171)
-    val ThermalCritical = Color(0xFFDC2626)
+    // ── Accent: Heather (dusty mauve, OKLCH 0.74 .065 320) ──
+    val Heather = Color(0xFFC5A8C9)
+    val HeatherInk = Color(0xFF2A1F2B)           // Ink on Heather surfaces
+    val HeatherDim = Color(0xFF6B5870)           // Pressed / disabled accent
+    val HeatherContainer = Color(0xFF3A2E3D)     // Low-emphasis accent fills
 
-    // ── Functional ──
-    val Error = Color(0xFFEF4444)
-    val ErrorRed = Error
-    val Warning = Color(0xFFF59E0B)
-    val Success = Color(0xFF10B981)
-    val Info = Color(0xFF3B82F6)
-    val NeonCyan = CognitionListening
+    // Stable aliases.
+    val Primary = Heather
+    val PrimaryDark = HeatherDim
+    val PrimaryLight = Heather                   // No separate light tone yet
+    val PrimaryGlow = Color(0x40C5A8C9)           // 25% Heather for soft glows
+    val PrimarySurface = HeatherContainer
+    val TextOnPrimary = HeatherInk
+    val TextAccent = Heather
 
-    // ── Message Bubbles ──
-    val BubbleUser = Color(0xFF1E3A5F)        // Deep blue bubble
-    val BubbleKid = Color(0xFF14141E)         // Surface matching
-    val BubbleThought = Color(0xFF1E1433)      // Purple tinted
-    val BubbleAction = Color(0xFF142218)        // Green tinted
-    val BubbleError = Color(0xFF1E1414)        // Red tinted
+    // ── Secondary surfaces ──
+    // Use HeatherContainer as the secondary fill — no second accent yet.
+    val Secondary = HeatherContainer
+    val SecondaryLight = HeatherDim
+    val SecondaryDark = HeatherInk
+    val SecondaryGlow = Color(0x40C5A8C9)
 
-    // ── Glass Effects ──
-    val GlassFill = Color(0x0DFFFFFF)          // 5% white
-    val GlassBorder = Color(0x1AFFFFFF)        // 10% white
-    val GlassHighlight = Color(0x26FFFFFF)       // 15% white
-    val GlassShadow = Color(0x80000000)        // Shadow overlay
+    // ── Semantic ──
+    val SuccessTone = Color(0xFFA4D2A9)         // Model loaded, download complete
+    val SuccessInk = Color(0xFF1E2A21)
+    val SuccessContainer = Color(0xFF24382A)
+    val ErrorTone = Color(0xFFE08574)           // OOM, failed generation
+    val ErrorInk = Color(0xFF2A1612)
+    val ErrorContainer = Color(0xFF5C2A20)
+
+    // Stable aliases.
+    val Success = SuccessTone
+    val Error = ErrorTone
+    val ErrorRed = ErrorTone
+    val Warning = Color(0xFFD4B68F)              // Warm cream-honey — palette-aware
+    val Info = Heather
+
+    // ── Cognition states (orb + processing indicators) ──
+    // Palette-aware; no raw RGB greens/reds.
+    val CognitionIdle = Heather
+    val CognitionThinking = Heather
+    val CognitionActing = SuccessTone
+    val CognitionOffloading = Color(0xFFD4B68F)  // Warm honey for offload
+    val CognitionStressed = ErrorTone
+    val CognitionListening = Heather
+    val CognitionSpeaking = Color(0xFFE2C2DA)     // Lighter heather variant
+
+    // ── Sentiment (legacy — kept palette-aware for any lingering callers) ──
+    val SentimentHappy = Color(0xFFD4B68F)
+    val SentimentSad = HeatherDim
+    val SentimentExcited = Color(0xFFE2C2DA)
+    val SentimentFrustrated = ErrorTone
+    val SentimentNeutral = TextLo
+    val SentimentCurious = SuccessTone
+    val SentimentInFlow = Heather
+
+    // ── Thermal indicators ──
+    val ThermalCool = SuccessTone
+    val ThermalWarm = Color(0xFFD4B68F)
+    val ThermalHot = ErrorTone
+    val ThermalCritical = Color(0xFFB3624E)     // Deeper error
+
+    // ── Gradient anchors (used by orb / splash) ──
+    val GradientStart = Heather
+    val GradientMid = HeatherContainer
+    val GradientEnd = SuccessTone
+
+    // ── Glass effects (palette-aware translucents) ──
+    // Old glass used white alpha; replace with warm-cream alpha so the
+    // glass tint stays inside the palette family.
+    val GlassFill = Color(0x0DEFE5D3)            // 5% warm cream
+    val GlassBorder = Color(0x804A3F38)          // 50% outline-soft
+    val GlassHighlight = Color(0x26EFE5D3)        // 15% warm cream
+    val GlassShadow = Color(0x801A1612)         // 50% surface-0
+    val SurfaceGlass = Color(0x14C5A8C9)         // 8% heather tint
+    val SurfaceGlassStroke = OutlineSoft
+
+    // ── Message bubbles ──
+    val BubbleUser = Heather
+    val BubbleKid = Surface3
+    val BubbleThought = HeatherContainer
+    val BubbleAction = SuccessContainer
+    val BubbleError = ErrorContainer
+
+    // Compatibility alias (old code referenced NeonCyan for live indicators).
+    val NeonCyan = SuccessTone
 }

@@ -5,10 +5,12 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.mias.core.common.model.BrainState
 import dev.mias.core.common.model.CognitionState
+import dev.mias.core.data.Conversation
 import dev.mias.core.data.ConversationRepository
 import dev.mias.core.inference.orchestrator.InferenceOrchestrator
 import dev.mias.core.modelhub.manager.ModelManager
 import dev.mias.core.modelhub.model.InstalledModel
+import dev.mias.core.modelhub.model.ModelRole
 import dev.mias.core.thermal.TawsGovernor
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -24,8 +26,17 @@ data class HomeUiState(
     val greeting: String = "Welcome",
     val subtitle: String = "Tap the orb when you're ready to begin",
     val installedModels: List<InstalledModel> = emptyList(),
+    val activeChatModelName: String? = null,
+    val recentConversations: List<RecentChat> = emptyList(),
     val recentConversationCount: Int = 0,
     val isReady: Boolean = false,
+)
+
+data class RecentChat(
+    val id: String,
+    val title: String,
+    val preview: String,
+    val updatedAt: Long,
 )
 
 @HiltViewModel
@@ -40,22 +51,38 @@ class HomeViewModel @Inject constructor(
         orchestrator.brainState,
         orchestrator.cognitionState,
         modelManager.installedModels,
-        conversationRepository.getConversations().map { it.size },
-    ) { brain, cognition, installed, recentCount ->
+        modelManager.roleAssignments,
+        conversationRepository.getConversations(),
+    ) { brain, cognition, installed, assignments, conversations ->
         val ready = installed.isNotEmpty()
+        val activeId = assignments[ModelRole.CHAT]
+        val activeName = installed.firstOrNull { it.id == activeId }?.card?.name
+            ?: installed.firstOrNull { ModelRole.CHAT in it.card.roles }?.card?.name
         HomeUiState(
             brainState = brain,
             cognitionState = cognition,
             greeting = timeBasedGreeting(),
-            subtitle = buildSubtitle(ready, installed.size, recentCount),
+            subtitle = buildSubtitle(ready, installed.size, conversations.size),
             installedModels = installed,
-            recentConversationCount = recentCount,
+            activeChatModelName = activeName,
+            recentConversations = conversations
+                .sortedByDescending { it.updatedAt }
+                .take(3)
+                .map { it.toRecent() },
+            recentConversationCount = conversations.size,
             isReady = ready,
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = HomeUiState(),
+    )
+
+    private fun Conversation.toRecent(): RecentChat = RecentChat(
+        id = id,
+        title = title.ifBlank { "Untitled conversation" },
+        preview = messages.lastOrNull()?.content.orEmpty().take(120),
+        updatedAt = updatedAt,
     )
 
     private fun buildSubtitle(ready: Boolean, installedCount: Int, recentCount: Int): String {

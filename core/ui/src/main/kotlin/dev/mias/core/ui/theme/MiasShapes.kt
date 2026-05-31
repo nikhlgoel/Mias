@@ -34,18 +34,20 @@ object MiasShapes {
     val Chip = Full
 
     // ── Message Bubble Shapes ──
+    // 18dp on the three rounded corners, 6dp on the tail.
+    // User → tail at bottom-end (right). Assistant → tail at bottom-start (left).
     val BubbleUser = RoundedCornerShape(
-        topStart = 20.dp,
-        topEnd = 20.dp,
-        bottomStart = 20.dp,
-        bottomEnd = 4.dp,
+        topStart = 18.dp,
+        topEnd = 18.dp,
+        bottomStart = 18.dp,
+        bottomEnd = 6.dp,
     )
 
     val BubbleKid = RoundedCornerShape(
-        topStart = 20.dp,
-        topEnd = 20.dp,
-        bottomStart = 4.dp,
-        bottomEnd = 20.dp,
+        topStart = 18.dp,
+        topEnd = 18.dp,
+        bottomStart = 6.dp,
+        bottomEnd = 18.dp,
     )
 
     // ── Glass Effects ──

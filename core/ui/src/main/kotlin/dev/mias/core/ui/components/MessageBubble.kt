@@ -1,10 +1,13 @@
-﻿package dev.mias.core.ui.components
+package dev.mias.core.ui.components
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,24 +20,29 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.mias.core.ui.theme.MiasColors
 import dev.mias.core.ui.theme.MiasShapes
 import dev.mias.core.ui.theme.MiasTypography
 
 /**
- * Chat message bubble for the conversation interface.
+ * Chat message bubble.
  *
- * - User messages align right with blue gradient
- * - Mias messages align left with dark surface
- * - Thought steps show in muted purple (ReAct thinking)
- * - Action steps show in green (ReAct tool call)
- * - Error messages show in red-tinted container
+ * Palette-aligned per Color System v1:
+ *  - User bubble: Heather (`primary`), HeatherInk text.
+ *  - Assistant bubble: Surface3 (`surfaceVariant`), TextHi text.
+ *  - Thought / Action: muted surface tints, only shown when the user has
+ *    enabled "Show thinking steps".
+ *
+ * 18dp corners with a 6dp tail on the source side. Streaming responses
+ * render an animated cursor (▍) at the end of text instead of a separate
+ * dot row, matching modern chat conventions.
  */
 @Composable
 fun MessageBubble(
@@ -43,126 +51,63 @@ fun MessageBubble(
     modifier: Modifier = Modifier,
     timestamp: String? = null,
     isStreaming: Boolean = false,
+    assistantLabel: String? = null,
 ) {
-    val alignment = when (type) {
-        BubbleType.USER -> Alignment.CenterEnd
-        else -> Alignment.CenterStart
-    }
+    val alignment = if (type == BubbleType.USER) Alignment.CenterEnd else Alignment.CenterStart
 
     val bubbleShape = when (type) {
         BubbleType.USER -> MiasShapes.BubbleUser
         else -> MiasShapes.BubbleKid
     }
 
-    val (bgBrush, textStyle, textColor) = when (type) {
-        BubbleType.USER -> Triple(
-            Brush.linearGradient(
-                colors = listOf(MiasColors.BubbleUser, MiasColors.BubbleUser.copy(alpha = 0.8f)),
-                start = Offset.Zero,
-                end = Offset(300f, 300f),
-            ),
-            MiasTypography.BodyLarge,
-            MiasColors.TextPrimary,
-        )
-        BubbleType.Mias -> Triple(
-            Brush.linearGradient(
-                colors = listOf(MiasColors.BubbleKid, MiasColors.Surface),
-            ),
-            MiasTypography.BodyLarge,
-            MiasColors.TextPrimary,
-        )
-        BubbleType.THOUGHT -> Triple(
-            Brush.linearGradient(
-                colors = listOf(MiasColors.BubbleThought, MiasColors.BubbleThought.copy(alpha = 0.6f)),
-            ),
-            MiasTypography.Thought,
-            MiasColors.TextTertiary,
-        )
-        BubbleType.ACTION -> Triple(
-            Brush.linearGradient(
-                colors = listOf(MiasColors.BubbleAction, MiasColors.BubbleAction.copy(alpha = 0.6f)),
-            ),
-            MiasTypography.Code,
-            MiasColors.CognitionActing,
-        )
-        BubbleType.ERROR -> Triple(
-            Brush.linearGradient(
-                colors = listOf(MiasColors.BubbleError, MiasColors.BubbleError.copy(alpha = 0.6f)),
-            ),
-            MiasTypography.BodyMedium,
-            MiasColors.Error,
-        )
+    val (background, textColor) = when (type) {
+        BubbleType.USER -> MiasColors.Heather to MiasColors.HeatherInk
+        BubbleType.Mias -> MiasColors.Surface3 to MiasColors.TextHi
+        BubbleType.THOUGHT -> MiasColors.BubbleThought to MiasColors.TextLo
+        BubbleType.ACTION -> MiasColors.BubbleAction to MiasColors.SuccessTone
+        BubbleType.ERROR -> MiasColors.BubbleError to MiasColors.ErrorTone
     }
 
-        Box(
-            modifier = modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            contentAlignment = alignment,
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        contentAlignment = alignment,
+    ) {
+        Column(
+            horizontalAlignment = if (type == BubbleType.USER) Alignment.End else Alignment.Start,
+            modifier = Modifier.widthIn(max = 320.dp),
         ) {
+            if (type != BubbleType.USER && assistantLabel != null) {
+                Text(
+                    text = assistantLabel,
+                    style = MiasTypography.LabelSmall,
+                    color = MiasColors.TextLo,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
+                )
+            }
+
             Column(
                 modifier = Modifier
-                    .widthIn(max = 340.dp)
                     .clip(bubbleShape)
-                    .background(bgBrush)
-                    .border(
-                        width = 1.dp,
-                        color = MiasColors.GlassBorder.copy(alpha = 0.4f),
-                        shape = bubbleShape
-                    )
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                .animateContentSize(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioLowBouncy,
-                        stiffness = Spring.StiffnessLow,
-                    ),
-                ),
-        ) {
-            if (type == BubbleType.THOUGHT) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(MiasShapes.Full)
-                            .background(MiasColors.CognitionThinking),
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    .background(background)
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .animateContentSize(),
+            ) {
+                if (type == BubbleType.THOUGHT || type == BubbleType.ACTION) {
+                    StepLabel(type)
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+
+                if (isStreaming && type == BubbleType.Mias) {
+                    StreamingText(text = text, textColor = textColor)
+                } else {
                     Text(
-                        text = "thinking",
-                        style = MiasTypography.LabelSmall,
-                        color = MiasColors.CognitionThinking.copy(alpha = 0.7f),
+                        text = text,
+                        style = MiasTypography.BodyLarge,
+                        color = textColor,
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-            }
-
-            if (type == BubbleType.ACTION) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(MiasShapes.Full)
-                            .background(MiasColors.CognitionActing),
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "action",
-                        style = MiasTypography.LabelSmall,
-                        color = MiasColors.CognitionActing.copy(alpha = 0.7f),
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-            }
-
-            Text(
-                text = text,
-                style = textStyle,
-                color = textColor,
-            )
-
-            if (isStreaming) {
-                Spacer(modifier = Modifier.height(4.dp))
-                ThinkingDots(color = MiasColors.TextTertiary)
             }
 
             if (timestamp != null) {
@@ -170,11 +115,62 @@ fun MessageBubble(
                 Text(
                     text = timestamp,
                     style = MiasTypography.LabelSmall,
-                    color = MiasColors.TextTertiary,
-                    modifier = Modifier.align(Alignment.End),
+                    color = MiasColors.TextMuted,
+                    modifier = Modifier.padding(horizontal = 6.dp),
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun StepLabel(type: BubbleType) {
+    val (dotColor, label) = when (type) {
+        BubbleType.THOUGHT -> MiasColors.HeatherDim to "thinking"
+        BubbleType.ACTION -> MiasColors.SuccessTone to "action"
+        else -> return
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(MiasShapes.Full)
+                .background(dotColor),
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = label,
+            style = MiasTypography.LabelSmall,
+            color = MiasColors.TextLo,
+        )
+    }
+}
+
+@Composable
+private fun StreamingText(text: String, textColor: Color) {
+    val transition = rememberInfiniteTransition(label = "cursor")
+    val cursorAlpha by transition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 600, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "cursor-alpha",
+    )
+    Row(verticalAlignment = Alignment.Bottom) {
+        Text(
+            text = text,
+            style = MiasTypography.BodyLarge,
+            color = textColor,
+        )
+        Spacer(modifier = Modifier.width(2.dp))
+        Box(
+            modifier = Modifier
+                .alpha(cursorAlpha)
+                .size(width = 8.dp, height = 18.dp)
+                .background(textColor.copy(alpha = 0.85f)),
+        )
     }
 }
 
