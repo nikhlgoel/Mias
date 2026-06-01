@@ -24,6 +24,7 @@ import dev.mias.core.common.MiasResult
 import dev.mias.core.inference.orchestrator.InferenceOrchestrator
 import dev.mias.core.inference.react.ReActStep
 import dev.mias.core.inference.react.ResponseSanitizer
+import dev.mias.core.inference.react.StreamingReActParser
 import dev.mias.core.inference.vision.MediaPipeVisionEngine
 import dev.mias.core.language.IntentExtractor
 import dev.mias.core.modelhub.manager.ModelManager
@@ -221,9 +222,14 @@ class ChatViewModel @Inject constructor(
                 metadata = metadata,
             )
 
-            // Collect the ReAct flow
+            // Collect the ReAct flow. We split the raw JSON stream in real
+            // time into the thinking ("thought") and the visible reply
+            // ("should_say") so the user never sees raw JSON.
             var finalResponse = ""
             var streamingMsgId: String? = null
+            val rawBuffer = StringBuilder()
+            var currentThinkingText = ""
+            var currentVisibleResponse = ""
 
             orchestrator.process(
                 stimulus = stimulus,
@@ -258,16 +264,21 @@ class ChatViewModel @Inject constructor(
                     }
 
                     is ReActStep.Observation -> {
-                        // Observations are internal — not shown
+                        // A tool ran; the agent loops for another turn. Reset the
+                        // streaming buffer so the next turn's thought/should_say
+                        // parse fresh instead of re-matching this turn's text.
+                        rawBuffer.setLength(0)
+                        currentVisibleResponse = ""
                     }
 
                     is ReActStep.FinalAnswer -> {
-                        // Split raw model output: only the clean conversational
-                        // text reaches the bubble, the DB, and Hindsight. The
-                        // reasoning JSON is kept aside so it never re-enters
-                        // the model's context and poisons later turns.
+                        // Finalize: strip any remaining JSON artifacts so only the
+                        // clean reply shows. Prefer the live-streamed thinking;
+                        // fall back to whatever the sanitizer parsed.
                         val sanitized = ResponseSanitizer.sanitize(step.response)
                         finalResponse = sanitized.chatText
+                        val thinking = currentThinkingText.ifBlank { sanitized.reasoningText.orEmpty() }
+                            .ifBlank { null }
                         _messages.update { currentList ->
                             val existingIndex = currentList.indexOfFirst { it.id == streamingMsgId }
                             if (existingIndex >= 0) {
@@ -276,7 +287,7 @@ class ChatViewModel @Inject constructor(
                                     text = sanitized.chatText,
                                     type = BubbleType.Mias,
                                     isStreaming = false,
-                                    reasoning = sanitized.reasoningText,
+                                    reasoning = thinking,
                                 )
                                 updatedList
                             } else {
@@ -286,7 +297,7 @@ class ChatViewModel @Inject constructor(
                                     type = BubbleType.Mias,
                                     timestamp = formatTime(System.currentTimeMillis()),
                                     isStreaming = false,
-                                    reasoning = sanitized.reasoningText,
+                                    reasoning = thinking,
                                 )
                             }
                         }
@@ -307,24 +318,36 @@ class ChatViewModel @Inject constructor(
                     }
 
                     is ReActStep.TokenChunk -> {
+                        // Accumulate the raw stream, then re-derive the live
+                        // thinking + visible split. Only the parsed fields ever
+                        // reach the bubble — never the raw JSON.
+                        rawBuffer.append(step.text)
+                        val parsed = StreamingReActParser.parse(rawBuffer.toString())
+                        currentThinkingText = parsed.thinking
+                        currentVisibleResponse = parsed.visible
+
                         if (streamingMsgId == null) {
                             streamingMsgId = UUID.randomUUID().toString()
-                            val streamMsg = ChatMessage(
-                                id = streamingMsgId!!,
-                                text = step.text,
-                                type = BubbleType.Mias,
-                                timestamp = formatTime(System.currentTimeMillis()),
-                                isStreaming = true,
-                            )
-                            _messages.update { it + streamMsg }
+                            _messages.update {
+                                it + ChatMessage(
+                                    id = streamingMsgId!!,
+                                    text = currentVisibleResponse,
+                                    type = BubbleType.Mias,
+                                    timestamp = formatTime(System.currentTimeMillis()),
+                                    isStreaming = true,
+                                    reasoning = currentThinkingText.ifBlank { null },
+                                )
+                            }
                         } else {
                             _messages.update { currentList ->
-                                val existingIndex = currentList.indexOfFirst { it.id == streamingMsgId }
-                                if (existingIndex >= 0) {
-                                    val updatedList = currentList.toMutableList()
-                                    val oldMsg = updatedList[existingIndex]
-                                    updatedList[existingIndex] = oldMsg.copy(text = oldMsg.text + step.text)
-                                    updatedList
+                                val idx = currentList.indexOfFirst { it.id == streamingMsgId }
+                                if (idx >= 0) {
+                                    val updated = currentList.toMutableList()
+                                    updated[idx] = updated[idx].copy(
+                                        text = currentVisibleResponse,
+                                        reasoning = currentThinkingText.ifBlank { null },
+                                    )
+                                    updated
                                 } else {
                                     currentList
                                 }

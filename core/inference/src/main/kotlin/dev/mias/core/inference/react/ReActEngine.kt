@@ -1,9 +1,12 @@
 ﻿package dev.mias.core.inference.react
 
 import dev.mias.core.common.MiasResult
+import dev.mias.core.common.di.IoDispatcher
 import dev.mias.core.inference.InferenceEngine
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -26,6 +29,7 @@ private fun JsonElement.asPlainString(): String? =
 @Singleton
 class ReActEngine @Inject constructor(
     private val toolRegistry: ToolRegistry,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
     /**
      * Run a full ReAct loop for the given prompt using the provided engine.
@@ -50,17 +54,27 @@ class ReActEngine @Inject constructor(
         if (hindsightContext.isNotBlank()) {
             conversationBuffer.append("\n\n$hindsightContext")
         }
+
+        // List the real tools so the model uses exact action names rather
+        // than free-text phrases (the cause of unroutable actions).
+        val toolCatalogue = toolRegistry.describeForPrompt()
+        if (toolCatalogue.isNotBlank()) {
+            conversationBuffer.append("\n\nAvailable tools:\n$toolCatalogue")
+        }
+
         conversationBuffer.append("\n\nUser: $userPrompt")
         conversationBuffer.append(
             "\n\nRespond with a JSON object: thought (your reasoning), action " +
-                "(a tool name or \"respond_user\"), action_input (an object of " +
-                "arguments for the tool, or {} when none), is_final (true when " +
-                "you are answering the user directly), and should_say (the " +
-                "message to show the user).",
+                "(EXACTLY one of the tool names above, or \"respond_user\" to " +
+                "answer directly), action_input (an object of arguments for the " +
+                "tool, or {} when none), is_final (true only when you are giving " +
+                "the user their final answer), and should_say (the message to " +
+                "show the user).",
         )
 
         var iterations = 0
         var lastThought = ""
+        var lastShouldSay = ""
         var lastObservation = ""
 
         while (iterations < maxIterations) {
@@ -114,6 +128,7 @@ class ReActEngine @Inject constructor(
 
             // Emit the thought
             if (parsed.thought.isNotBlank()) lastThought = parsed.thought
+            parsed.shouldSay?.takeIf { it.isNotBlank() }?.let { lastShouldSay = it }
             emit(ReActStep.Thought(parsed.thought))
 
             // Check if this is a direct response to user
@@ -143,25 +158,37 @@ class ReActEngine @Inject constructor(
             conversationBuffer.append("\n\nContinue reasoning. Respond with JSON.")
         }
 
-        // Max iterations reached — share the partial reasoning rather than
-        // disappearing into silence. The wording stays calm and informative,
-        // not apologetic theatre.
-        val partial = buildString {
-            append("I considered this carefully but couldn't reach a complete answer ")
-            append("in the time available. Here is what I had so far:")
-            if (lastThought.isNotBlank()) append("\n\nLine of thought: $lastThought")
-            if (lastObservation.isNotBlank()) append("\n\nLast finding: $lastObservation")
-        }
-        emit(ReActStep.FinalAnswer(partial))
+        // Loop limit reached without an explicit final turn. Prefer the
+        // model's most recent user-facing text; otherwise share the partial
+        // reasoning rather than disappearing into silence.
+        val fallback = lastShouldSay.takeIf { it.isNotBlank() }
+            ?: buildString {
+                append("I considered this carefully but couldn't reach a complete answer ")
+                append("in the time available. Here is what I had so far:")
+                if (lastThought.isNotBlank()) append("\n\nLine of thought: $lastThought")
+                if (lastObservation.isNotBlank()) append("\n\nLast finding: $lastObservation")
+            }
+        emit(ReActStep.FinalAnswer(fallback))
     }
 
-    private suspend fun executeAction(tool: String, input: Map<String, String>): String {
-        val handler = toolRegistry.get(tool)
-            ?: return "Tool '$tool' not available. Available: ${toolRegistry.availableTools()}"
-        return try {
-            handler.execute(input)
-        } catch (e: Exception) {
-            "Tool error: ${e.message}"
+    /**
+     * Resolve and run a tool. Tool work is dispatched to [ioDispatcher] so a
+     * blocking capability (filesystem, network) never freezes the UI thread.
+     * Resolution is lenient — a phrase like "Respond with the current time"
+     * still maps to the `datetime` tool.
+     */
+    private suspend fun executeAction(action: String, input: Map<String, String>): String {
+        val resolved = toolRegistry.resolve(action)
+            ?: return "Tool '$action' is not available. Use exactly one of: " +
+                "${toolRegistry.availableTools()}, or set action to \"respond_user\"."
+        val handler = toolRegistry.get(resolved)
+            ?: return "Tool '$resolved' is not available."
+        return withContext(ioDispatcher) {
+            try {
+                handler.execute(input)
+            } catch (e: Exception) {
+                "Tool error: ${e.message}"
+            }
         }
     }
 
@@ -229,7 +256,9 @@ class ReActEngine @Inject constructor(
     )
 
     companion object {
-        const val MAX_ITERATIONS = 7
+        // Hard cap on agent turns: initial decision + at most two tool
+        // round-trips. Prevents infinite loops when a tool keeps erroring.
+        const val MAX_ITERATIONS = 3
         const val MAX_TOOL_OUTPUT_LENGTH = 2000
 
         /**

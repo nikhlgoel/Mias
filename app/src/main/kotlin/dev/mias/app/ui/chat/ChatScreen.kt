@@ -171,12 +171,16 @@ fun ChatScreen(
                                 timestamp = message.timestamp,
                                 isStreaming = message.isStreaming,
                                 image = message.image,
+                                reasoning = message.reasoning,
                             )
                         }
                     }
 
-                    // Thinking indicator
-                    if (state.isProcessing) {
+                    // Pre-stream loader only — once a streaming bubble exists,
+                    // its in-bubble "Thinking…" box carries the activity, so we
+                    // don't leave a second loader hanging below the message.
+                    val hasStreamingBubble = state.messages.lastOrNull()?.isStreaming == true
+                    if (state.isProcessing && !hasStreamingBubble) {
                         item {
                             ProcessingIndicator(
                                 cognitionState = state.cognitionState,

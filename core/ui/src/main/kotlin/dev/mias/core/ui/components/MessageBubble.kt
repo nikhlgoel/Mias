@@ -1,15 +1,19 @@
 package dev.mias.core.ui.components
 
 import android.graphics.Bitmap
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,15 +25,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Psychology
+import androidx.compose.material3.Icon
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.mias.core.ui.theme.MiasColors
@@ -58,6 +70,8 @@ fun MessageBubble(
     isStreaming: Boolean = false,
     assistantLabel: String? = null,
     image: Bitmap? = null,
+    /** Parsed reasoning ("thought"); shown in a collapsible box above the reply. */
+    reasoning: String? = null,
 ) {
     val alignment = if (type == BubbleType.USER) Alignment.CenterEnd else Alignment.CenterStart
 
@@ -105,6 +119,13 @@ fun MessageBubble(
                     )
                     .animateContentSize(),
             ) {
+                // Claude-style collapsible "Thinking Process" box at the top
+                // of assistant bubbles whenever reasoning was produced.
+                if (type == BubbleType.Mias && !reasoning.isNullOrBlank()) {
+                    ThinkingProcessBox(reasoning = reasoning, isStreaming = isStreaming)
+                    if (text.isNotBlank()) Spacer(modifier = Modifier.height(8.dp))
+                }
+
                 if (image != null) {
                     Image(
                         bitmap = image.asImageBitmap(),
@@ -123,7 +144,11 @@ fun MessageBubble(
                     Spacer(modifier = Modifier.height(4.dp))
                 }
 
-                if (text.isNotBlank() || isStreaming) {
+                // Show the reply body once there's visible text, or while
+                // streaming when there's no thinking box carrying the activity.
+                val showBody = text.isNotBlank() ||
+                    (isStreaming && reasoning.isNullOrBlank())
+                if (showBody) {
                     val effectiveStartPadding = if (image != null) 8.dp else 0.dp
                     Box(modifier = Modifier.padding(horizontal = effectiveStartPadding)) {
                         if (isStreaming && type == BubbleType.Mias) {
@@ -148,6 +173,84 @@ fun MessageBubble(
                     modifier = Modifier.padding(horizontal = 6.dp),
                 )
             }
+        }
+    }
+}
+
+/**
+ * Collapsible "Thinking Process" panel, Claude-style: a dark, semi-transparent
+ * card with a 2dp accent left border, a brain-icon header with a rotating
+ * chevron, and the reasoning text revealed when expanded. Auto-expands while
+ * the answer is still streaming, then the user can fold it away.
+ */
+@Composable
+private fun ThinkingProcessBox(reasoning: String, isStreaming: Boolean) {
+    // First composition decides the default: live (streaming) messages open
+    // so the user watches it think; reloaded/finished ones start collapsed.
+    var expanded by remember { mutableStateOf(isStreaming) }
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        label = "chevron",
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MiasShapes.Small)
+            .background(MiasColors.Surface0.copy(alpha = 0.6f))
+            .border(
+                width = 1.dp,
+                color = MiasColors.OutlineSoft,
+                shape = MiasShapes.Small,
+            ),
+    ) {
+        // Header — whole row toggles.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // 2dp accent left edge.
+            Box(
+                modifier = Modifier
+                    .width(2.dp)
+                    .height(16.dp)
+                    .clip(MiasShapes.Full)
+                    .background(MiasColors.Heather),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(
+                imageVector = Icons.Rounded.Psychology,
+                contentDescription = null,
+                tint = MiasColors.Heather,
+                modifier = Modifier.size(15.dp),
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = if (isStreaming) "Thinking…" else "Thinking Process",
+                style = MiasTypography.LabelMedium,
+                color = MiasColors.TextLo,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = Icons.Rounded.ExpandMore,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                tint = MiasColors.TextLo,
+                modifier = Modifier
+                    .size(16.dp)
+                    .rotate(chevronRotation),
+            )
+        }
+
+        AnimatedVisibility(visible = expanded) {
+            Text(
+                text = reasoning,
+                style = MiasTypography.BodySmall,
+                color = MiasColors.TextLo,
+                modifier = Modifier.padding(start = 18.dp, end = 10.dp, bottom = 10.dp),
+            )
         }
     }
 }

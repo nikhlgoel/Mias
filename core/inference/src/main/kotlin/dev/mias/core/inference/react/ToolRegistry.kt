@@ -7,17 +7,40 @@ import javax.inject.Singleton
 @Singleton
 class ToolRegistry @Inject constructor() {
 
-    private val tools = mutableMapOf<String, ToolHandler>()
+    private data class Entry(val description: String, val handler: ToolHandler)
 
-    fun register(name: String, handler: ToolHandler) {
-        tools[name] = handler
+    private val tools = mutableMapOf<String, Entry>()
+
+    fun register(name: String, description: String, handler: ToolHandler) {
+        tools[name] = Entry(description, handler)
     }
 
-    fun get(name: String): ToolHandler? = tools[name]
+    /** Back-compat overload (no description). */
+    fun register(name: String, handler: ToolHandler) = register(name, "", handler)
+
+    fun get(name: String): ToolHandler? = tools[name]?.handler
 
     fun availableTools(): List<String> = tools.keys.toList()
 
     fun isRegistered(name: String): Boolean = name in tools
+
+    /** Tool catalogue for the model's prompt, e.g. "- datetime: Get current…". */
+    fun describeForPrompt(): String =
+        tools.entries.joinToString("\n") { (name, e) ->
+            if (e.description.isBlank()) "- $name" else "- $name: ${e.description}"
+        }
+
+    /**
+     * Resolve a model-supplied action to a registered tool name. Handles the
+     * common case where a weak model emits a phrase ("Respond with the current
+     * time") instead of the exact id ("datetime"): exact match first, then a
+     * case-insensitive substring match against known tool names.
+     */
+    fun resolve(action: String): String? {
+        if (action in tools) return action
+        val lower = action.lowercase()
+        return tools.keys.firstOrNull { it.lowercase() in lower }
+    }
 }
 
 /** A single executable tool action. */

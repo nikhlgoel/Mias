@@ -7,6 +7,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
 import dev.mias.app.bootstrap.PreferencesBootstrapper
+import dev.mias.app.bootstrap.ToolBootstrapper
 import dev.mias.core.modelhub.bootstrap.ModelBootstrapper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,11 +27,17 @@ class MiasApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var modelBootstrapper: ModelBootstrapper
 
+    @Inject
+    lateinit var toolBootstrapper: ToolBootstrapper
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
         super.onCreate()
         preferencesBootstrapper.start()
+        // Wire agent capabilities into the ReAct tool registry so the agent
+        // loop can actually execute actions.
+        toolBootstrapper.register()
         // Reassign roles for already-installed models on every cold start.
         // This catches models that were installed before the role-assignment
         // bug was fixed, and any future cases where assignment was skipped.
