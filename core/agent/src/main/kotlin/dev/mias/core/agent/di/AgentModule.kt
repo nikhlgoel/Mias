@@ -13,6 +13,7 @@ import dev.mias.core.agent.capabilities.DateTimeCapability
 import dev.mias.core.agent.capabilities.FileSystemCapability
 import dev.mias.core.agent.capabilities.WebFetchCapability
 import dev.mias.core.agent.capabilities.WebResearchCapability
+import dev.mias.core.agent.capabilities.WebSearchCapability
 import dev.mias.core.agent.capabilities.MediaStoreFileGenerationCapability
 
 /**
@@ -38,6 +39,9 @@ abstract class AgentModule {
 
     @Binds @IntoSet
     abstract fun bindFileSystem(impl: FileSystemCapability): AgentCapability
+
+    @Binds @IntoSet
+    abstract fun bindWebSearch(impl: WebSearchCapability): AgentCapability
 
     @Binds @IntoSet
     abstract fun bindWebFetch(impl: WebFetchCapability): AgentCapability
