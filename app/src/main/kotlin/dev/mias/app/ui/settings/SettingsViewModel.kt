@@ -1,8 +1,10 @@
 package dev.mias.app.ui.settings
 
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.mias.core.agent.storage.StorageAccessManager
 import dev.mias.core.common.model.BrainState
 import dev.mias.core.data.preferences.MiasPreferences
 import dev.mias.core.data.preferences.MiasPrefs
@@ -43,7 +45,13 @@ class SettingsViewModel @Inject constructor(
     private val speechEngine: SpeechEngine,
     private val modelManager: ModelManager,
     private val preferences: MiasPreferences,
+    private val storageAccess: StorageAccessManager,
 ) : ViewModel() {
+
+    /** Current storage reach, recomputed on read (changes after the user grants access). */
+    fun storageAccessSummary(): String = storageAccess.describeAccess()
+    fun hasAllFilesAccess(): Boolean = storageAccess.hasAllFilesAccess()
+    fun allFilesAccessIntent(): Intent? = storageAccess.allFilesAccessSettingsIntent()
 
     private val _speechAutoDetect = MutableStateFlow(true)
 

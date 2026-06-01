@@ -61,6 +61,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val ctxForStorage = androidx.compose.ui.platform.LocalContext.current
 
     Column(
         modifier = modifier
@@ -249,6 +250,22 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // ── Storage access ───────────────────────────────────
+            SectionHeader("Storage access")
+            Spacer(modifier = Modifier.height(8.dp))
+            StorageAccessCard(
+                summary = viewModel.storageAccessSummary(),
+                hasAllFiles = viewModel.hasAllFilesAccess(),
+                onEnable = {
+                    viewModel.allFilesAccessIntent()?.let { intent ->
+                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        runCatching { ctxForStorage.startActivity(intent) }
+                    }
+                },
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             // ── Privacy ──────────────────────────────────────────
             SectionHeader("Privacy")
             Spacer(modifier = Modifier.height(8.dp))
@@ -365,6 +382,44 @@ private fun LangChip(
             style = MiasTypography.LabelMedium,
             color = if (selected) MiasColors.TextPrimary else MiasColors.TextSecondary,
         )
+    }
+}
+
+@Composable
+private fun StorageAccessCard(
+    summary: String,
+    hasAllFiles: Boolean,
+    onEnable: () -> Unit,
+) {
+    GlassCard(accentColor = MiasColors.SurfaceGlass) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = summary,
+                style = MiasTypography.BodySmall,
+                color = MiasColors.TextSecondary,
+            )
+            Text(
+                text = "System files and other apps' data are always off-limits, " +
+                    "even with full access enabled.",
+                style = MiasTypography.LabelSmall,
+                color = MiasColors.TextTertiary,
+            )
+            if (!hasAllFiles) {
+                Box(
+                    modifier = Modifier
+                        .clip(MiasShapes.Card)
+                        .background(MiasColors.Primary.copy(alpha = 0.22f))
+                        .clickable(onClick = onEnable)
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                ) {
+                    Text(
+                        text = "Enable full storage access",
+                        style = MiasTypography.LabelMedium,
+                        color = MiasColors.TextPrimary,
+                    )
+                }
+            }
+        }
     }
 }
 
