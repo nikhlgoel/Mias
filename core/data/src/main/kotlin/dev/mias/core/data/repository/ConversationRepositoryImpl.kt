@@ -1,5 +1,7 @@
 ﻿package dev.mias.core.data.repository
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.mias.core.common.MiasResult
 import dev.mias.core.common.di.IoDispatcher
 import dev.mias.core.common.runCatchingMias
@@ -16,11 +18,13 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class ConversationRepositoryImpl @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val dao: ConversationDao,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ConversationRepository {
@@ -63,7 +67,16 @@ class ConversationRepositoryImpl @Inject constructor(
 
     override suspend fun deleteConversation(id: String): MiasResult<Unit> =
         withContext(ioDispatcher) {
-            runCatchingMias { dao.deleteById(id) }
+            runCatchingMias {
+                dao.deleteById(id)
+                // Drop any image attachments stored on disk for this
+                // conversation. The DB cascade handles message rows; the
+                // file tree we wrote alongside them is our responsibility.
+                val dir = File(context.filesDir, "conversations/$id")
+                if (dir.exists()) {
+                    runCatching { dir.deleteRecursively() }
+                }
+            }
         }
 
     /** Get a reactive stream of messages for a conversation. */
@@ -94,6 +107,7 @@ private fun MessageEntity.toDomain() = Message(
     role = Role.valueOf(role),
     content = content,
     timestamp = timestamp,
+    imagePath = imagePath,
 )
 
 private fun Message.toEntity() = MessageEntity(
@@ -102,4 +116,5 @@ private fun Message.toEntity() = MessageEntity(
     role = role.name,
     content = content,
     timestamp = timestamp,
+    imagePath = imagePath,
 )

@@ -29,6 +29,7 @@ import dev.mias.core.modelhub.manager.ModelManager
 import dev.mias.core.modelhub.model.InstalledModel
 import dev.mias.core.modelhub.model.ModelRole
 import dev.mias.core.ui.components.BubbleType
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -39,6 +40,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -52,6 +54,7 @@ data class ChatMessage(
     val timestamp: String,
     val isStreaming: Boolean = false,
     val image: Bitmap? = null,
+    val imagePath: String? = null,
 )
 
 data class ChatUiState(
@@ -356,6 +359,11 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    fun attachBitmap(bitmap: Bitmap?) {
+        if (bitmap == null) return
+        _attachedImage.value = resizeBitmap(bitmap, MAX_ATTACH_DIM)
+    }
+
     fun clearAttachment() {
         _attachedImage.value = null
     }
@@ -374,8 +382,9 @@ class ChatViewModel @Inject constructor(
 
     private fun sendWithImage(image: Bitmap, prompt: String) {
         val effectivePrompt = prompt.ifBlank { "What's in this image?" }
+        val userMsgId = UUID.randomUUID().toString()
         val userMsg = ChatMessage(
-            id = UUID.randomUUID().toString(),
+            id = userMsgId,
             text = effectivePrompt,
             type = BubbleType.USER,
             timestamp = formatTime(System.currentTimeMillis()),
@@ -387,6 +396,22 @@ class ChatViewModel @Inject constructor(
         _events.tryEmit(ChatEvent.ScrollToBottom)
 
         viewModelScope.launch {
+            // Persist the bitmap off the main thread, then record the path on
+            // the message so saveConversation() picks it up.
+            val savedPath = withContext(Dispatchers.IO) {
+                saveAttachmentToDisk(image, userMsgId)
+            }
+            if (savedPath != null) {
+                _messages.update { list ->
+                    val idx = list.indexOfFirst { it.id == userMsgId }
+                    if (idx >= 0) {
+                        val updated = list.toMutableList()
+                        updated[idx] = updated[idx].copy(imagePath = savedPath)
+                        updated
+                    } else list
+                }
+            }
+
             val visionModel = modelManager.getModelForRole(ModelRole.VISION)
             if (visionModel == null) {
                 _messages.update {
@@ -400,6 +425,7 @@ class ChatViewModel @Inject constructor(
                     )
                 }
                 _events.tryEmit(ChatEvent.ScrollToBottom)
+                saveConversation()
                 return@launch
             }
 
@@ -468,6 +494,8 @@ class ChatViewModel @Inject constructor(
                     text = msg.content,
                     type = if (msg.role == Role.USER) BubbleType.USER else BubbleType.Mias,
                     timestamp = formatTime(msg.timestamp),
+                    image = msg.imagePath?.let { loadAttachmentFromDisk(it) },
+                    imagePath = msg.imagePath,
                 )
             }
         }
@@ -488,6 +516,7 @@ class ChatViewModel @Inject constructor(
                     role = if (msg.type == BubbleType.USER) Role.USER else Role.ASSISTANT,
                     content = msg.text,
                     timestamp = System.currentTimeMillis() - (msgs.size - i) * 1000L,
+                    imagePath = msg.imagePath,
                 )
             },
             createdAt = System.currentTimeMillis(),
@@ -496,6 +525,27 @@ class ChatViewModel @Inject constructor(
         conversationRepository.saveConversation(conversation)
     }
 
+    /**
+     * Persist the attached bitmap as a JPEG under
+     * `${filesDir}/conversations/<convId>/<msgId>.jpg` and return its
+     * absolute path. Returns null on write failure — the message still
+     * goes through, just without disk-backed image persistence.
+     */
+    private fun saveAttachmentToDisk(image: Bitmap, messageId: String): String? = runCatching {
+        val dir = java.io.File(context.filesDir, "conversations/$conversationId").apply { mkdirs() }
+        val file = java.io.File(dir, "$messageId.jpg")
+        java.io.FileOutputStream(file).use { out ->
+            image.compress(Bitmap.CompressFormat.JPEG, ATTACHMENT_QUALITY, out)
+        }
+        file.absolutePath
+    }.getOrNull()
+
+    private fun loadAttachmentFromDisk(path: String): Bitmap? = runCatching {
+        val file = java.io.File(path)
+        if (!file.exists()) return@runCatching null
+        BitmapFactory.decodeFile(file.absolutePath)
+    }.getOrNull()
+
     private fun formatTime(timestamp: Long): String {
         val formatter = SimpleDateFormat("HH:mm", Locale.getDefault())
         return formatter.format(Date(timestamp))
@@ -503,5 +553,6 @@ class ChatViewModel @Inject constructor(
 
     companion object {
         private const val MAX_ATTACH_DIM: Int = 1024
+        private const val ATTACHMENT_QUALITY: Int = 85
     }
 }

@@ -70,6 +70,12 @@ class RoleClassifier @Inject constructor(
     /**
      * Lazy-load the embedding model and embed exemplars. Returns true only
      * when the cache is non-empty and ready to use.
+     *
+     * Distinguishes "no embedding model installed yet" (transient — we'll
+     * retry on the next prompt, so installing Nomic mid-session activates
+     * the classifier) from "model present but failed to load / embed"
+     * (latched off via [loadAttempted] so we don't hammer a broken model
+     * on every message).
      */
     private suspend fun ensureReady(): Boolean {
         if (loadedExemplars.isNotEmpty()) return true
@@ -77,9 +83,14 @@ class RoleClassifier @Inject constructor(
         initLock.withLock {
             if (loadedExemplars.isNotEmpty()) return true
             if (loadAttempted) return false
+
+            // Not installed yet — transient, do NOT latch off.
+            val embeddingModel = modelManager.getModelForRole(ModelRole.EMBEDDING)
+                ?: return false
+
+            // From here on, a failure is a real failure → latch off.
             loadAttempted = true
 
-            val embeddingModel = modelManager.getModelForRole(ModelRole.EMBEDDING) ?: return false
             if (!embeddingEngine.isModelLoaded()) {
                 val load = embeddingEngine.loadModel(embeddingModel.localPath)
                 if (load is MiasResult.Error) return false

@@ -24,4 +24,6 @@ data class MessageEntity(
     val content: String,
     val brainState: String? = null,
     val timestamp: Long,
+    /** Absolute path to an image attached to this message, if any. */
+    val imagePath: String? = null,
 )

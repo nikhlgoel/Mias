@@ -62,6 +62,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.mias.core.modelhub.model.InstalledModel
 import dev.mias.core.ui.theme.MiasShapes
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -69,6 +71,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material.icons.rounded.PhotoLibrary
+import androidx.core.content.ContextCompat
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -184,10 +190,41 @@ fun ChatScreen(
             }
         }
 
-        // ── Image pick launcher ──
+        // ── Attachment launchers ──
+        val ctx = LocalContext.current
         val pickImage = rememberLauncherForActivityResult(
             ActivityResultContracts.PickVisualMedia(),
         ) { uri -> viewModel.attachImage(uri) }
+        val takePhoto = rememberLauncherForActivityResult(
+            ActivityResultContracts.TakePicturePreview(),
+        ) { bitmap -> viewModel.attachBitmap(bitmap) }
+        val requestCameraPermission = rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { granted -> if (granted) takePhoto.launch(null) }
+        var attachSheetOpen by remember { mutableStateOf(false) }
+
+        if (attachSheetOpen) {
+            AttachmentSheet(
+                onDismiss = { attachSheetOpen = false },
+                onPickGallery = {
+                    attachSheetOpen = false
+                    pickImage.launch(
+                        PickVisualMediaRequest(
+                            ActivityResultContracts.PickVisualMedia.ImageOnly,
+                        ),
+                    )
+                },
+                onCapture = {
+                    attachSheetOpen = false
+                    val granted = ContextCompat.checkSelfPermission(
+                        ctx,
+                        Manifest.permission.CAMERA,
+                    ) == PackageManager.PERMISSION_GRANTED
+                    if (granted) takePhoto.launch(null)
+                    else requestCameraPermission.launch(Manifest.permission.CAMERA)
+                },
+            )
+        }
 
         // ── Input Bar ──
         Column(
@@ -216,13 +253,7 @@ fun ChatScreen(
                         isProcessing = state.isProcessing,
                         enabled = !state.isProcessing,
                         onAttach = if (state.hasVisionModel) {
-                            {
-                                pickImage.launch(
-                                    PickVisualMediaRequest(
-                                        ActivityResultContracts.PickVisualMedia.ImageOnly,
-                                    ),
-                                )
-                            }
+                            { attachSheetOpen = true }
                         } else null,
                     )
                 }
@@ -487,6 +518,88 @@ private val SUGGESTIONS = listOf(
         icon = Icons.Rounded.AutoAwesome,
     ),
 )
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AttachmentSheet(
+    onDismiss: () -> Unit,
+    onPickGallery: () -> Unit,
+    onCapture: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MiasColors.Surface4,
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+            Text(
+                text = "Attach an image",
+                style = MiasTypography.LabelLarge,
+                color = MiasColors.TextLo,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            AttachmentOption(
+                icon = Icons.Rounded.PhotoLibrary,
+                label = "Choose from gallery",
+                hint = "Pick any image already on this device",
+                onClick = onPickGallery,
+            )
+            AttachmentOption(
+                icon = Icons.Rounded.PhotoCamera,
+                label = "Take a photo",
+                hint = "Capture with the camera right now",
+                onClick = onCapture,
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+        }
+    }
+}
+
+@Composable
+private fun AttachmentOption(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    hint: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MiasShapes.Card)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(MiasShapes.Full)
+                .background(MiasColors.HeatherContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MiasColors.Heather,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(14.dp))
+        Column {
+            Text(
+                text = label,
+                style = MiasTypography.LabelLarge,
+                color = MiasColors.TextHi,
+            )
+            Text(
+                text = hint,
+                style = MiasTypography.LabelSmall,
+                color = MiasColors.TextLo,
+            )
+        }
+    }
+}
 
 @Composable
 private fun AttachedImageStrip(

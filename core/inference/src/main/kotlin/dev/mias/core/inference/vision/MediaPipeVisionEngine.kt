@@ -122,20 +122,25 @@ class MediaPipeVisionEngine @Inject constructor(
         try {
             session.addImage(BitmapImageBuilder(image).build())
             session.addQueryChunk(prompt)
+            // partial = incremental delta (MediaPipe streams token deltas).
+            // On done we only close the channel; the single session.close()
+            // lives in awaitClose so we never double-close.
             val listener = ProgressListener<String> { partial, done ->
                 trySend(MiasResult.Success(partial))
-                if (done) {
-                    session.close()
-                    close()
-                }
+                if (done) close()
             }
             session.generateResponseAsync(listener)
         } catch (e: Exception) {
-            session.close()
             trySend(MiasResult.Error("Vision inference failed: ${e.message}"))
             close(e)
         }
-        awaitClose { runCatching { session.close() } }
+        awaitClose {
+            // Covers normal completion, error, and collector cancellation
+            // (user left the screen mid-generation). Cancel first so the
+            // native side stops calling the listener before we free it.
+            runCatching { session.cancelGenerateResponseAsync() }
+            runCatching { session.close() }
+        }
     }
 
     private fun newSession(): LlmInferenceSession {

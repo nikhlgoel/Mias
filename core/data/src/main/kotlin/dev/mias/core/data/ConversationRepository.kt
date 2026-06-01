@@ -28,6 +28,7 @@ data class Message(
     val role: Role,
     val content: String,
     val timestamp: Long,
+    val imagePath: String? = null,
 )
 
 enum class Role { USER, ASSISTANT }

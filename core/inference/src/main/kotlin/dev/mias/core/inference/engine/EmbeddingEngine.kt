@@ -4,13 +4,21 @@ import dev.mias.core.common.MiasResult
 import dev.mias.core.common.model.EmbeddingProvider
 import dev.mias.core.common.runCatchingMias
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * High-performance embedding engine wrapping natively compiled llama.cpp.
  *
  * Utilizes JNI to execute GGUF embedding models (like Nomic Embed v2) directly on CPU.
  * Retrieves FloatArrays to be stored in the Hindsight vector database for semantic search.
+ *
+ * Must be `@Singleton`: the underlying llama.cpp embedding context is a single
+ * global native slot, and both [dev.mias.core.data.hindsight.HindsightMemory]
+ * (via [EmbeddingProvider]) and [dev.mias.core.inference.orchestrator.RoleClassifier]
+ * (direct injection) share it. Two instances would diverge on `isLoaded` and
+ * double-load the native model.
  */
+@Singleton
 class EmbeddingEngine @Inject constructor() : EmbeddingProvider {
 
     @Volatile

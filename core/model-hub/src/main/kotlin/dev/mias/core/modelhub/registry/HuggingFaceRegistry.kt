@@ -121,8 +121,11 @@ class HuggingFaceRegistry @Inject constructor(
             ?: return null
         val bestFile = taskFiles.sortedByDescending { it.size ?: 0L }.firstOrNull() ?: return null
         val filename = bestFile.rfilename ?: return null
-        // Task bundles for Gemma 3n are vision-capable.
-        val roles = mutableListOf(ModelRole.VISION, ModelRole.CHAT)
+        // VISION only — these run through MediaPipeVisionEngine. We do NOT
+        // claim CHAT here: the orchestrator's text path uses llama.cpp, which
+        // cannot load a `.task` bundle. Declaring CHAT would let a `.task`
+        // model get assigned to the CHAT role and break every text message.
+        // (Routing text through MediaPipe is a separate, future change.)
         return ModelCard(
             id = hf.id.replace("/", "--"),
             name = hf.id.substringAfter("/"),
@@ -131,7 +134,7 @@ class HuggingFaceRegistry @Inject constructor(
             sizeBytes = bestFile.size ?: 0L,
             quantization = "TASK",
             format = ModelFormat.LITERT,
-            roles = roles,
+            roles = listOf(ModelRole.VISION),
             contextLength = 4096,
             parameterCount = inferParamCount(hf.id),
             downloadUrl = "$HF_BASE/${hf.id}/resolve/main/$filename",
