@@ -108,6 +108,7 @@ private fun MessageEntity.toDomain() = Message(
     content = content,
     timestamp = timestamp,
     imagePath = imagePath,
+    reasoningText = reasoningText,
 )
 
 private fun Message.toEntity() = MessageEntity(
@@ -117,4 +118,5 @@ private fun Message.toEntity() = MessageEntity(
     content = content,
     timestamp = timestamp,
     imagePath = imagePath,
+    reasoningText = reasoningText,
 )

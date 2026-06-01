@@ -23,6 +23,7 @@ import dev.mias.core.data.hindsight.HindsightMemory
 import dev.mias.core.common.MiasResult
 import dev.mias.core.inference.orchestrator.InferenceOrchestrator
 import dev.mias.core.inference.react.ReActStep
+import dev.mias.core.inference.react.ResponseSanitizer
 import dev.mias.core.inference.vision.MediaPipeVisionEngine
 import dev.mias.core.language.IntentExtractor
 import dev.mias.core.modelhub.manager.ModelManager
@@ -30,6 +31,7 @@ import dev.mias.core.modelhub.model.InstalledModel
 import dev.mias.core.modelhub.model.ModelRole
 import dev.mias.core.ui.components.BubbleType
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -55,6 +57,8 @@ data class ChatMessage(
     val isStreaming: Boolean = false,
     val image: Bitmap? = null,
     val imagePath: String? = null,
+    /** Parsed reasoning for an assistant turn. Stored, not replayed to the model. */
+    val reasoning: String? = null,
 )
 
 data class ChatUiState(
@@ -95,6 +99,9 @@ class ChatViewModel @Inject constructor(
     private val _isProcessing = MutableStateFlow(false)
     private val _showReActSteps = MutableStateFlow(false)
     private val _attachedImage = MutableStateFlow<Bitmap?>(null)
+
+    /** The active generation coroutine, so the Stop button can cancel it. */
+    private var inferenceJob: Job? = null
 
     private val _events = MutableSharedFlow<ChatEvent>(extraBufferCapacity = 8)
     val events = _events.asSharedFlow()
@@ -181,7 +188,7 @@ class ChatViewModel @Inject constructor(
         _messages.update { it + userMsg }
         _events.tryEmit(ChatEvent.ScrollToBottom)
 
-        viewModelScope.launch {
+        inferenceJob = viewModelScope.launch {
             // Store fact in Hindsight
             hindsightMemory.storeFact(
                 content = "User said: $cleanedText",
@@ -255,24 +262,31 @@ class ChatViewModel @Inject constructor(
                     }
 
                     is ReActStep.FinalAnswer -> {
-                        finalResponse = step.response
+                        // Split raw model output: only the clean conversational
+                        // text reaches the bubble, the DB, and Hindsight. The
+                        // reasoning JSON is kept aside so it never re-enters
+                        // the model's context and poisons later turns.
+                        val sanitized = ResponseSanitizer.sanitize(step.response)
+                        finalResponse = sanitized.chatText
                         _messages.update { currentList ->
                             val existingIndex = currentList.indexOfFirst { it.id == streamingMsgId }
                             if (existingIndex >= 0) {
                                 val updatedList = currentList.toMutableList()
                                 updatedList[existingIndex] = updatedList[existingIndex].copy(
-                                    text = step.response,
+                                    text = sanitized.chatText,
                                     type = BubbleType.Mias,
-                                    isStreaming = false
+                                    isStreaming = false,
+                                    reasoning = sanitized.reasoningText,
                                 )
                                 updatedList
                             } else {
                                 currentList + ChatMessage(
                                     id = UUID.randomUUID().toString(),
-                                    text = step.response,
+                                    text = sanitized.chatText,
                                     type = BubbleType.Mias,
                                     timestamp = formatTime(System.currentTimeMillis()),
-                                    isStreaming = false
+                                    isStreaming = false,
+                                    reasoning = sanitized.reasoningText,
                                 )
                             }
                         }
@@ -335,6 +349,23 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Stop button. Cancels the active generation coroutine, which cancels the
+     * inference flow — its `awaitClose` flips the native abort flag so the C++
+     * loop breaks within one token. Any partial response stays on screen and
+     * is persisted.
+     */
+    fun stopGeneration() {
+        val job = inferenceJob ?: return
+        inferenceJob = null
+        job.cancel()
+        _isProcessing.value = false
+        _messages.update { list ->
+            list.map { if (it.isStreaming) it.copy(isStreaming = false) else it }
+        }
+        viewModelScope.launch { saveConversation() }
+    }
+
     fun toggleReActSteps() {
         _showReActSteps.update { !it }
     }
@@ -395,7 +426,7 @@ class ChatViewModel @Inject constructor(
         _attachedImage.value = null
         _events.tryEmit(ChatEvent.ScrollToBottom)
 
-        viewModelScope.launch {
+        inferenceJob = viewModelScope.launch {
             // Persist the bitmap off the main thread, then record the path on
             // the message so saveConversation() picks it up.
             val savedPath = withContext(Dispatchers.IO) {
@@ -496,6 +527,7 @@ class ChatViewModel @Inject constructor(
                     timestamp = formatTime(msg.timestamp),
                     image = msg.imagePath?.let { loadAttachmentFromDisk(it) },
                     imagePath = msg.imagePath,
+                    reasoning = msg.reasoningText,
                 )
             }
         }
@@ -517,6 +549,7 @@ class ChatViewModel @Inject constructor(
                     content = msg.text,
                     timestamp = System.currentTimeMillis() - (msgs.size - i) * 1000L,
                     imagePath = msg.imagePath,
+                    reasoningText = msg.reasoning,
                 )
             },
             createdAt = System.currentTimeMillis(),

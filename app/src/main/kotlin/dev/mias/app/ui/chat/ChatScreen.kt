@@ -252,6 +252,7 @@ fun ChatScreen(
                         onSend = viewModel::onSend,
                         isProcessing = state.isProcessing,
                         enabled = !state.isProcessing,
+                        onStop = viewModel::stopGeneration,
                         onAttach = if (state.hasVisionModel) {
                             { attachSheetOpen = true }
                         } else null,

@@ -26,9 +26,12 @@ data class Message(
     val id: String,
     val conversationId: String,
     val role: Role,
+    /** Clean, user-visible text. This is the only field replayed to the model. */
     val content: String,
     val timestamp: Long,
     val imagePath: String? = null,
+    /** Reasoning/thought detail for assistant turns — never fed back to the model. */
+    val reasoningText: String? = null,
 )
 
 enum class Role { USER, ASSISTANT }

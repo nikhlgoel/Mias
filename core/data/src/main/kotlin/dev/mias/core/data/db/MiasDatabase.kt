@@ -22,7 +22,7 @@ import dev.mias.core.data.db.entity.RawFactEntity
         MentalModelEntity::class,
         HindsightUserEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class MiasDatabase : RoomDatabase() {
@@ -37,6 +37,17 @@ abstract class MiasDatabase : RoomDatabase() {
         val MIGRATION_1_2: Migration = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE messages ADD COLUMN imagePath TEXT")
+            }
+        }
+
+        /**
+         * v2 → v3: add `messages.reasoningText` so reasoning/JSON is stored
+         * separately from the clean conversational `content`. Existing rows
+         * get NULL (their `content` is already what was shown).
+         */
+        val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE messages ADD COLUMN reasoningText TEXT")
             }
         }
     }

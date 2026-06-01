@@ -3,6 +3,7 @@
 #include <vector>
 #include <android/log.h>
 #include <mutex>
+#include <atomic>
 
 #include "llama.h"
 
@@ -15,6 +16,37 @@ static llama_model *model = nullptr;
 static llama_context *ctx = nullptr;
 static llama_sampler *sampler = nullptr;
 static std::mutex llama_mutex;
+
+// Cooperative-cancellation flag. Set by nativeStopGeneration() WITHOUT taking
+// llama_mutex (the generation loop holds it for the whole run), and polled by
+// the generation loops each iteration so the stop button can break out
+// instantly mid-inference.
+static std::atomic<bool> g_abort_generation{false};
+
+// Chat-template stop markers. llama_vocab_is_eog only catches tokens the GGUF
+// explicitly tags as end-of-generation; many conversions leave ChatML / Phi
+// control tokens untagged, so they leak into the output as plain text and the
+// model "runs away" — regurgitating its system prompt, templates, and the
+// start of a new turn. We additionally halt the moment any of these appears.
+static const char *const STOP_MARKERS[] = {
+    "<|im_end|>", "<|im_start|>",            // Qwen ChatML
+    "<|end|>", "<|endoftext|>",               // Phi-3.5
+    "<|user|>", "<|system|>", "<|assistant|>", // generic turn boundaries
+    "## Instruction", "## Instructions",        // Phi instruction header
+};
+// Longest marker length — used as the streaming hold-back window so we never
+// emit a partial marker that completes on the next token.
+static const size_t STOP_HOLDBACK = 16;
+
+// Index of the earliest stop marker in `text`, or std::string::npos if none.
+static size_t find_stop_marker(const std::string &text) {
+    size_t earliest = std::string::npos;
+    for (const char *m : STOP_MARKERS) {
+        size_t pos = text.find(m);
+        if (pos != std::string::npos && pos < earliest) earliest = pos;
+    }
+    return earliest;
+}
 
 // Global state (Embedding)
 static llama_model *emb_model = nullptr;
@@ -116,8 +148,13 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerate(JNIEnv *env, j
     }
 
     // 3. Autoregressive loop
+    g_abort_generation.store(false);
     int n_curr = prompt_tokens.size();
     while (n_curr < prompt_tokens.size() + jmax_tokens) {
+        if (g_abort_generation.load()) {
+            break; // Stop button / cancellation.
+        }
+
         llama_token id = llama_sampler_sample(sampler, ctx, -1);
         llama_sampler_accept(sampler, id);
 
@@ -132,6 +169,14 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerate(JNIEnv *env, j
             break;
         }
         response += std::string(buf, n);
+
+        // Halt on any chat-template stop marker that leaked as text, and trim
+        // it (and anything after) from the returned response.
+        size_t stop = find_stop_marker(response);
+        if (stop != std::string::npos) {
+            response.erase(stop);
+            break;
+        }
 
         batch = llama_batch_get_one(&id, 1);
         if (llama_decode(ctx, batch) != 0) {
@@ -194,9 +239,28 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerateStream(JNIEnv *
         return;
     }
 
-    // 3. Streaming loop
+    // Emits a chunk back to the Kotlin callback. Empty chunks are skipped.
+    auto emit = [&](const std::string &chunk) {
+        if (chunk.empty()) return;
+        jstring js = env->NewStringUTF(chunk.c_str());
+        env->CallObjectMethod(jcallback, invokeMethod, js);
+        env->DeleteLocalRef(js);
+    };
+
+    // 3. Streaming loop.
+    // We accumulate the full decoded text and only emit text we're certain is
+    // not part of a stop marker, holding back the last STOP_HOLDBACK chars
+    // until they're confirmed safe (so a marker split across token pieces is
+    // never streamed to the UI).
+    g_abort_generation.store(false);
+    std::string accumulated;
+    size_t emitted = 0;
     int n_curr = prompt_tokens.size();
     while (n_curr < prompt_tokens.size() + jmax_tokens) {
+        if (g_abort_generation.load()) {
+            break; // Stop button / cancellation.
+        }
+
         llama_token id = llama_sampler_sample(sampler, ctx, -1);
         llama_sampler_accept(sampler, id);
 
@@ -207,9 +271,22 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerateStream(JNIEnv *
         char buf[128];
         int n = llama_token_to_piece(vocab, id, buf, sizeof(buf), 0, true);
         if (n >= 0) {
-             jstring jtoken_str = env->NewStringUTF(std::string(buf, n).c_str());
-             env->CallObjectMethod(jcallback, invokeMethod, jtoken_str);
-             env->DeleteLocalRef(jtoken_str);
+            accumulated.append(buf, n);
+
+            // Hard stop on any chat-template marker that leaked as text.
+            size_t stop = find_stop_marker(accumulated);
+            if (stop != std::string::npos) {
+                if (stop > emitted) emit(accumulated.substr(emitted, stop - emitted));
+                emitted = accumulated.size();
+                break;
+            }
+
+            // Emit everything except a possible partial-marker tail.
+            if (accumulated.size() > emitted + STOP_HOLDBACK) {
+                size_t safe_end = accumulated.size() - STOP_HOLDBACK;
+                emit(accumulated.substr(emitted, safe_end - emitted));
+                emitted = safe_end;
+            }
         }
 
         batch = llama_batch_get_one(&id, 1);
@@ -219,7 +296,24 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerateStream(JNIEnv *
         n_curr++;
     }
 
+    // Flush whatever safe text remains (no stop marker was hit), trimming a
+    // trailing marker if one is present in the held-back tail.
+    if (emitted < accumulated.size()) {
+        std::string tail = accumulated.substr(emitted);
+        size_t stop = find_stop_marker(tail);
+        if (stop != std::string::npos) tail.erase(stop);
+        emit(tail);
+    }
+
     env->ReleaseStringUTFChars(jprompt, prompt);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeStopGeneration(JNIEnv *env, jobject thiz) {
+    // Intentionally does NOT acquire llama_mutex: an in-flight generation holds
+    // it for the whole run. Flipping this atomic lets the loop, which polls it
+    // every iteration, break out within one token.
+    g_abort_generation.store(true);
 }
 
 extern "C" JNIEXPORT void JNICALL

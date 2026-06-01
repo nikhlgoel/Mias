@@ -63,10 +63,22 @@ class LlamaCppEngine @Inject constructor() : InferenceEngine {
             }
 
             awaitClose {
-                // If stream gets cancelled mid-flight, we'd theoretically signal the C++ loop.
-                // For now, C++ processes the stream completely.
+                // Cancelling the collector (e.g. the user taps Stop, which
+                // cancels the inference Job) flips the native abort flag so
+                // the in-flight C++ generation loop breaks out within one token
+                // instead of running to completion.
+                runCatching { nativeStopGeneration() }
             }
         }
+
+    /**
+     * Request the active native generation to halt. Safe to call at any time;
+     * it only sets an atomic flag the C++ loop polls. A no-op when nothing is
+     * generating.
+     */
+    fun stopGeneration() {
+        runCatching { nativeStopGeneration() }
+    }
 
     override suspend fun unloadModel(): MiasResult<Unit> = runCatchingMias {
         nativeUnload()
@@ -80,6 +92,7 @@ class LlamaCppEngine @Inject constructor() : InferenceEngine {
     private external fun nativeLoadModel(path: String): Boolean
     private external fun nativeGenerate(prompt: String, maxTokens: Int): String
     private external fun nativeGenerateStream(prompt: String, maxTokens: Int, callback: (String) -> Unit)
+    private external fun nativeStopGeneration()
     private external fun nativeUnload()
 
     companion object {
