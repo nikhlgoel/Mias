@@ -55,7 +55,9 @@ class GoogleAiEdgeEngine(
             }
         }
 
-    override suspend fun generate(prompt: String, maxTokens: Int): MiasResult<String> =
+    // MediaPipe GenAI does not support GBNF grammars; the `grammar` argument
+    // is accepted for interface conformance and ignored.
+    override suspend fun generate(prompt: String, maxTokens: Int, grammar: String?): MiasResult<String> =
         withContext(Dispatchers.IO) {
             runCatchingMias {
                 val inference = requireNotNull(llmInference) {
@@ -65,7 +67,7 @@ class GoogleAiEdgeEngine(
             }
         }
 
-    override fun generateStream(prompt: String, maxTokens: Int): Flow<MiasResult<String>> =
+    override fun generateStream(prompt: String, maxTokens: Int, grammar: String?): Flow<MiasResult<String>> =
         callbackFlow {
             val inference = llmInference
             if (inference == null) {

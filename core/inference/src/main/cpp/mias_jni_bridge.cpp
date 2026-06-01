@@ -48,6 +48,38 @@ static size_t find_stop_marker(const std::string &text) {
     return earliest;
 }
 
+// Builds a fresh sampler chain for one generation. When grammar_str is
+// non-empty and parses, a GBNF grammar constraint is prepended so the model
+// can only emit schema-valid tokens (used for the ReAct/agentic JSON loop).
+// The grammar comes first so it masks the full vocabulary before the
+// probabilistic samplers narrow it. Returns nullptr on allocation failure;
+// the caller owns the chain and frees it with llama_sampler_free.
+//
+// Robustness: llama_sampler_init_grammar returns NULL if the GBNF fails to
+// parse — we log and continue UNCONSTRAINED rather than dereference null, so a
+// malformed grammar (or unexpected unicode in it) never crashes the JNI/C++
+// boundary. The grammar's own `char` rule accepts any non-quote/backslash byte,
+// so multi-byte UTF-8 and \t / \n / \uXXXX escapes pass through safely.
+static llama_sampler *build_local_sampler(const llama_vocab *vocab, const char *grammar_str) {
+    llama_sampler_chain_params sparams = llama_sampler_chain_default_params();
+    llama_sampler *chain = llama_sampler_chain_init(sparams);
+    if (chain == nullptr) return nullptr;
+
+    if (grammar_str != nullptr && grammar_str[0] != '\0') {
+        llama_sampler *gram = llama_sampler_init_grammar(vocab, grammar_str, "root");
+        if (gram != nullptr) {
+            llama_sampler_chain_add(chain, gram);
+        } else {
+            LOGE("GBNF grammar failed to parse; running unconstrained");
+        }
+    }
+    llama_sampler_chain_add(chain, llama_sampler_init_top_k(40));
+    llama_sampler_chain_add(chain, llama_sampler_init_top_p(0.9f, 1));
+    llama_sampler_chain_add(chain, llama_sampler_init_temp(0.7f));
+    llama_sampler_chain_add(chain, llama_sampler_init_dist(1234));
+    return chain;
+}
+
 // Global state (Embedding)
 static llama_model *emb_model = nullptr;
 static llama_context *emb_ctx = nullptr;
@@ -113,9 +145,9 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeLoadModel(JNIEnv *env, 
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerate(JNIEnv *env, jobject thiz, jstring jprompt, jint jmax_tokens) {
+Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerate(JNIEnv *env, jobject thiz, jstring jprompt, jint jmax_tokens, jstring jgrammar) {
     std::lock_guard<std::mutex> lock(llama_mutex);
-    
+
     if (model == nullptr || ctx == nullptr) {
         LOGE("Cannot generate: model not loaded");
         return env->NewStringUTF("");
@@ -127,6 +159,21 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerate(JNIEnv *env, j
         LOGE("Failed to get prompt string");
         return env->NewStringUTF("");
     }
+
+    // Grammar-constrained chain only when a (non-empty) grammar was passed —
+    // i.e. the ReAct/agentic JSON loop. Plain chat passes "" → global sampler.
+    const char *grammar = (jgrammar != nullptr) ? env->GetStringUTFChars(jgrammar, nullptr) : nullptr;
+    bool use_grammar = grammar != nullptr && grammar[0] != '\0';
+    llama_sampler *active_sampler = use_grammar ? build_local_sampler(vocab, grammar) : sampler;
+    if (active_sampler == nullptr) active_sampler = sampler; // build failure → global
+    bool owns_sampler = use_grammar && active_sampler != sampler;
+
+    // Frees the local grammar chain (if any) and releases the grammar string.
+    auto cleanup_grammar = [&]() {
+        if (owns_sampler) llama_sampler_free(active_sampler);
+        if (grammar != nullptr) env->ReleaseStringUTFChars(jgrammar, grammar);
+    };
+
     std::string response = "";
 
     // Very basic generation loop for Phase 1 verification
@@ -135,6 +182,7 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerate(JNIEnv *env, j
     std::vector<llama_token> prompt_tokens(n_prompt);
     if (llama_tokenize(vocab, prompt, strlen(prompt), prompt_tokens.data(), prompt_tokens.size(), true, true) < 0) {
         LOGE("Failed to tokenize prompt");
+        cleanup_grammar();
         env->ReleaseStringUTFChars(jprompt, prompt);
         return env->NewStringUTF("");
     }
@@ -143,6 +191,7 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerate(JNIEnv *env, j
     llama_batch batch = llama_batch_get_one(prompt_tokens.data(), prompt_tokens.size());
     if (llama_decode(ctx, batch) != 0) {
         LOGE("llama_decode failed");
+        cleanup_grammar();
         env->ReleaseStringUTFChars(jprompt, prompt);
         return env->NewStringUTF("");
     }
@@ -155,8 +204,8 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerate(JNIEnv *env, j
             break; // Stop button / cancellation.
         }
 
-        llama_token id = llama_sampler_sample(sampler, ctx, -1);
-        llama_sampler_accept(sampler, id);
+        llama_token id = llama_sampler_sample(active_sampler, ctx, -1);
+        llama_sampler_accept(active_sampler, id);
 
         if (llama_vocab_is_eog(vocab, id)) {
             break;
@@ -186,14 +235,15 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerate(JNIEnv *env, j
         n_curr++;
     }
 
+    cleanup_grammar();
     env->ReleaseStringUTFChars(jprompt, prompt);
     return env->NewStringUTF(response.c_str());
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerateStream(JNIEnv *env, jobject thiz, jstring jprompt, jint jmax_tokens, jobject jcallback) {
+Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerateStream(JNIEnv *env, jobject thiz, jstring jprompt, jint jmax_tokens, jstring jgrammar, jobject jcallback) {
     std::lock_guard<std::mutex> lock(llama_mutex);
-    
+
     if (model == nullptr || ctx == nullptr) {
         LOGE("Cannot stream: model not loaded");
         return;
@@ -205,19 +255,33 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerateStream(JNIEnv *
         LOGE("Failed to get prompt string");
         return;
     }
-    
+
+    // Grammar-constrained chain only when a non-empty grammar was passed (the
+    // ReAct/agentic JSON loop). Plain chat passes "" → global sampler.
+    const char *grammar = (jgrammar != nullptr) ? env->GetStringUTFChars(jgrammar, nullptr) : nullptr;
+    bool use_grammar = grammar != nullptr && grammar[0] != '\0';
+    llama_sampler *active_sampler = use_grammar ? build_local_sampler(vocab, grammar) : sampler;
+    if (active_sampler == nullptr) active_sampler = sampler; // build failure → global
+    bool owns_sampler = use_grammar && active_sampler != sampler;
+    auto cleanup_grammar = [&]() {
+        if (owns_sampler) llama_sampler_free(active_sampler);
+        if (grammar != nullptr) env->ReleaseStringUTFChars(jgrammar, grammar);
+    };
+
     jclass callbackClass = env->GetObjectClass(jcallback);
     if (callbackClass == nullptr) {
         LOGE("Failed to get callback class");
+        cleanup_grammar();
         env->ReleaseStringUTFChars(jprompt, prompt);
         return;
     }
-    
+
     jmethodID invokeMethod = env->GetMethodID(callbackClass, "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;");
     env->DeleteLocalRef(callbackClass); // Release local reference
 
     if (invokeMethod == nullptr) {
         LOGE("Cannot find callback invoke method");
+        cleanup_grammar();
         env->ReleaseStringUTFChars(jprompt, prompt);
         return;
     }
@@ -227,6 +291,7 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerateStream(JNIEnv *
     std::vector<llama_token> prompt_tokens(n_prompt);
     if (llama_tokenize(vocab, prompt, strlen(prompt), prompt_tokens.data(), prompt_tokens.size(), true, true) < 0) {
         LOGE("Failed to tokenize prompt for streaming");
+        cleanup_grammar();
         env->ReleaseStringUTFChars(jprompt, prompt);
         return;
     }
@@ -235,6 +300,7 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerateStream(JNIEnv *
     llama_batch batch = llama_batch_get_one(prompt_tokens.data(), prompt_tokens.size());
     if (llama_decode(ctx, batch) != 0) {
         LOGE("llama_decode failed for streaming prompt");
+        cleanup_grammar();
         env->ReleaseStringUTFChars(jprompt, prompt);
         return;
     }
@@ -261,8 +327,8 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerateStream(JNIEnv *
             break; // Stop button / cancellation.
         }
 
-        llama_token id = llama_sampler_sample(sampler, ctx, -1);
-        llama_sampler_accept(sampler, id);
+        llama_token id = llama_sampler_sample(active_sampler, ctx, -1);
+        llama_sampler_accept(active_sampler, id);
 
         if (llama_vocab_is_eog(vocab, id)) {
             break;
@@ -305,6 +371,7 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerateStream(JNIEnv *
         emit(tail);
     }
 
+    cleanup_grammar();
     env->ReleaseStringUTFChars(jprompt, prompt);
 }
 

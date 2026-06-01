@@ -51,7 +51,10 @@ class ReActEngine @Inject constructor(
             conversationBuffer.append("\n\n$hindsightContext")
         }
         conversationBuffer.append("\n\nUser: $userPrompt")
-        conversationBuffer.append("\n\nRespond with a JSON object containing: thought, action, action_input, is_final")
+        conversationBuffer.append(
+            "\n\nRespond with a JSON object containing: thought, action, " +
+                "action_input, is_final, and should_say (the message to show the user).",
+        )
 
         var iterations = 0
         var lastThought = ""
@@ -66,6 +69,10 @@ class ReActEngine @Inject constructor(
             engine.generateStream(
                 prompt = conversationBuffer.toString(),
                 maxTokens = 1024,
+                // Constrain output to the ReAct JSON schema at the token level.
+                // Small on-device models can't reliably hold JSON from a prompt
+                // alone; the grammar makes invalid output physically impossible.
+                grammar = REACT_GRAMMAR,
             ).collect { result ->
                 when (result) {
                     is MiasResult.Success -> {
@@ -108,7 +115,10 @@ class ReActEngine @Inject constructor(
 
             // Check if this is a direct response to user
             if (parsed.isFinal || parsed.action == "respond_user") {
-                val response = parsed.actionInput["response"]
+                // `should_say` is the grammar's canonical user-facing field;
+                // fall back to legacy action_input fields, then the thought.
+                val response = parsed.shouldSay?.takeIf { it.isNotBlank() }
+                    ?: parsed.actionInput["response"]
                     ?: parsed.actionInput["text"]
                     ?: parsed.thought
                 emit(ReActStep.FinalAnswer(response))
@@ -168,7 +178,9 @@ class ReActEngine @Inject constructor(
                 ?.mapValues { (_, v) -> v.asPlainString().orEmpty() }
                 .orEmpty()
 
-            ParsedReAct(thought, action, actionInput, isFinal)
+            val shouldSay = element["should_say"]?.asPlainString()
+
+            ParsedReAct(thought, action, actionInput, isFinal, shouldSay)
         } catch (_: Exception) {
             null
         }
@@ -201,10 +213,28 @@ class ReActEngine @Inject constructor(
         val action: String,
         val actionInput: Map<String, String>,
         val isFinal: Boolean,
+        val shouldSay: String? = null,
     )
 
     companion object {
         const val MAX_ITERATIONS = 7
         const val MAX_TOOL_OUTPUT_LENGTH = 2000
+
+        /**
+         * GBNF grammar constraining model output to the ReAct JSON schema.
+         * Passed to the native llama.cpp sampler (see [InferenceEngine.generateStream]'s
+         * `grammar` param) so weak on-device models cannot emit malformed JSON.
+         *
+         * `char` accepts any byte except `"`/`\` plus standard JSON escapes
+         * (including `\uXXXX`), so tabs, newlines, and multi-byte UTF-8 in
+         * string values are handled without breaking the constraint.
+         */
+        val REACT_GRAMMAR = """
+            root   ::= object
+            object ::= "{" ws "\"thought\":" ws string "," ws "\"action\":" ws string "," ws "\"action_input\":" ws string "," ws "\"is_final\":" ws ( "true" | "false" ) "," ws "\"should_say\":" ws string ws "}"
+            string ::= "\"" char* "\""
+            char   ::= [^"\\] | "\\" (["\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F])
+            ws     ::= [ \t\n\r]*
+        """.trimIndent()
     }
 }

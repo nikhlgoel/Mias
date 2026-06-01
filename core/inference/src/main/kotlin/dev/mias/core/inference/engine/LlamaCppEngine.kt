@@ -34,15 +34,15 @@ class LlamaCppEngine @Inject constructor() : InferenceEngine {
         isLoaded = true
     }
 
-    override suspend fun generate(prompt: String, maxTokens: Int): MiasResult<String> =
+    override suspend fun generate(prompt: String, maxTokens: Int, grammar: String?): MiasResult<String> =
         withContext(Dispatchers.IO) {
             runCatchingMias {
                 check(isLoaded) { "Model not loaded. Call loadModel() first." }
-                nativeGenerate(prompt, maxTokens)
+                nativeGenerate(prompt, maxTokens, grammar.orEmpty())
             }
         }
 
-    override fun generateStream(prompt: String, maxTokens: Int): Flow<MiasResult<String>> =
+    override fun generateStream(prompt: String, maxTokens: Int, grammar: String?): Flow<MiasResult<String>> =
         callbackFlow {
             if (!isLoaded) {
                 trySend(MiasResult.Error("Model not loaded. Call loadModel() first."))
@@ -56,7 +56,8 @@ class LlamaCppEngine @Inject constructor() : InferenceEngine {
 
             launch(Dispatchers.IO) {
                 try {
-                    nativeGenerateStream(prompt, maxTokens, callback)
+                    // Empty grammar string = unconstrained (native treats "" as none).
+                    nativeGenerateStream(prompt, maxTokens, grammar.orEmpty(), callback)
                 } finally {
                     close()
                 }
@@ -90,8 +91,8 @@ class LlamaCppEngine @Inject constructor() : InferenceEngine {
     // JNI native methods (Implemented in mias_jni_bridge.cpp)
     private external fun nativeInit()
     private external fun nativeLoadModel(path: String): Boolean
-    private external fun nativeGenerate(prompt: String, maxTokens: Int): String
-    private external fun nativeGenerateStream(prompt: String, maxTokens: Int, callback: (String) -> Unit)
+    private external fun nativeGenerate(prompt: String, maxTokens: Int, grammar: String): String
+    private external fun nativeGenerateStream(prompt: String, maxTokens: Int, grammar: String, callback: (String) -> Unit)
     private external fun nativeStopGeneration()
     private external fun nativeUnload()
 

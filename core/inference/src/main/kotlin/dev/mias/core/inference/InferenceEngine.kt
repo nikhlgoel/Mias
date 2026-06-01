@@ -9,8 +9,15 @@ import dev.mias.core.common.MiasResult
  */
 interface InferenceEngine {
     suspend fun loadModel(modelPath: String): MiasResult<Unit>
-    suspend fun generate(prompt: String, maxTokens: Int = 512): MiasResult<String>
-    
+
+    /**
+     * @param grammar Optional GBNF grammar. When non-null, the engine
+     *   constrains generation to tokens matching the grammar (used by the
+     *   ReAct/agentic loop to force valid JSON). Null = unconstrained
+     *   (standard chat). Engines without grammar support ignore it.
+     */
+    suspend fun generate(prompt: String, maxTokens: Int = 512, grammar: String? = null): MiasResult<String>
+
     /**
      * Streams output token by token.
      *
@@ -20,8 +27,14 @@ interface InferenceEngine {
      * deltas should emit the full response as a single chunk.
      *
      * Essential for fast Time-To-First-Token (TTFT) on UI.
+     *
+     * @param grammar Optional GBNF grammar — see [generate].
      */
-    fun generateStream(prompt: String, maxTokens: Int = 512): kotlinx.coroutines.flow.Flow<MiasResult<String>>
+    fun generateStream(
+        prompt: String,
+        maxTokens: Int = 512,
+        grammar: String? = null,
+    ): kotlinx.coroutines.flow.Flow<MiasResult<String>>
 
     suspend fun unloadModel(): MiasResult<Unit>
     fun isModelLoaded(): Boolean
