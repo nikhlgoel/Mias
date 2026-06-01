@@ -52,8 +52,11 @@ class ReActEngine @Inject constructor(
         }
         conversationBuffer.append("\n\nUser: $userPrompt")
         conversationBuffer.append(
-            "\n\nRespond with a JSON object containing: thought, action, " +
-                "action_input, is_final, and should_say (the message to show the user).",
+            "\n\nRespond with a JSON object: thought (your reasoning), action " +
+                "(a tool name or \"respond_user\"), action_input (an object of " +
+                "arguments for the tool, or {} when none), is_final (true when " +
+                "you are answering the user directly), and should_say (the " +
+                "message to show the user).",
         )
 
         var iterations = 0
@@ -174,8 +177,17 @@ class ReActEngine @Inject constructor(
                     ?: e.asPlainString()?.toBooleanStrictOrNull()
             } ?: false
 
+            // action_input is a JSON object of tool arguments. Primitive values
+            // (string/number/bool) come through as their plain content; nested
+            // objects/arrays are kept as compact JSON strings so a tool can
+            // re-parse structured args rather than losing them.
             val actionInput = (element["action_input"] as? JsonObject)
-                ?.mapValues { (_, v) -> v.asPlainString().orEmpty() }
+                ?.mapValues { (_, v) ->
+                    when (v) {
+                        is JsonPrimitive -> v.content
+                        else -> v.toString()
+                    }
+                }
                 .orEmpty()
 
             val shouldSay = element["should_say"]?.asPlainString()
@@ -225,16 +237,28 @@ class ReActEngine @Inject constructor(
          * Passed to the native llama.cpp sampler (see [InferenceEngine.generateStream]'s
          * `grammar` param) so weak on-device models cannot emit malformed JSON.
          *
+         * `action_input` is a full JSON **object** (recursive values: string,
+         * number, boolean, null, array, nested object) so tool calls can carry
+         * real structured arguments — e.g. `{"path":"/a.txt","lines":[1,2]}` —
+         * not just a flat string. Use `{}` when no tool is needed. This is the
+         * standard llama.cpp JSON grammar shape, proven with small models.
+         *
          * `char` accepts any byte except `"`/`\` plus standard JSON escapes
          * (including `\uXXXX`), so tabs, newlines, and multi-byte UTF-8 in
          * string values are handled without breaking the constraint.
          */
         val REACT_GRAMMAR = """
-            root   ::= object
-            object ::= "{" ws "\"thought\":" ws string "," ws "\"action\":" ws string "," ws "\"action_input\":" ws string "," ws "\"is_final\":" ws ( "true" | "false" ) "," ws "\"should_say\":" ws string ws "}"
-            string ::= "\"" char* "\""
-            char   ::= [^"\\] | "\\" (["\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F])
-            ws     ::= [ \t\n\r]*
+            root    ::= object
+            object  ::= "{" ws "\"thought\":" ws string "," ws "\"action\":" ws string "," ws "\"action_input\":" ws args "," ws "\"is_final\":" ws boolean "," ws "\"should_say\":" ws string ws "}"
+            args    ::= "{" ws ( member ( ws "," ws member )* )? ws "}"
+            member  ::= string ws ":" ws value
+            value   ::= string | number | boolean | "null" | array | args
+            array   ::= "[" ws ( value ( ws "," ws value )* )? ws "]"
+            string  ::= "\"" char* "\""
+            char    ::= [^"\\] | "\\" (["\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F])
+            number  ::= "-"? ( "0" | [1-9] [0-9]* ) ( "." [0-9]+ )? ( [eE] [-+]? [0-9]+ )?
+            boolean ::= "true" | "false"
+            ws      ::= [ \t\n\r]*
         """.trimIndent()
     }
 }
