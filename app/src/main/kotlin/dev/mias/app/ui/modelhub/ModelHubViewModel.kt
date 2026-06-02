@@ -25,14 +25,20 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/** Install-status filter tabs shown under the search bar. */
+enum class ModelFilter { ALL, INSTALLED, AVAILABLE }
+
 data class ModelHubUiState(
     val installedModels: List<InstalledModel> = emptyList(),
+    /** Installed models after the search + role filters are applied (for the list). */
+    val displayedInstalled: List<InstalledModel> = emptyList(),
     val catalogItems: List<BrowseItem> = emptyList(),
     val remoteResults: List<ModelCard> = emptyList(),
     val isSearchingRemote: Boolean = false,
     val downloadStates: Map<String, DownloadState> = emptyMap(),
     val activeSearchQuery: String = "",
     val selectedRole: ModelRole? = null,
+    val selectedFilter: ModelFilter = ModelFilter.ALL,
     val searchKind: HuggingFaceRegistry.Kind = HuggingFaceRegistry.Kind.GGUF,
     val statusMessage: String? = null,
     val errorMessage: String? = null,
@@ -48,6 +54,7 @@ class ModelHubViewModel @Inject constructor(
 
     private val _searchQuery = MutableStateFlow("")
     private val _selectedRole = MutableStateFlow<ModelRole?>(null)
+    private val _selectedFilter = MutableStateFlow(ModelFilter.ALL)
     private val _searchKind = MutableStateFlow(HuggingFaceRegistry.Kind.GGUF)
     private val _statusMessage = MutableStateFlow<String?>(null)
     private val _errorMessage = MutableStateFlow<String?>(null)
@@ -94,14 +101,17 @@ class ModelHubViewModel @Inject constructor(
         modelManager.installedModels,
         modelManager.activeDownloads,
         _searchQuery,
-        combine(_selectedRole, _searchKind) { role, kind -> role to kind },
+        combine(_selectedRole, _searchKind, _selectedFilter) { role, kind, filter -> Triple(role, kind, filter) },
         combine(_remoteResults, _isSearchingRemote) { results, loading -> results to loading },
-    ) { installed, downloads, query, roleAndKind, remote ->
-        val (role, kind) = roleAndKind
+    ) { installed, downloads, query, roleKindFilter, remote ->
+        val (role, kind, filter) = roleKindFilter
         val (remoteResults, isSearching) = remote
         val catalog = modelManager.browseCurated()
         ModelHubUiState(
             installedModels = installed,
+            displayedInstalled = installed
+                .filter { role == null || role in it.card.roles }
+                .filter { query.isBlank() || it.card.name.contains(query, ignoreCase = true) },
             catalogItems = catalog
                 .filter { role == null || role in it.card.roles }
                 .filter { query.isBlank() || it.card.name.contains(query, ignoreCase = true) },
@@ -111,6 +121,7 @@ class ModelHubViewModel @Inject constructor(
             downloadStates = downloads,
             activeSearchQuery = query,
             selectedRole = role,
+            selectedFilter = filter,
             searchKind = kind,
             storageUsedBytes = installed.sumOf { it.sizeOnDisk },
         )
@@ -122,6 +133,7 @@ class ModelHubViewModel @Inject constructor(
 
     fun onSearchQuery(query: String) { _searchQuery.value = query }
     fun onRoleFilter(role: ModelRole?) { _selectedRole.value = role }
+    fun onFilterSelected(filter: ModelFilter) { _selectedFilter.value = filter }
     fun onSearchKind(kind: HuggingFaceRegistry.Kind) { _searchKind.value = kind }
 
     fun downloadModel(card: ModelCard) {

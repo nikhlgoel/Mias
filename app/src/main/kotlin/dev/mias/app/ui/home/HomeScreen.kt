@@ -87,6 +87,10 @@ fun HomeScreen(
                     scope.launch { drawerState.close() }
                     onNavigateToChats()
                 },
+                onModels = {
+                    scope.launch { drawerState.close() }
+                    onNavigateToModelHub()
+                },
                 onSettings = {
                     scope.launch { drawerState.close() }
                     onNavigateToSettings()
@@ -106,7 +110,6 @@ fun HomeScreen(
             TopBar(
                 state = state,
                 onOpenDrawer = { scope.launch { drawerState.open() } },
-                onNavigateToModelHub = onNavigateToModelHub,
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -171,6 +174,7 @@ private fun DrawerContent(
     state: HomeUiState,
     onOpenConversation: (String) -> Unit,
     onSeeAllChats: () -> Unit,
+    onModels: () -> Unit,
     onSettings: () -> Unit,
 ) {
     // ModalDrawerSheet would add its own surface color; we control the
@@ -307,28 +311,46 @@ private fun DrawerContent(
             }
         }
 
-        // Bottom — Settings
+        // Bottom — Models + Settings
         HorizontalDivider(color = MiasColors.OutlineSoft, thickness = 1.dp)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onSettings)
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Settings,
-                contentDescription = null,
-                tint = MiasColors.TextLo,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = "Settings",
-                style = MiasTypography.LabelLarge,
-                color = MiasColors.TextLo,
-            )
-        }
+        DrawerNavItem(
+            icon = Icons.Rounded.WorkspacePremium,
+            label = "Models",
+            onClick = onModels,
+        )
+        DrawerNavItem(
+            icon = Icons.Rounded.Settings,
+            label = "Settings",
+            onClick = onSettings,
+        )
+    }
+}
+
+@Composable
+private fun DrawerNavItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MiasColors.TextLo,
+            modifier = Modifier.size(20.dp),
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = label,
+            style = MiasTypography.LabelLarge,
+            color = MiasColors.TextLo,
+        )
     }
 }
 
@@ -380,35 +402,25 @@ private fun DrawerConversationRow(chat: RecentChat, onClick: () -> Unit) {
 private fun TopBar(
     state: HomeUiState,
     onOpenDrawer: () -> Unit,
-    onNavigateToModelHub: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onOpenDrawer) {
-                Icon(
-                    imageVector = Icons.Rounded.Menu,
-                    contentDescription = "Open menu",
-                    tint = MiasColors.TextLo,
-                )
-            }
-            StatusPill(
-                brainState = state.brainState,
-                cognitionState = state.cognitionState,
-            )
-        }
-        IconButton(onClick = onNavigateToModelHub) {
+        IconButton(onClick = onOpenDrawer) {
             Icon(
-                imageVector = Icons.Rounded.WorkspacePremium,
-                contentDescription = "Models",
+                imageVector = Icons.Rounded.Menu,
+                contentDescription = "Open menu",
                 tint = MiasColors.TextLo,
             )
         }
+        StatusPill(
+            brainState = state.brainState,
+            cognitionState = state.cognitionState,
+        )
     }
 }
 

@@ -82,11 +82,14 @@ fun MiasInputBar(
             onValueChange = onValueChange,
             modifier = Modifier
                 .weight(1f)
-                .heightIn(min = 40.dp, max = 160.dp)
+                // Bounded height so the composer auto-grows up to ~5 lines and
+                // then scrolls internally — never expands to fill the screen.
+                .heightIn(min = 40.dp, max = 132.dp)
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             enabled = enabled,
             textStyle = MiasTypography.BodyLarge.copy(color = MiasColors.TextHi),
             cursorBrush = SolidColor(MiasColors.Heather),
+            maxLines = 5,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
             keyboardActions = KeyboardActions(
                 onSend = {

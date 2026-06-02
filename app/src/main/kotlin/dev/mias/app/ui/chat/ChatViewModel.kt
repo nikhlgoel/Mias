@@ -31,6 +31,7 @@ import dev.mias.core.modelhub.manager.ModelManager
 import dev.mias.core.modelhub.model.InstalledModel
 import dev.mias.core.modelhub.model.ModelRole
 import dev.mias.core.ui.components.BubbleType
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -203,8 +204,9 @@ class ChatViewModel @Inject constructor(
             return
         }
 
-        val structuredIntent = intentExtractor.extract(text)
-        val cleanedText = structuredIntent.cleanedText.ifBlank { text }
+        // Intent extraction is best-effort enrichment — never let it crash a send.
+        val structuredIntent = runCatching { intentExtractor.extract(text) }.getOrNull()
+        val cleanedText = structuredIntent?.cleanedText?.ifBlank { text } ?: text
 
         _inputText.value = ""
         _isProcessing.value = true
@@ -227,52 +229,56 @@ class ChatViewModel @Inject constructor(
             // never collide on the single non-reentrant engine.
             pendingTitleJob?.cancelAndJoin()
 
-            // Store fact in Hindsight
-            hindsightMemory.storeFact(
-                content = "User said: $cleanedText",
-                conversationId = conversationId,
-            )
-
-            // Get Hindsight context
-            val hindsightContext = hindsightMemory.query(structuredIntent.cleanedText)
-                .getOrNull()
-                ?.toPromptString()
-                ?: ""
-
-            val systemPrompt = InferenceOrchestrator.DEFAULT_SYSTEM_PROMPT
-
-            val metadata = buildMap<String, String> {
-                put("intent_type", structuredIntent.intentType.value)
-                put("intent_confidence", structuredIntent.confidence.toString())
-                structuredIntent.actionHint?.let { put("action_hint", it) }
-                structuredIntent.modifiers.forEachIndexed { index, tag ->
-                    put("modifier_${index + 1}", tag)
-                }
-                structuredIntent.entities.forEach { (k, v) ->
-                    put("entity_$k", v)
-                }
-            }
-
-            val stimulus = Stimulus(
-                type = StimulusType.USER_MESSAGE,
-                content = cleanedText,
-                metadata = metadata,
-            )
-
             // Collect the ReAct flow. We split the raw JSON stream in real
             // time into the thinking ("thought") and the visible reply
-            // ("should_say") so the user never sees raw JSON.
+            // ("should_say") so the user never sees raw JSON. Declared outside
+            // the try so the catch fallback can recover any readable text.
             var finalResponse = ""
             var streamingMsgId: String? = null
             val rawBuffer = StringBuilder()
             var currentThinkingText = ""
             var currentVisibleResponse = ""
 
-            orchestrator.process(
-                stimulus = stimulus,
-                systemPrompt = systemPrompt,
-                hindsightContext = hindsightContext,
-            ).collect { step ->
+            try {
+                // Store fact in Hindsight
+                hindsightMemory.storeFact(
+                    content = "User said: $cleanedText",
+                    conversationId = conversationId,
+                )
+
+                // Get Hindsight context
+                val hindsightContext = hindsightMemory.query(cleanedText)
+                    .getOrNull()
+                    ?.toPromptString()
+                    ?: ""
+
+                val systemPrompt = InferenceOrchestrator.DEFAULT_SYSTEM_PROMPT
+
+                val metadata = buildMap<String, String> {
+                    structuredIntent?.let { si ->
+                        put("intent_type", si.intentType.value)
+                        put("intent_confidence", si.confidence.toString())
+                        si.actionHint?.let { put("action_hint", it) }
+                        si.modifiers.forEachIndexed { index, tag ->
+                            put("modifier_${index + 1}", tag)
+                        }
+                        si.entities.forEach { (k, v) ->
+                            put("entity_$k", v)
+                        }
+                    }
+                }
+
+                val stimulus = Stimulus(
+                    type = StimulusType.USER_MESSAGE,
+                    content = cleanedText,
+                    metadata = metadata,
+                )
+
+                orchestrator.process(
+                    stimulus = stimulus,
+                    systemPrompt = systemPrompt,
+                    hindsightContext = hindsightContext,
+                ).collect { step ->
                 when (step) {
                     is ReActStep.Thought -> {
                         if (_showReActSteps.value) {
@@ -395,20 +401,53 @@ class ChatViewModel @Inject constructor(
                 }
             }
 
-            // Store Mias's response in Hindsight
-            if (finalResponse.isNotBlank()) {
-                hindsightMemory.storeFact(
-                    content = "Mias responded: $finalResponse",
-                    conversationId = conversationId,
-                )
+                // Store Mias's response in Hindsight
+                if (finalResponse.isNotBlank()) {
+                    hindsightMemory.storeFact(
+                        content = "Mias responded: $finalResponse",
+                        conversationId = conversationId,
+                    )
+                }
+
+                // Persist conversation
+                saveConversation()
+
+                // First completed exchange — kick off a one-shot title pass.
+                maybeGenerateTitle(userText = cleanedText, assistantText = finalResponse)
+            } catch (ce: CancellationException) {
+                // Stop button / new send cancelled this turn — re-throw so the
+                // engine's awaitClose aborts native generation. Never swallow.
+                throw ce
+            } catch (e: Exception) {
+                // Anything else (engine load, parser, IO) must not crash the app.
+                android.util.Log.e("ChatViewModel", "Chat generation failed", e)
+                // Keep whatever readable text was streamed; otherwise apologise.
+                val fallback = currentVisibleResponse
+                    .ifBlank { rawBuffer.toString().trim() }
+                    .ifBlank { "Something went wrong while I was answering. Please try again." }
+                _messages.update { list ->
+                    val idx = list.indexOfFirst { it.id == streamingMsgId }
+                    if (idx >= 0) {
+                        val updated = list.toMutableList()
+                        updated[idx] = updated[idx].copy(
+                            text = fallback,
+                            type = BubbleType.Mias,
+                            isStreaming = false,
+                        )
+                        updated
+                    } else {
+                        list + ChatMessage(
+                            id = UUID.randomUUID().toString(),
+                            text = fallback,
+                            type = BubbleType.Mias,
+                            timestamp = formatTime(System.currentTimeMillis()),
+                        )
+                    }
+                }
+                runCatching { saveConversation() }
+            } finally {
+                _isProcessing.value = false
             }
-
-            // Persist conversation
-            saveConversation()
-            _isProcessing.value = false
-
-            // First completed exchange — kick off a one-shot title pass.
-            maybeGenerateTitle(userText = cleanedText, assistantText = finalResponse)
         }
     }
 
@@ -651,37 +690,48 @@ class ChatViewModel @Inject constructor(
     }
 
     private suspend fun saveConversation() {
-        val msgs = _messages.value
-        if (msgs.isEmpty()) return
+        // Persistence must never crash the chat. Any failure here is logged and
+        // swallowed — losing a save is recoverable; crashing the turn isn't.
+        try {
+            val msgs = _messages.value
+            if (msgs.isEmpty()) return
 
-        // Stable creation time: prefer an already-captured value (loaded or set
-        // on a prior save), otherwise the earliest message, then now. Set once
-        // so it never drifts on subsequent saves.
-        val createdAt = conversationCreatedAt
-            ?: msgs.minOfOrNull { it.createdAtMillis }
-            ?: System.currentTimeMillis()
-        conversationCreatedAt = createdAt
+            // Stable creation time: prefer an already-captured value (loaded or set
+            // on a prior save), otherwise the earliest message, then now. Set once
+            // so it never drifts on subsequent saves.
+            val createdAt = conversationCreatedAt
+                ?: msgs.minOfOrNull { it.createdAtMillis }
+                ?: System.currentTimeMillis()
+            conversationCreatedAt = createdAt
 
-        val conversation = Conversation(
-            id = conversationId,
-            title = _generatedTitle.value
-                ?: msgs.firstOrNull { it.type == BubbleType.USER }?.text?.take(50)
-                ?: "Conversation",
-            messages = msgs.map { msg ->
-                Message(
-                    id = msg.id,
-                    conversationId = conversationId,
-                    role = if (msg.type == BubbleType.USER) Role.USER else Role.ASSISTANT,
-                    content = msg.text,
-                    timestamp = msg.createdAtMillis,
-                    imagePath = msg.imagePath,
-                    reasoningText = msg.reasoning,
-                )
-            },
-            createdAt = createdAt,
-            updatedAt = System.currentTimeMillis(),
-        )
-        conversationRepository.saveConversation(conversation)
+            val conversation = Conversation(
+                id = conversationId,
+                title = _generatedTitle.value
+                    ?: msgs.firstOrNull { it.type == BubbleType.USER }?.text?.take(50)
+                    ?: "Conversation",
+                messages = msgs.map { msg ->
+                    Message(
+                        id = msg.id,
+                        conversationId = conversationId,
+                        role = if (msg.type == BubbleType.USER) Role.USER else Role.ASSISTANT,
+                        content = msg.text,
+                        timestamp = msg.createdAtMillis,
+                        imagePath = msg.imagePath,
+                        reasoningText = msg.reasoning,
+                    )
+                },
+                createdAt = createdAt,
+                updatedAt = System.currentTimeMillis(),
+            )
+            val result = conversationRepository.saveConversation(conversation)
+            if (result is MiasResult.Error) {
+                android.util.Log.e("ChatViewModel", "Failed to save conversation: ${result.message}")
+            }
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (e: Exception) {
+            android.util.Log.e("ChatViewModel", "Failed to save conversation", e)
+        }
     }
 
     /**

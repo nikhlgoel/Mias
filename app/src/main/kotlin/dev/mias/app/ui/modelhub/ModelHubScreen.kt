@@ -1,8 +1,5 @@
 ﻿package dev.mias.app.ui.modelhub
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -52,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -116,26 +114,53 @@ fun ModelHubScreen(
                 }
             }
 
-            // Search bar
+            // Search bar. The field is bound to local TextFieldValue state so the
+            // cursor/selection is preserved on each keystroke — binding directly
+            // to the ViewModel's StateFlow<String> caused the cursor to jump to
+            // index 0 after every character (async round-trip recomposition).
+            // The query string is dispatched to the VM independently for filtering.
+            var searchInput by remember { mutableStateOf(TextFieldValue(state.activeSearchQuery)) }
             GlassCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.Search, null, tint = MiasColors.TextSecondary, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     BasicTextField(
-                        value = state.activeSearchQuery,
-                        onValueChange = viewModel::onSearchQuery,
+                        value = searchInput,
+                        onValueChange = { newValue ->
+                            searchInput = newValue
+                            viewModel.onSearchQuery(newValue.text)
+                        },
                         textStyle = MiasTypography.BodyMedium.copy(color = MiasColors.TextPrimary),
                         cursorBrush = SolidColor(MiasColors.NeonCyan),
+                        singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         decorationBox = { inner ->
-                            if (state.activeSearchQuery.isEmpty()) Text("Search for a model", style = MiasTypography.BodyMedium, color = MiasColors.TextSecondary)
+                            if (searchInput.text.isEmpty()) Text("Search for a model", style = MiasTypography.BodyMedium, color = MiasColors.TextSecondary)
                             inner()
                         },
                     )
                 }
             }
 
-            // Role filter chips
+            // Install-status filter tabs (under the search bar)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterTab("All", state.selectedFilter == ModelFilter.ALL, Modifier.weight(1f)) {
+                    viewModel.onFilterSelected(ModelFilter.ALL)
+                }
+                FilterTab("Installed", state.selectedFilter == ModelFilter.INSTALLED, Modifier.weight(1f)) {
+                    viewModel.onFilterSelected(ModelFilter.INSTALLED)
+                }
+                FilterTab("Available", state.selectedFilter == ModelFilter.AVAILABLE, Modifier.weight(1f)) {
+                    viewModel.onFilterSelected(ModelFilter.AVAILABLE)
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Role (capability) filter chips
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -151,20 +176,43 @@ fun ModelHubScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            // Installed models
             var pendingDeleteId by remember { mutableStateOf<String?>(null) }
             var pendingDeleteName by remember { mutableStateOf("") }
 
-            AnimatedVisibility(visible = state.installedModels.isNotEmpty(), enter = fadeIn(), exit = fadeOut()) {
-                Column {
-                    SectionLabel("Installed")
-                    state.installedModels.forEach { model ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
+            if (pendingDeleteId != null) {
+                AlertDialog(
+                    onDismissRequest = { pendingDeleteId = null },
+                    title = { Text("Remove $pendingDeleteName?") },
+                    text = { Text("This model will be removed from your device. You can download it again at any time.") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            pendingDeleteId?.let(viewModel::deleteModel)
+                            pendingDeleteId = null
+                        }) { Text("Remove") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { pendingDeleteId = null }) { Text("Cancel") }
+                    },
+                )
+            }
+
+            val showInstalled = state.selectedFilter != ModelFilter.AVAILABLE
+            val showAvailable = state.selectedFilter != ModelFilter.INSTALLED
+            // Drop catalog entries already installed so the same model never
+            // appears in both sections — the core clutter this screen had.
+            val availableCatalog = state.catalogItems.filterNot { it.isInstalled }
+
+            // Single LazyColumn renders everything for high-performance scrolling.
+            LazyColumn(
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 80.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars),
+            ) {
+                // ── Installed ──
+                if (showInstalled && state.displayedInstalled.isNotEmpty()) {
+                    item(key = "installed-header") { SectionLabel("Installed") }
+                    items(state.displayedInstalled, key = { "inst-${it.id}" }) { model ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             ModelCard(
                                 modelCard = model.card,
                                 isActive = true,
@@ -186,92 +234,83 @@ fun ModelHubScreen(
                             }
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
-                }
-            }
-
-            if (pendingDeleteId != null) {
-                AlertDialog(
-                    onDismissRequest = { pendingDeleteId = null },
-                    title = { Text("Remove $pendingDeleteName?") },
-                    text = { Text("This model will be removed from your device. You can download it again at any time.") },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            pendingDeleteId?.let(viewModel::deleteModel)
-                            pendingDeleteId = null
-                        }) { Text("Remove") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { pendingDeleteId = null }) { Text("Cancel") }
-                    },
-                )
-            }
-
-            SectionLabel("Available")
-
-            LazyColumn(
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 80.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars),
-            ) {
-                items(state.catalogItems, key = { it.card.id }) { item ->
-                    val dlState = state.downloadStates[item.card.id]
-                    ModelCard(
-                        modelCard = item.card,
-                        downloadState = dlState,
-                        isActive = item.isInstalled,
-                        onAction = {
-                            when {
-                                item.isInstalled -> {}
-                                dlState?.status == DownloadStatus.DOWNLOADING -> viewModel.pauseDownload(item.card.id)
-                                dlState?.status == DownloadStatus.PAUSED -> viewModel.resumeDownload(item.card.id)
-                                else -> viewModel.downloadModel(item.card)
-                            }
-                        },
-                    )
                 }
 
-                if (state.isSearchingRemote) {
-                    item(key = "remote-loading") {
+                if (showInstalled && state.displayedInstalled.isEmpty() &&
+                    state.selectedFilter == ModelFilter.INSTALLED
+                ) {
+                    item(key = "installed-empty") {
                         Text(
-                            text = "Searching Hugging Face…",
+                            text = "No models installed yet. Switch to Available to download one.",
                             style = MiasTypography.LabelSmall,
                             color = MiasColors.TextSecondary,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 12.dp),
                         )
                     }
                 }
 
-                item(key = "kind-filter") {
-                    HuggingFaceKindFilter(
-                        active = state.searchKind,
-                        onPick = viewModel::onSearchKind,
-                    )
-                }
+                // ── Available ──
+                if (showAvailable) {
+                    item(key = "available-header") { SectionLabel("Available") }
 
-                if (state.remoteResults.isNotEmpty()) {
-                    item(key = "remote-header") {
-                        Text(
-                            text = "From Hugging Face",
-                            style = MiasTypography.LabelMedium,
-                            color = MiasColors.TextSecondary,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
-                        )
-                    }
-                    items(state.remoteResults, key = { "hf-${it.id}" }) { card ->
-                        val dlState = state.downloadStates[card.id]
+                    items(availableCatalog, key = { "cat-${it.card.id}" }) { item ->
+                        val dlState = state.downloadStates[item.card.id]
                         ModelCard(
-                            modelCard = card,
+                            modelCard = item.card,
                             downloadState = dlState,
                             isActive = false,
                             onAction = {
                                 when {
-                                    dlState?.status == DownloadStatus.DOWNLOADING -> viewModel.pauseDownload(card.id)
-                                    dlState?.status == DownloadStatus.PAUSED -> viewModel.resumeDownload(card.id)
-                                    else -> viewModel.downloadModel(card)
+                                    dlState?.status == DownloadStatus.DOWNLOADING -> viewModel.pauseDownload(item.card.id)
+                                    dlState?.status == DownloadStatus.PAUSED -> viewModel.resumeDownload(item.card.id)
+                                    else -> viewModel.downloadModel(item.card)
                                 }
                             },
                         )
+                    }
+
+                    if (state.isSearchingRemote) {
+                        item(key = "remote-loading") {
+                            Text(
+                                text = "Searching Hugging Face…",
+                                style = MiasTypography.LabelSmall,
+                                color = MiasColors.TextSecondary,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                            )
+                        }
+                    }
+
+                    item(key = "kind-filter") {
+                        HuggingFaceKindFilter(
+                            active = state.searchKind,
+                            onPick = viewModel::onSearchKind,
+                        )
+                    }
+
+                    if (state.remoteResults.isNotEmpty()) {
+                        item(key = "remote-header") {
+                            Text(
+                                text = "From Hugging Face",
+                                style = MiasTypography.LabelMedium,
+                                color = MiasColors.TextSecondary,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                            )
+                        }
+                        items(state.remoteResults, key = { "hf-${it.id}" }) { card ->
+                            val dlState = state.downloadStates[card.id]
+                            ModelCard(
+                                modelCard = card,
+                                downloadState = dlState,
+                                isActive = false,
+                                onAction = {
+                                    when {
+                                        dlState?.status == DownloadStatus.DOWNLOADING -> viewModel.pauseDownload(card.id)
+                                        dlState?.status == DownloadStatus.PAUSED -> viewModel.resumeDownload(card.id)
+                                        else -> viewModel.downloadModel(card)
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -333,6 +372,35 @@ private fun KindChip(label: String, selected: Boolean, onClick: () -> Unit) {
             text = label,
             style = MiasTypography.LabelMedium,
             color = if (selected) MiasColors.TextHi else MiasColors.TextLo,
+        )
+    }
+}
+
+@Composable
+private fun FilterTab(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .clip(MiasShapes.Full)
+            .background(if (selected) MiasColors.Heather.copy(alpha = 0.18f) else MiasColors.Surface2)
+            .border(
+                1.dp,
+                if (selected) MiasColors.Heather else MiasColors.OutlineSoft,
+                MiasShapes.Full,
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = MiasTypography.LabelMedium,
+            color = if (selected) MiasColors.TextHi else MiasColors.TextSecondary,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         )
     }
 }

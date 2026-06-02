@@ -124,8 +124,14 @@ fun ModelCard(
 
             Spacer(Modifier.height(12.dp))
 
-            // ── Role badges ────────────────────────────────────────────────
+            // ── Spec + role badges ─────────────────────────────────────────
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (modelCard.parameterCount.isNotBlank()) {
+                    SpecBadge(modelCard.parameterCount)
+                }
+                if (modelCard.quantization.isNotBlank()) {
+                    SpecBadge(modelCard.quantization)
+                }
                 modelCard.roles.take(3).forEach { role ->
                     RoleBadge(role)
                 }
@@ -151,6 +157,29 @@ fun ModelCard(
                 }
             }
         }
+    }
+}
+
+/**
+ * Neutral spec badge — model size ("1.5B"), quantization ("Q4_K_M"), etc.
+ * Visually distinct from the colored [RoleBadge] so capability vs. spec
+ * read as separate dimensions.
+ */
+@Composable
+fun SpecBadge(text: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(MiasColors.Surface2)
+            .border(0.5.dp, MiasColors.OutlineSoft, RoundedCornerShape(4.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    ) {
+        Text(
+            text = text,
+            style = MiasTypography.LabelSmall,
+            color = MiasColors.TextSecondary,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 
