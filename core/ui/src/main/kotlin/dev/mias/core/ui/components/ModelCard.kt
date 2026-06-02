@@ -70,7 +70,12 @@ fun ModelCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // Weighted so a long model name can't push the trailing status
+                // indicator off the right edge — the name ellipsizes instead.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f),
+                ) {
                     // Brain icon
                     Box(
                         modifier = Modifier
@@ -89,12 +94,14 @@ fun ModelCard(
 
                     Spacer(Modifier.width(12.dp))
 
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = modelCard.name,
                             style = MiasTypography.LabelLarge,
                             color = MiasColors.TextPrimary,
                             fontWeight = FontWeight.SemiBold,
+                            maxLines = 2,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         )
                         Text(
                             text = "${formatSize(modelCard.sizeBytes)} · ${modelCard.quantization}",
@@ -103,6 +110,8 @@ fun ModelCard(
                         )
                     }
                 }
+
+                Spacer(Modifier.width(8.dp))
 
                 // Active / download indicator
                 if (isActive) {

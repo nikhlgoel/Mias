@@ -31,9 +31,11 @@ class ModelSourcePolicy @Inject constructor() {
             return ModelValidationResult.Rejected("Invalid SHA-256 checksum metadata")
         }
 
-        if (card.sizeBytes <= 0) {
-            return ModelValidationResult.Rejected("Model size is missing")
-        }
+        // Size is metadata, not a safety property. Hugging Face search results
+        // legitimately arrive with size 0 (the /api/models listing omits sibling
+        // sizes); the true byte count comes from the download's Content-Length.
+        // Gating on it made every searched model un-downloadable, so we only
+        // enforce the security-relevant checks above (scheme, host, sha format).
 
         return ModelValidationResult.Accepted
     }

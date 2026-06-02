@@ -75,7 +75,10 @@ class HuggingFaceRegistry @Inject constructor(
     }
 
     private suspend fun resolveCard(repoId: String, kind: Kind = Kind.GGUF): ModelCard? {
-        val infoUrl = "$HF_API_BASE/models/$repoId"
+        // `?blobs=true` expands each sibling with its `size`, which the plain
+        // model endpoint omits. Without it sizeBytes stays 0 and the card shows
+        // "0B" (download still works — Content-Length is read at transfer time).
+        val infoUrl = "$HF_API_BASE/models/$repoId?blobs=true"
         val body: String = httpClient.get(infoUrl) { applyAuth() }.body()
         val hf = json.decodeFromString<HfModelInfo>(body)
 
