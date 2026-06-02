@@ -28,6 +28,8 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material3.DrawerValue
@@ -86,6 +88,14 @@ fun HomeScreen(
                 onSeeAllChats = {
                     scope.launch { drawerState.close() }
                     onNavigateToChats()
+                },
+                onVoice = {
+                    scope.launch { drawerState.close() }
+                    onNavigateToVoice()
+                },
+                onVision = {
+                    scope.launch { drawerState.close() }
+                    onNavigateToVision()
                 },
                 onModels = {
                     scope.launch { drawerState.close() }
@@ -174,6 +184,8 @@ private fun DrawerContent(
     state: HomeUiState,
     onOpenConversation: (String) -> Unit,
     onSeeAllChats: () -> Unit,
+    onVoice: () -> Unit,
+    onVision: () -> Unit,
     onModels: () -> Unit,
     onSettings: () -> Unit,
 ) {
@@ -311,8 +323,18 @@ private fun DrawerContent(
             }
         }
 
-        // Bottom — Models + Settings
+        // Bottom — quick destinations + Settings
         HorizontalDivider(color = MiasColors.OutlineSoft, thickness = 1.dp)
+        DrawerNavItem(
+            icon = Icons.Rounded.Mic,
+            label = "Voice chat",
+            onClick = onVoice,
+        )
+        DrawerNavItem(
+            icon = Icons.Rounded.PhotoCamera,
+            label = "Visual chat",
+            onClick = onVision,
+        )
         DrawerNavItem(
             icon = Icons.Rounded.WorkspacePremium,
             label = "Models",

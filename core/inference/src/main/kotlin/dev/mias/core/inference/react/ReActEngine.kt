@@ -63,14 +63,23 @@ class ReActEngine @Inject constructor(
         }
 
         conversationBuffer.append("\n\nUser: $userPrompt")
-        conversationBuffer.append(
-            "\n\nRespond with a JSON object: thought (your reasoning), action " +
-                "(EXACTLY one of the tool names above, or \"respond_user\" to " +
-                "answer directly), action_input (an object of arguments for the " +
-                "tool, or {} when none), is_final (true only when you are giving " +
-                "the user their final answer), and should_say (the message to " +
-                "show the user).",
-        )
+        // Plain-text-first contract. The previous version forced every reply
+        // through a GBNF-constrained JSON schema, which made grammar-masked
+        // sampling crawl on mobile CPUs (effectively "stuck thinking") and hid
+        // the answer until the trailing should_say field. Now the model answers
+        // normally and only emits JSON when it actually needs a tool.
+        if (toolCatalogue.isNotBlank()) {
+            conversationBuffer.append(
+                "\n\nReply directly in plain, natural language. Only if you " +
+                    "genuinely need one of the tools above, instead output a single " +
+                    "JSON object: {\"thought\":\"<why>\",\"action\":\"<exact tool " +
+                    "name>\",\"action_input\":{...},\"is_final\":false,\"should_say\":" +
+                    "\"<short note to the user>\"}.",
+            )
+        } else {
+            conversationBuffer.append("\n\nReply directly in plain, natural language.")
+        }
+        conversationBuffer.append("\n\nAssistant:")
 
         var iterations = 0
         var lastThought = ""
@@ -86,14 +95,13 @@ class ReActEngine @Inject constructor(
             engine.generateStream(
                 prompt = conversationBuffer.toString(),
                 // Capped per turn so a slow on-device CPU can't grind through a
-                // 1024-token response before the user sees anything. ~512 is a
-                // full conversational reply; the worst-case wait is roughly
-                // halved on phones with no GPU/NPU offload.
+                // 1024-token response before the user sees anything.
                 maxTokens = MAX_RESPONSE_TOKENS,
-                // Constrain output to the ReAct JSON schema at the token level.
-                // Small on-device models can't reliably hold JSON from a prompt
-                // alone; the grammar makes invalid output physically impossible.
-                grammar = REACT_GRAMMAR,
+                // No GBNF grammar: token-level JSON masking made sampling
+                // pathologically slow on mobile CPUs. The lenient parser
+                // (StreamingReActParser / parseReActOutput) handles both plain
+                // prose and the optional tool-call JSON instead.
+                grammar = null,
             ).collect { result ->
                 when (result) {
                     is MiasResult.Success -> {

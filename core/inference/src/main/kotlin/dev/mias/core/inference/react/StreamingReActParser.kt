@@ -29,7 +29,18 @@ object StreamingReActParser {
 
     fun parse(buffer: String): StreamState {
         val thinking = THOUGHT.find(buffer)?.groupValues?.getOrNull(1)?.let { unescape(it) }.orEmpty()
-        val visible = SHOULD_SAY.find(buffer)?.groupValues?.getOrNull(1)?.let { unescape(it) }.orEmpty()
+        val say = SHOULD_SAY.find(buffer)?.groupValues?.getOrNull(1)?.let { unescape(it) }
+
+        val visible = when {
+            // JSON tool-call form: surface should_say once it appears.
+            say != null -> say
+            // A JSON object is still forming (tool call) — don't leak braces;
+            // the thought (if any) carries the activity until should_say lands.
+            buffer.trimStart().startsWith("{") -> ""
+            // Plain-language reply (the common case now that grammar is off):
+            // stream the text straight through.
+            else -> buffer
+        }
         return StreamState(thinking = thinking.trim(), visible = visible)
     }
 

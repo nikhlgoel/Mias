@@ -39,7 +39,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Memory
-import androidx.compose.material.icons.rounded.MenuBook
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Today
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -534,7 +534,7 @@ private val SUGGESTIONS = listOf(
         label = "Explain",
         hint = "a concept in plain words",
         prompt = "Explain ",
-        icon = Icons.Rounded.MenuBook,
+        icon = Icons.AutoMirrored.Rounded.MenuBook,
     ),
     Suggestion(
         label = "Brainstorm",
