@@ -2,6 +2,7 @@
 
 import android.content.Context
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
+import com.google.mediapipe.tasks.genai.llminference.LlmInferenceSession
 import dev.mias.core.common.MiasResult
 import dev.mias.core.common.runCatchingMias
 import dev.mias.core.inference.InferenceEngine
@@ -9,7 +10,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -76,18 +76,45 @@ class GoogleAiEdgeEngine(
                 return@callbackFlow
             }
 
-            launch(Dispatchers.IO) {
-                try {
-                    trySend(MiasResult.Success(inference.generateResponse(prompt)))
-                } catch (e: Exception) {
-                    trySend(MiasResult.Error("AI Edge inference failed: ${e.message}"))
-                } finally {
-                    close()
+            // A per-request session gives both true token streaming and a real
+            // cancellation handle. The previous blocking generateResponse() call
+            // ignored cancellation entirely — the Stop button changed the UI but
+            // the NPU kept running to completion. cancelGenerateResponseAsync()
+            // halts the in-flight run so those cycles are actually freed.
+            val sessionOptions = LlmInferenceSession.LlmInferenceSessionOptions.builder()
+                .setTopK(40)
+                .setTopP(0.9f)
+                .setTemperature(0.7f)
+                .build()
+
+            val session = try {
+                LlmInferenceSession.createFromOptions(inference, sessionOptions)
+            } catch (e: Exception) {
+                trySend(MiasResult.Error("AI Edge session failed: ${e.message}"))
+                close()
+                return@callbackFlow
+            }
+
+            try {
+                session.addQueryChunk(prompt)
+                // ProgressListener.run(partial, done): each partial is an
+                // incremental delta, matching the generateStream contract.
+                session.generateResponseAsync { partial, done ->
+                    trySend(MiasResult.Success(partial))
+                    if (done) close()
                 }
+            } catch (e: Exception) {
+                trySend(MiasResult.Error("AI Edge inference failed: ${e.message}"))
+                close()
             }
 
             awaitClose {
-                // Stream cancelled — no cleanup needed as LlmInference handles its own lifecycle
+                // Stop button / collector cancellation: halt generation, then
+                // release the session so the native context is freed without a
+                // JNI pointer leak. Guarded so a normal completion (already
+                // closed) doesn't throw on double-close.
+                runCatching { session.cancelGenerateResponseAsync() }
+                runCatching { session.close() }
             }
         }
 
