@@ -1,193 +1,105 @@
-﻿package dev.mias.core.ui.components
+package dev.mias.core.ui.components
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import dev.mias.core.speech.SpeechState
+import dev.mias.core.ui.theme.MiasColors
 
 /**
- * Speech-to-Text Button for ChatScreen
- * Shows real-time feedback while recording
+ * Circular mic button for the chat input row.
+ *
+ * Fixed 40×40 dp — matches [MiasInputBar]'s minimum height so the
+ * surrounding Row(verticalAlignment = Alignment.Bottom) is always stable.
+ *
+ * State is expressed purely through animated color + a graphicsLayer pulse.
+ * graphicsLayer transforms are graphics-only and do not trigger a layout
+ * remeasurement pass, so transcription updates and state changes cannot
+ * cause infinite measure loops or layout jitter.
+ *
+ * Transcription text is intentionally absent here. It writes exclusively to
+ * the input field via ChatScreen's LaunchedEffect → applyTranscription.
+ * Rendering it here too was the source of the duplicate-text layout bug.
  */
 @Composable
 fun SpeechButton(
     state: SpeechState,
-    confidence: Float,
     onStartListening: () -> Unit,
     onStopListening: () -> Unit,
-    transcription: String = "",
     modifier: Modifier = Modifier,
 ) {
-    val isListening = state == SpeechState.LISTENING
-    val isProcessing = state == SpeechState.PROCESSING
-    
-    val backgroundColor = when {
-        isListening -> Color(0xFFFF6B6B) // Red for active recording
-        isProcessing -> Color(0xFF4ECDC4) // Teal for processing
-        state == SpeechState.SUCCESS -> Color(0xFF51CF66) // Green for success
-        state == SpeechState.ERROR -> Color(0xFFFFB347) // Orange for error
-        else -> MaterialTheme.colorScheme.primary
-    }
-    
-    val scale = animateDpAsState(
-        targetValue = if (isListening) 32.dp else 28.dp,
-    )
-    
-    val pulseScale = remember { 
-        androidx.compose.animation.core.Animatable(1f)
-    }
-    
-    // Pulsing animation when recording
-    if (isListening) {
-        androidx.compose.runtime.LaunchedEffect(Unit) {
-            while (true) {
-                pulseScale.animateTo(1.15f, animationSpec = androidx.compose.animation.core.tween(500))
-                pulseScale.animateTo(1f, animationSpec = androidx.compose.animation.core.tween(500))
-            }
-        }
-    }
-    
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        // Main button with pulse effect
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .scale(pulseScale.value)
-                .background(
-                    color = backgroundColor,
-                    shape = CircleShape,
-                )
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {
-                        if (isListening || isProcessing) {
-                            onStopListening()
-                        } else {
-                            onStartListening()
-                        }
-                    },
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = if (isListening) Icons.Filled.Mic else Icons.Filled.MicOff,
-                contentDescription = if (isListening) "🎤 Stop Recording" else "🎤 Start Recording",
-                tint = Color.White,
-                modifier = Modifier.size(24.dp),
-            )
-        }
-        
-        // Show status text
-        if (isListening) {
-            Spacer(modifier = Modifier.size(8.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                // Animated dots
-                repeat(3) { index ->
-                    Box(
-                        modifier = Modifier
-                            .size(4.dp)
-                            .background(Color(0xFFFF6B6B), CircleShape),
-                    )
-                    if (index < 2) Spacer(modifier = Modifier.width(4.dp))
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    "Listening...",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFFFF6B6B),
-                )
-            }
-        }
-        
-        // Show confidence when recording
-        if (isListening && confidence > 0f) {
-            Spacer(modifier = Modifier.size(4.dp))
-            Text(
-                "Confidence: ${String.format("%.0f%%", confidence * 100)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.outline,
-            )
-        }
-        
-        // Show transcription preview
-        if (transcription.isNotEmpty() && !isListening) {
-            Spacer(modifier = Modifier.size(8.dp))
-            Text(
-                "\"$transcription\"",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-    }
-}
+    val isActive = state == SpeechState.LISTENING || state == SpeechState.PROCESSING
 
-/**
- * Floating Action Button variant for speech
- */
-@Composable
-fun SpeechFAB(
-    state: SpeechState,
-    confidence: Float,
-    onStartListening: () -> Unit,
-    onStopListening: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val isListening = state == SpeechState.LISTENING
-    
-    val backgroundColor = animateColorAsState(
-        targetValue = if (isListening) Color(0xFFFF6B6B) else MaterialTheme.colorScheme.primary,
+    val bgColor by animateColorAsState(
+        targetValue = when (state) {
+            SpeechState.LISTENING         -> MiasColors.ErrorTone       // warm red — clearly recording
+            SpeechState.PROCESSING        -> MiasColors.HeatherDim      // muted mauve — working
+            SpeechState.SUCCESS           -> MiasColors.SuccessTone     // brief green flash
+            SpeechState.ERROR,
+            SpeechState.PERMISSION_DENIED -> MiasColors.ErrorContainer
+            else                          -> MiasColors.Surface3        // IDLE
+        },
+        label = "micBg",
     )
-    
+
+    val iconTint by animateColorAsState(
+        targetValue = if (isActive) MiasColors.Surface0 else MiasColors.TextLo,
+        label = "micIcon",
+    )
+
+    // Pulse is applied via graphicsLayer so it never changes the measured size,
+    // preventing the layout thrashing the old Column approach caused.
+    val pulse = remember { Animatable(1f) }
+    LaunchedEffect(isActive) {
+        if (isActive) {
+            while (true) {
+                pulse.animateTo(1.14f, tween(550))
+                pulse.animateTo(1f, tween(550))
+            }
+        } else {
+            pulse.animateTo(1f, tween(180))
+        }
+    }
+
     Box(
         modifier = modifier
-            .size(64.dp)
-            .background(
-                color = backgroundColor.value,
-                shape = CircleShape,
-            )
-            .clickable {
-                if (isListening) {
-                    onStopListening()
-                } else {
-                    onStartListening()
-                }
-            },
+            .size(40.dp)
+            .graphicsLayer {
+                scaleX = pulse.value
+                scaleY = pulse.value
+            }
+            .clip(CircleShape)
+            .background(bgColor)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = { if (isActive) onStopListening() else onStartListening() },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = if (isListening) Icons.Filled.Mic else Icons.Filled.MicOff,
-            contentDescription = "Speech-to-Text",
-            tint = Color.White,
-            modifier = Modifier.size(28.dp),
+            imageVector = Icons.Rounded.Mic,
+            contentDescription = if (isActive) "Stop recording" else "Start recording",
+            tint = iconTint,
+            modifier = Modifier.size(20.dp),
         )
     }
 }

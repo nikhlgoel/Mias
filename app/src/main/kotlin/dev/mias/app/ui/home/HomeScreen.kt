@@ -1,6 +1,5 @@
 package dev.mias.app.ui.home
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,20 +23,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Menu
-import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.WorkspacePremium
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -52,8 +44,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -108,8 +100,8 @@ fun HomeScreen(
                 .fillMaxSize()
                 .background(MiasColors.Surface1)
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp),
         ) {
             TopBar(
                 state = state,
@@ -117,83 +109,56 @@ fun HomeScreen(
                 onNavigateToModelHub = onNavigateToModelHub,
             )
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
+            // ── Greeting block ──
             Text(
                 text = state.greeting,
                 style = MiasTypography.DisplaySmall,
                 color = MiasColors.TextHi,
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = state.subtitle,
-                style = MiasTypography.BodyMedium,
+                style = MiasTypography.BodyLarge,
                 color = MiasColors.TextLo,
             )
-
             if (state.activeChatModelName != null) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
                 ActiveModelRow(name = state.activeChatModelName!!)
             }
 
-            Spacer(modifier = Modifier.height(36.dp))
-
-            // ── Orb (the start-new-chat affordance) ──
+            // ── Orb — centered in the remaining vertical space ──
             Box(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
                 contentAlignment = Alignment.Center,
             ) {
-                CognitionGlow(
-                    cognitionState = state.cognitionState,
-                    intensity = 0.4f,
-                ) {
-                    AnimatedOrb(
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CognitionGlow(
                         cognitionState = state.cognitionState,
-                        size = 128.dp,
-                        modifier = Modifier
-                            .size(128.dp)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) { onNavigateToChat(null) },
+                        intensity = 0.4f,
+                    ) {
+                        AnimatedOrb(
+                            cognitionState = state.cognitionState,
+                            size = 140.dp,
+                            modifier = Modifier
+                                .size(140.dp)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) { onNavigateToChat(null) },
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Tap to start a new chat",
+                        style = MiasTypography.BodyMedium,
+                        color = MiasColors.TextLo,
+                        textAlign = TextAlign.Center,
                     )
                 }
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Tap to start a new chat",
-                style = MiasTypography.LabelMedium,
-                color = MiasColors.TextLo,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center,
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // ── Quick actions ──
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                QuickChip(label = "Speak", icon = Icons.Rounded.Mic, onClick = onNavigateToVoice)
-                Spacer(modifier = Modifier.width(10.dp))
-                QuickChip(label = "Type", icon = Icons.Rounded.Keyboard) { onNavigateToChat(null) }
-                Spacer(modifier = Modifier.width(10.dp))
-                QuickChip(label = "See", icon = Icons.Rounded.PhotoCamera, onClick = onNavigateToVision)
-            }
-
-            Spacer(modifier = Modifier.height(36.dp))
-
-            // ── Recent conversations ──
-            if (state.recentConversations.isNotEmpty()) {
-                RecentSection(
-                    items = state.recentConversations,
-                    totalCount = state.recentConversationCount,
-                    onOpen = { onNavigateToChat(it) },
-                    onSeeAll = onNavigateToChats,
-                )
-                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
@@ -478,113 +443,6 @@ private fun ActiveModelRow(name: String) {
             style = MiasTypography.LabelMedium,
             color = MiasColors.TextHi,
         )
-    }
-}
-
-@Composable
-private fun QuickChip(
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit,
-) {
-    AssistChip(
-        onClick = onClick,
-        label = { Text(label) },
-        leadingIcon = { Icon(icon, contentDescription = null) },
-        colors = AssistChipDefaults.assistChipColors(
-            containerColor = MiasColors.Surface2,
-            labelColor = MiasColors.TextHi,
-            leadingIconContentColor = MiasColors.Heather,
-        ),
-        border = BorderStroke(1.dp, MiasColors.OutlineSoft),
-    )
-}
-
-@Composable
-private fun RecentSection(
-    items: List<RecentChat>,
-    totalCount: Int,
-    onOpen: (String) -> Unit,
-    onSeeAll: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "Recent",
-            style = MiasTypography.LabelLarge,
-            color = MiasColors.TextLo,
-        )
-        if (totalCount > items.size) {
-            Row(
-                modifier = Modifier
-                    .clip(MiasShapes.Full)
-                    .clickable(onClick = onSeeAll)
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "See all",
-                    style = MiasTypography.LabelMedium,
-                    color = MiasColors.Heather,
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                    contentDescription = null,
-                    tint = MiasColors.Heather,
-                    modifier = Modifier.size(14.dp),
-                )
-            }
-        }
-    }
-    Spacer(modifier = Modifier.height(10.dp))
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items.forEach { item -> RecentRow(item = item, onClick = { onOpen(item.id) }) }
-    }
-}
-
-@Composable
-private fun RecentRow(item: RecentChat, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MiasShapes.Card)
-            .background(MiasColors.Surface2)
-            .border(1.dp, MiasColors.OutlineSoft, MiasShapes.Card)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = item.title,
-                style = MiasTypography.LabelLarge,
-                color = MiasColors.TextHi,
-                maxLines = 1,
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = formatRelative(item.updatedAt),
-                style = MiasTypography.LabelSmall,
-                color = MiasColors.TextMuted,
-            )
-        }
-        if (item.preview.isNotBlank()) {
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = item.preview,
-                style = MiasTypography.BodySmall,
-                color = MiasColors.TextLo,
-                maxLines = 2,
-            )
-        }
     }
 }
 

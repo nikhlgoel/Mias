@@ -102,7 +102,6 @@ fun ChatScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val speechState by speechViewModel.isListening.collectAsStateWithLifecycle()
     val transcription by speechViewModel.transcription.collectAsStateWithLifecycle()
-    val confidence by speechViewModel.confidence.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
     LaunchedEffect(transcription) {
@@ -266,8 +265,6 @@ fun ChatScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 SpeechButton(
                     state = if (speechState) SpeechState.LISTENING else SpeechState.IDLE,
-                    confidence = confidence,
-                    transcription = transcription,
                     onStartListening = { speechViewModel.startListening() },
                     onStopListening = { speechViewModel.stopListening() },
                 )
