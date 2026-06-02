@@ -85,7 +85,11 @@ class ReActEngine @Inject constructor(
 
             engine.generateStream(
                 prompt = conversationBuffer.toString(),
-                maxTokens = 1024,
+                // Capped per turn so a slow on-device CPU can't grind through a
+                // 1024-token response before the user sees anything. ~512 is a
+                // full conversational reply; the worst-case wait is roughly
+                // halved on phones with no GPU/NPU offload.
+                maxTokens = MAX_RESPONSE_TOKENS,
                 // Constrain output to the ReAct JSON schema at the token level.
                 // Small on-device models can't reliably hold JSON from a prompt
                 // alone; the grammar makes invalid output physically impossible.
@@ -260,6 +264,9 @@ class ReActEngine @Inject constructor(
         // round-trips. Prevents infinite loops when a tool keeps erroring.
         const val MAX_ITERATIONS = 3
         const val MAX_TOOL_OUTPUT_LENGTH = 2000
+
+        /** Per-turn generation cap. Keeps worst-case latency bounded on CPU-only devices. */
+        const val MAX_RESPONSE_TOKENS = 512
 
         /**
          * GBNF grammar constraining model output to the ReAct JSON schema.

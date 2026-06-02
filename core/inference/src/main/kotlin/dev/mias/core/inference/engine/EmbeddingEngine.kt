@@ -3,6 +3,8 @@
 import dev.mias.core.common.MiasResult
 import dev.mias.core.common.model.EmbeddingProvider
 import dev.mias.core.common.runCatchingMias
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,21 +26,29 @@ class EmbeddingEngine @Inject constructor() : EmbeddingProvider {
     @Volatile
     private var isLoaded = false
 
-    suspend fun loadModel(modelPath: String): MiasResult<Unit> = runCatchingMias {
-        if (!nativeLoadEmbeddingModel(modelPath)) {
-            throw IllegalStateException("Failed to bind embeddings llama.cpp to GGUF path: $modelPath")
+    // All native calls run on Dispatchers.IO — they block (model load / inference)
+    // and would ANR the UI if a caller invoked them from the main thread.
+    suspend fun loadModel(modelPath: String): MiasResult<Unit> = withContext(Dispatchers.IO) {
+        runCatchingMias {
+            if (!nativeLoadEmbeddingModel(modelPath)) {
+                throw IllegalStateException("Failed to bind embeddings llama.cpp to GGUF path: $modelPath")
+            }
+            isLoaded = true
         }
-        isLoaded = true
     }
 
-    override suspend fun getEmbedding(text: String): MiasResult<FloatArray> = runCatchingMias {
-        check(isLoaded) { "Embedding model not loaded. Call loadModel() first." }
-        nativeGetEmbedding(text) ?: throw IllegalStateException("JNI returned null embedding array")
+    override suspend fun getEmbedding(text: String): MiasResult<FloatArray> = withContext(Dispatchers.IO) {
+        runCatchingMias {
+            check(isLoaded) { "Embedding model not loaded. Call loadModel() first." }
+            nativeGetEmbedding(text) ?: throw IllegalStateException("JNI returned null embedding array")
+        }
     }
 
-    suspend fun unloadModel(): MiasResult<Unit> = runCatchingMias {
-        nativeUnloadEmbeddingModel()
-        isLoaded = false
+    suspend fun unloadModel(): MiasResult<Unit> = withContext(Dispatchers.IO) {
+        runCatchingMias {
+            nativeUnloadEmbeddingModel()
+            isLoaded = false
+        }
     }
 
     fun isModelLoaded(): Boolean = isLoaded

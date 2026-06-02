@@ -27,12 +27,18 @@ class LlamaCppEngine @Inject constructor() : InferenceEngine {
     @Volatile
     private var isLoaded = false
 
-    override suspend fun loadModel(modelPath: String): MiasResult<Unit> = runCatchingMias {
-        if (!nativeLoadModel(modelPath)) {
-            throw IllegalStateException("Failed to bind llama.cpp to GGUF model path: $modelPath")
+    override suspend fun loadModel(modelPath: String): MiasResult<Unit> =
+        withContext(Dispatchers.IO) {
+            // MUST be off the main thread: loading a GGUF reads/mmaps hundreds of
+            // MB and allocates the KV cache, which blocks for seconds and ANRs the
+            // UI if run on the caller's (Main) dispatcher.
+            runCatchingMias {
+                if (!nativeLoadModel(modelPath)) {
+                    throw IllegalStateException("Failed to bind llama.cpp to GGUF model path: $modelPath")
+                }
+                isLoaded = true
+            }
         }
-        isLoaded = true
-    }
 
     override suspend fun generate(prompt: String, maxTokens: Int, grammar: String?): MiasResult<String> =
         withContext(Dispatchers.IO) {
@@ -81,9 +87,11 @@ class LlamaCppEngine @Inject constructor() : InferenceEngine {
         runCatching { nativeStopGeneration() }
     }
 
-    override suspend fun unloadModel(): MiasResult<Unit> = runCatchingMias {
-        nativeUnload()
-        isLoaded = false
+    override suspend fun unloadModel(): MiasResult<Unit> = withContext(Dispatchers.IO) {
+        runCatchingMias {
+            nativeUnload()
+            isLoaded = false
+        }
     }
 
     override fun isModelLoaded(): Boolean = isLoaded
