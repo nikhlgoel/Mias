@@ -33,6 +33,7 @@ import dev.mias.core.modelhub.model.ModelRole
 import dev.mias.core.ui.components.BubbleType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -54,7 +55,10 @@ data class ChatMessage(
     val id: String,
     val text: String,
     val type: BubbleType,
+    /** Display string (HH:mm) used by the bubble UI. */
     val timestamp: String,
+    /** Real epoch-millis of creation — the source of truth for ordering and persistence. */
+    val createdAtMillis: Long = System.currentTimeMillis(),
     val isStreaming: Boolean = false,
     val image: Bitmap? = null,
     val imagePath: String? = null,
@@ -101,6 +105,21 @@ class ChatViewModel @Inject constructor(
     private val _showReActSteps = MutableStateFlow(false)
     private val _attachedImage = MutableStateFlow<Bitmap?>(null)
 
+    /**
+     * Model-generated title for this conversation. Null until the first
+     * user/assistant exchange completes and the title pass runs. Persisted
+     * across loads via [loadExistingConversation].
+     */
+    private val _generatedTitle = MutableStateFlow<String?>(null)
+    private var titleJob: Job? = null
+
+    /**
+     * Real creation time of this conversation. Captured once — from the loaded
+     * conversation, or the first persisted message — and never reset, so
+     * repeated saves don't keep stamping `createdAt` with "now".
+     */
+    private var conversationCreatedAt: Long? = null
+
     /** The active generation coroutine, so the Stop button can cancel it. */
     private var inferenceJob: Job? = null
 
@@ -122,23 +141,34 @@ class ChatViewModel @Inject constructor(
             )
         }
 
+    private data class MessagesSnapshot(
+        val messages: List<ChatMessage>,
+        val attachedImage: Bitmap?,
+        val title: String?,
+    )
+
     val uiState: StateFlow<ChatUiState> = combine(
-        combine(_messages, _attachedImage) { msgs, img -> msgs to img },
+        combine(_messages, _attachedImage, _generatedTitle) { msgs, img, title ->
+            MessagesSnapshot(msgs, img, title)
+        },
         _inputText,
         _isProcessing,
         combine(orchestrator.brainState, orchestrator.cognitionState) { b, c -> b to c },
         chatModelSelection,
-    ) { messagesAndImage, input, processing, brainCog, info ->
+    ) { snapshot, input, processing, brainCog, info ->
         ChatUiState(
-            messages = messagesAndImage.first,
+            messages = snapshot.messages,
             inputText = input,
             isProcessing = processing,
             brainState = brainCog.first,
             cognitionState = brainCog.second,
+            conversationTitle = snapshot.title
+                ?: snapshot.messages.firstOrNull { it.type == BubbleType.USER }?.text?.take(40)
+                ?: "New Conversation",
             showReActSteps = _showReActSteps.value,
             chatModels = info.chatModels,
             activeChatModelId = info.activeChatModelId,
-            attachedImage = messagesAndImage.second,
+            attachedImage = snapshot.attachedImage,
             hasVisionModel = info.hasVisionModel,
         )
     }.stateIn(
@@ -189,7 +219,14 @@ class ChatViewModel @Inject constructor(
         _messages.update { it + userMsg }
         _events.tryEmit(ChatEvent.ScrollToBottom)
 
+        val pendingTitleJob = titleJob
+        titleJob = null
         inferenceJob = viewModelScope.launch {
+            // A background title pass from the previous turn may still hold the
+            // native context. Stop and await it before we generate, so the two
+            // never collide on the single non-reentrant engine.
+            pendingTitleJob?.cancelAndJoin()
+
             // Store fact in Hindsight
             hindsightMemory.storeFact(
                 content = "User said: $cleanedText",
@@ -369,7 +406,43 @@ class ChatViewModel @Inject constructor(
             // Persist conversation
             saveConversation()
             _isProcessing.value = false
+
+            // First completed exchange — kick off a one-shot title pass.
+            maybeGenerateTitle(userText = cleanedText, assistantText = finalResponse)
         }
+    }
+
+    /**
+     * After the first user/assistant exchange, ask the model for a short
+     * title (≤6 words) via the orchestrator's dedicated, state-free title
+     * pass. Runs once per conversation; silent on failure, since the fallback
+     * (first 50 chars of the first user message) still applies in
+     * [saveConversation]. Held in [titleJob] so a new send can cancel it
+     * before touching the shared native context.
+     */
+    private fun maybeGenerateTitle(userText: String, assistantText: String) {
+        if (_generatedTitle.value != null) return
+        if (userText.isBlank() || assistantText.isBlank()) return
+        if (titleJob?.isActive == true) return
+
+        titleJob = viewModelScope.launch {
+            val raw = runCatching {
+                orchestrator.summarizeTitle(userText, assistantText)
+            }.getOrNull().orEmpty()
+            val cleaned = sanitizeTitle(raw)
+            if (cleaned.isNotBlank()) {
+                _generatedTitle.value = cleaned
+                saveConversation()
+            }
+        }
+    }
+
+    private fun sanitizeTitle(raw: String): String {
+        if (raw.isBlank()) return ""
+        val firstLine = raw.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty()
+        val unquoted = firstLine.trim('"', '\'', '`', '*', ' ', '.', ':', '-', '—')
+        val words = unquoted.split(Regex("\\s+")).filter { it.isNotBlank() }
+        return words.take(6).joinToString(" ").take(60)
     }
 
     /**
@@ -449,7 +522,11 @@ class ChatViewModel @Inject constructor(
         _attachedImage.value = null
         _events.tryEmit(ChatEvent.ScrollToBottom)
 
+        val pendingTitleJob = titleJob
+        titleJob = null
         inferenceJob = viewModelScope.launch {
+            pendingTitleJob?.cancelAndJoin()
+
             // Persist the bitmap off the main thread, then record the path on
             // the message so saveConversation() picks it up.
             val savedPath = withContext(Dispatchers.IO) {
@@ -534,6 +611,14 @@ class ChatViewModel @Inject constructor(
                 }
                 _isProcessing.value = false
                 saveConversation()
+
+                // Title parity with the text path. Reuses whichever text
+                // engine is warm; if only the vision engine is loaded,
+                // summarizeTitle finds nothing and we keep the fallback title.
+                val finalMsg = _messages.value.firstOrNull { it.id == streamingId }
+                if (finalMsg != null && finalMsg.type != BubbleType.ERROR) {
+                    maybeGenerateTitle(userText = effectivePrompt, assistantText = finalMsg.text)
+                }
             }
         }
     }
@@ -542,12 +627,21 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             val result = conversationRepository.getConversation(conversationId)
             val conversation = result.getOrNull() ?: return@launch
+            // Preserve any previously generated title so we don't re-run the
+            // title pass on every reopen. The fallback string is treated as
+            // "no title yet" so a real title is still generated on next send.
+            val savedTitle = conversation.title
+            if (savedTitle.isNotBlank() && savedTitle != "Conversation" && savedTitle != "New Conversation") {
+                _generatedTitle.value = savedTitle
+            }
+            conversationCreatedAt = conversation.createdAt
             _messages.value = conversation.messages.map { msg ->
                 ChatMessage(
                     id = msg.id,
                     text = msg.content,
                     type = if (msg.role == Role.USER) BubbleType.USER else BubbleType.Mias,
                     timestamp = formatTime(msg.timestamp),
+                    createdAtMillis = msg.timestamp,
                     image = msg.imagePath?.let { loadAttachmentFromDisk(it) },
                     imagePath = msg.imagePath,
                     reasoning = msg.reasoningText,
@@ -560,22 +654,31 @@ class ChatViewModel @Inject constructor(
         val msgs = _messages.value
         if (msgs.isEmpty()) return
 
+        // Stable creation time: prefer an already-captured value (loaded or set
+        // on a prior save), otherwise the earliest message, then now. Set once
+        // so it never drifts on subsequent saves.
+        val createdAt = conversationCreatedAt
+            ?: msgs.minOfOrNull { it.createdAtMillis }
+            ?: System.currentTimeMillis()
+        conversationCreatedAt = createdAt
+
         val conversation = Conversation(
             id = conversationId,
-            title = msgs.firstOrNull { it.type == BubbleType.USER }?.text?.take(50)
+            title = _generatedTitle.value
+                ?: msgs.firstOrNull { it.type == BubbleType.USER }?.text?.take(50)
                 ?: "Conversation",
-            messages = msgs.mapIndexed { i, msg ->
+            messages = msgs.map { msg ->
                 Message(
                     id = msg.id,
                     conversationId = conversationId,
                     role = if (msg.type == BubbleType.USER) Role.USER else Role.ASSISTANT,
                     content = msg.text,
-                    timestamp = System.currentTimeMillis() - (msgs.size - i) * 1000L,
+                    timestamp = msg.createdAtMillis,
                     imagePath = msg.imagePath,
                     reasoningText = msg.reasoning,
                 )
             },
-            createdAt = System.currentTimeMillis(),
+            createdAt = createdAt,
             updatedAt = System.currentTimeMillis(),
         )
         conversationRepository.saveConversation(conversation)

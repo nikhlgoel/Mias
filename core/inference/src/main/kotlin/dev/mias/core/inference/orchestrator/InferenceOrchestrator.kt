@@ -25,6 +25,8 @@ import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * The "Consciousness Router" — decides which brain fires and routes
@@ -67,6 +69,15 @@ class InferenceOrchestrator @Inject constructor(
      * model id currently bound to that engine.
      */
     private val loadedModelByEngine = mutableMapOf<InferenceEngine, String>()
+
+    /**
+     * Serializes all access to the native inference context. The llama.cpp
+     * engine is a single non-reentrant context with a global abort flag, so
+     * two concurrent generations would corrupt each other. Every path that
+     * drives a model — [process] and [summarizeTitle] — generates under this
+     * lock so they queue instead of colliding.
+     */
+    private val generationMutex = Mutex()
 
     /** Process a stimulus through the appropriate brain. */
     fun process(
@@ -117,29 +128,71 @@ class InferenceOrchestrator @Inject constructor(
             }
         }
 
-        reActEngine.execute(
-            engine = engine,
-            systemPrompt = systemPrompt,
-            userPrompt = stimulus.content,
-            hindsightContext = hindsightContext,
-        ).onStart {
-            _brainState.value = newState
-            _cognitionState.value = CognitionState.THINKING
-            if (previousState != newState) {
-                emit(ReActStep.ModelSwitch(previousState, newState))
-            }
-        }.onEach { step ->
-            emit(step) // Pass execution up
-            when (step) {
-                is ReActStep.Thought -> _cognitionState.value = CognitionState.THINKING
-                is ReActStep.Action -> _cognitionState.value = CognitionState.ACTING
-                is ReActStep.Observation -> _cognitionState.value = CognitionState.WAITING
-                is ReActStep.FinalAnswer -> _cognitionState.value = CognitionState.IDLE
-                else -> {}
-            }
-        }.onCompletion {
-            _cognitionState.value = CognitionState.IDLE
-        }.collect { } // Terminal operator
+        generationMutex.withLock {
+            reActEngine.execute(
+                engine = engine,
+                systemPrompt = systemPrompt,
+                userPrompt = stimulus.content,
+                hindsightContext = hindsightContext,
+            ).onStart {
+                _brainState.value = newState
+                _cognitionState.value = CognitionState.THINKING
+                if (previousState != newState) {
+                    emit(ReActStep.ModelSwitch(previousState, newState))
+                }
+            }.onEach { step ->
+                emit(step) // Pass execution up
+                when (step) {
+                    is ReActStep.Thought -> _cognitionState.value = CognitionState.THINKING
+                    is ReActStep.Action -> _cognitionState.value = CognitionState.ACTING
+                    is ReActStep.Observation -> _cognitionState.value = CognitionState.WAITING
+                    is ReActStep.FinalAnswer -> _cognitionState.value = CognitionState.IDLE
+                    else -> {}
+                }
+            }.onCompletion {
+                _cognitionState.value = CognitionState.IDLE
+            }.collect { } // Terminal operator
+        }
+    }
+
+    /**
+     * Produce a short conversation title from the first exchange.
+     *
+     * Deliberately lightweight: it reuses whichever engine is already warm
+     * (the one that just answered), runs a single unconstrained completion —
+     * no ReAct loop, no tools, no guardrails, no Hindsight — and never touches
+     * [brainState] / [cognitionState], so the status pill stays quiet during
+     * this background pass. Generation runs under [generationMutex] so it can
+     * never collide with a foreground [process] call on the shared native
+     * context.
+     *
+     * Returns null when no model is loaded or the model produces nothing — the
+     * caller is expected to fall back to a non-model title in that case.
+     */
+    suspend fun summarizeTitle(userText: String, assistantText: String): String? {
+        // Reuse the engine that just answered. We never load or switch models
+        // for a title — if nothing is warm, the caller keeps its fallback.
+        val engine = loadedModelByEngine.keys.firstOrNull { it.isModelLoaded() } ?: return null
+
+        val prompt = buildString {
+            append("Summarize the following exchange as a short conversation title ")
+            append("of at most six words. Reply with only the title — no quotes, no ")
+            append("trailing punctuation, no preamble.\n\n")
+            append("User: ").append(userText.take(TITLE_INPUT_CHAR_CAP)).append('\n')
+            append("Assistant: ").append(assistantText.take(TITLE_INPUT_CHAR_CAP))
+            append("\n\nTitle:")
+        }
+
+        return generationMutex.withLock {
+            val buffer = StringBuilder()
+            // Streamed (not generate()) so collector cancellation aborts the
+            // native loop promptly and frees the lock for a waiting send.
+            engine.generateStream(prompt, maxTokens = TITLE_MAX_TOKENS, grammar = null)
+                .collect { result ->
+                    if (result is MiasResult.Success) buffer.append(result.data)
+                }
+            buffer.toString().ifBlank { null }
+        }
     }
 
     private suspend fun selectEngine(tawsAction: TawsAction, stimulus: Stimulus): Pair<InferenceEngine, BrainState> =
@@ -276,6 +329,12 @@ class InferenceOrchestrator @Inject constructor(
          * default returns 0.65, so 0.7 effectively means "ignore the default".
          */
         private const val INTENT_CONFIDENCE_THRESHOLD: Float = 0.7f
+
+        /** Token budget for the title pass — a title is a handful of words. */
+        private const val TITLE_MAX_TOKENS: Int = 24
+
+        /** Cap on how much of each turn we feed the title prompt. */
+        private const val TITLE_INPUT_CHAR_CAP: Int = 500
 
         /**
          * Default persona. Warm and approachable without being performative.

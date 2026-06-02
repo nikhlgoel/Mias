@@ -59,6 +59,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.mias.core.modelhub.model.InstalledModel
 import dev.mias.core.ui.theme.MiasShapes
@@ -289,45 +290,63 @@ private fun ChatTopBar(
     val activeModel = state.chatModels.firstOrNull { it.id == state.activeChatModelId }
         ?: state.chatModels.firstOrNull()
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClick = onBack) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                contentDescription = "Back",
-                tint = MiasColors.TextPrimary,
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = "Back",
+                    tint = MiasColors.TextPrimary,
+                )
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            StatusPill(
+                brainState = state.brainState,
+                cognitionState = state.cognitionState,
             )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            if (state.chatModels.isNotEmpty()) {
+                ModelChip(
+                    label = activeModel?.card?.name ?: "Pick a model",
+                    onClick = { pickerOpen = true },
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            IconButton(onClick = onToggleReAct) {
+                Icon(
+                    imageVector = if (state.showReActSteps) Icons.Rounded.Visibility
+                    else Icons.Rounded.VisibilityOff,
+                    contentDescription = "Toggle thinking steps",
+                    tint = MiasColors.TextSecondary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
 
-        Spacer(modifier = Modifier.width(4.dp))
-
-        StatusPill(
-            brainState = state.brainState,
-            cognitionState = state.cognitionState,
-        )
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        if (state.chatModels.isNotEmpty()) {
-            ModelChip(
-                label = activeModel?.card?.name ?: "Pick a model",
-                onClick = { pickerOpen = true },
-            )
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        IconButton(onClick = onToggleReAct) {
-            Icon(
-                imageVector = if (state.showReActSteps) Icons.Rounded.Visibility
-                else Icons.Rounded.VisibilityOff,
-                contentDescription = "Toggle thinking steps",
-                tint = MiasColors.TextSecondary,
-                modifier = Modifier.size(20.dp),
+        // Conversation title caption. Only shown once the chat has content and
+        // carries a real title — the "New Conversation" placeholder stays hidden
+        // so the empty state isn't labelled.
+        if (state.messages.isNotEmpty() && state.conversationTitle != "New Conversation") {
+            Text(
+                text = state.conversationTitle,
+                style = MiasTypography.LabelLarge,
+                color = MiasColors.TextSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 4.dp),
             )
         }
     }
