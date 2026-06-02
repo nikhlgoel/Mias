@@ -11,14 +11,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -26,21 +31,28 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -51,6 +63,7 @@ import dev.mias.core.ui.glass.CognitionGlow
 import dev.mias.core.ui.theme.MiasColors
 import dev.mias.core.ui.theme.MiasShapes
 import dev.mias.core.ui.theme.MiasTypography
+import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
 
@@ -66,109 +79,343 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MiasColors.Surface1)
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp),
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            DrawerContent(
+                state = state,
+                onOpenConversation = { id ->
+                    scope.launch { drawerState.close() }
+                    onNavigateToChat(id)
+                },
+                onSeeAllChats = {
+                    scope.launch { drawerState.close() }
+                    onNavigateToChats()
+                },
+                onSettings = {
+                    scope.launch { drawerState.close() }
+                    onNavigateToSettings()
+                },
+            )
+        },
+        modifier = modifier,
     ) {
-        TopBar(
-            state = state,
-            onNavigateToChats = onNavigateToChats,
-            onNavigateToModelHub = onNavigateToModelHub,
-            onNavigateToSettings = onNavigateToSettings,
-        )
-
-        Spacer(modifier = Modifier.height(28.dp))
-
-        Text(
-            text = state.greeting,
-            style = MiasTypography.DisplaySmall,
-            color = MiasColors.TextHi,
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = state.subtitle,
-            style = MiasTypography.BodyMedium,
-            color = MiasColors.TextLo,
-        )
-
-        if (state.activeChatModelName != null) {
-            Spacer(modifier = Modifier.height(16.dp))
-            ActiveModelRow(name = state.activeChatModelName!!)
-        }
-
-        Spacer(modifier = Modifier.height(36.dp))
-
-        // ── Orb (the start-new-chat affordance) ──
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.Center,
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MiasColors.Surface1)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
         ) {
-            CognitionGlow(
-                cognitionState = state.cognitionState,
-                intensity = 0.4f,
+            TopBar(
+                state = state,
+                onOpenDrawer = { scope.launch { drawerState.open() } },
+                onNavigateToModelHub = onNavigateToModelHub,
+            )
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            Text(
+                text = state.greeting,
+                style = MiasTypography.DisplaySmall,
+                color = MiasColors.TextHi,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = state.subtitle,
+                style = MiasTypography.BodyMedium,
+                color = MiasColors.TextLo,
+            )
+
+            if (state.activeChatModelName != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                ActiveModelRow(name = state.activeChatModelName!!)
+            }
+
+            Spacer(modifier = Modifier.height(36.dp))
+
+            // ── Orb (the start-new-chat affordance) ──
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
             ) {
-                AnimatedOrb(
+                CognitionGlow(
                     cognitionState = state.cognitionState,
-                    size = 128.dp,
-                    modifier = Modifier
-                        .size(128.dp)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { onNavigateToChat(null) },
+                    intensity = 0.4f,
+                ) {
+                    AnimatedOrb(
+                        cognitionState = state.cognitionState,
+                        size = 128.dp,
+                        modifier = Modifier
+                            .size(128.dp)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) { onNavigateToChat(null) },
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Tap to start a new chat",
+                style = MiasTypography.LabelMedium,
+                color = MiasColors.TextLo,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ── Quick actions ──
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                QuickChip(label = "Speak", icon = Icons.Rounded.Mic, onClick = onNavigateToVoice)
+                Spacer(modifier = Modifier.width(10.dp))
+                QuickChip(label = "Type", icon = Icons.Rounded.Keyboard) { onNavigateToChat(null) }
+                Spacer(modifier = Modifier.width(10.dp))
+                QuickChip(label = "See", icon = Icons.Rounded.PhotoCamera, onClick = onNavigateToVision)
+            }
+
+            Spacer(modifier = Modifier.height(36.dp))
+
+            // ── Recent conversations ──
+            if (state.recentConversations.isNotEmpty()) {
+                RecentSection(
+                    items = state.recentConversations,
+                    totalCount = state.recentConversationCount,
+                    onOpen = { onNavigateToChat(it) },
+                    onSeeAll = onNavigateToChats,
                 )
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = "Tap to start a new chat",
-            style = MiasTypography.LabelMedium,
-            color = MiasColors.TextLo,
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Center,
-        )
+    }
+}
 
-        Spacer(modifier = Modifier.height(24.dp))
+// ── Navigation Drawer ─────────────────────────────────────────────────────────
 
-        // ── Quick actions ──
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
+@Composable
+private fun DrawerContent(
+    state: HomeUiState,
+    onOpenConversation: (String) -> Unit,
+    onSeeAllChats: () -> Unit,
+    onSettings: () -> Unit,
+) {
+    // ModalDrawerSheet would add its own surface color; we control the
+    // background directly so it matches the Mias surface ladder.
+    Column(
+        modifier = Modifier
+            .widthIn(max = 300.dp)
+            .fillMaxHeight()
+            .background(MiasColors.Surface2)
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .navigationBarsPadding(),
+    ) {
+        // Header
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 20.dp),
         ) {
-            QuickChip(label = "Speak", icon = Icons.Rounded.Mic, onClick = onNavigateToVoice)
-            Spacer(modifier = Modifier.width(10.dp))
-            QuickChip(label = "Type", icon = Icons.Rounded.Keyboard) { onNavigateToChat(null) }
-            Spacer(modifier = Modifier.width(10.dp))
-            QuickChip(label = "See", icon = Icons.Rounded.PhotoCamera, onClick = onNavigateToVision)
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(MiasShapes.Full)
+                    .background(MiasColors.HeatherContainer)
+                    .border(1.dp, MiasColors.OutlineSoft, MiasShapes.Full),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "M",
+                    style = MiasTypography.LabelLarge,
+                    color = MiasColors.Heather,
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = "Mias",
+                style = MiasTypography.HeadlineMedium,
+                color = MiasColors.TextHi,
+            )
+            Text(
+                text = "Your on-device assistant",
+                style = MiasTypography.BodySmall,
+                color = MiasColors.TextMuted,
+            )
         }
 
-        Spacer(modifier = Modifier.height(36.dp))
+        HorizontalDivider(color = MiasColors.OutlineSoft, thickness = 1.dp)
 
-        // ── Recent conversations ──
-        if (state.recentConversations.isNotEmpty()) {
-            RecentSection(
-                items = state.recentConversations,
-                totalCount = state.recentConversationCount,
-                onOpen = { onNavigateToChat(it) },
-                onSeeAll = onNavigateToChats,
+        // Conversations section
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Rounded.History,
+                    contentDescription = null,
+                    tint = MiasColors.TextMuted,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Chats",
+                    style = MiasTypography.LabelLarge,
+                    color = MiasColors.TextLo,
+                )
+            }
+            if (state.recentConversationCount > state.recentConversations.size) {
+                IconButton(
+                    onClick = onSeeAllChats,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                        contentDescription = "See all chats",
+                        tint = MiasColors.Heather,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+        }
+
+        if (state.recentConversations.isEmpty()) {
+            Text(
+                text = "No conversations yet",
+                style = MiasTypography.BodySmall,
+                color = MiasColors.TextMuted,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
             )
-            Spacer(modifier = Modifier.height(24.dp))
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                    horizontal = 12.dp,
+                    vertical = 4.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                items(state.recentConversations, key = { it.id }) { chat ->
+                    DrawerConversationRow(
+                        chat = chat,
+                        onClick = { onOpenConversation(chat.id) },
+                    )
+                }
+                if (state.recentConversationCount > state.recentConversations.size) {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(MiasShapes.Card)
+                                .clickable(onClick = onSeeAllChats)
+                                .padding(horizontal = 8.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "All conversations (${state.recentConversationCount})",
+                                style = MiasTypography.LabelMedium,
+                                color = MiasColors.Heather,
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                                contentDescription = null,
+                                tint = MiasColors.Heather,
+                                modifier = Modifier.size(13.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Bottom — Settings
+        HorizontalDivider(color = MiasColors.OutlineSoft, thickness = 1.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onSettings)
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Settings,
+                contentDescription = null,
+                tint = MiasColors.TextLo,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "Settings",
+                style = MiasTypography.LabelLarge,
+                color = MiasColors.TextLo,
+            )
         }
     }
 }
 
 @Composable
+private fun DrawerConversationRow(chat: RecentChat, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MiasShapes.Card)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = chat.title,
+                style = MiasTypography.LabelMedium,
+                color = MiasColors.TextHi,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = formatRelative(chat.updatedAt),
+                style = MiasTypography.LabelSmall,
+                color = MiasColors.TextMuted,
+            )
+        }
+        if (chat.preview.isNotBlank()) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = chat.preview,
+                style = MiasTypography.BodySmall,
+                color = MiasColors.TextLo,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+// ── Top bar ───────────────────────────────────────────────────────────────────
+
+@Composable
 private fun TopBar(
     state: HomeUiState,
-    onNavigateToChats: () -> Unit,
+    onOpenDrawer: () -> Unit,
     onNavigateToModelHub: () -> Unit,
-    onNavigateToSettings: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -177,32 +424,30 @@ private fun TopBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StatusPill(
-            brainState = state.brainState,
-            cognitionState = state.cognitionState,
-        )
-        Row {
-            TopBarIcon(Icons.Rounded.History, "Chats", onNavigateToChats)
-            TopBarIcon(Icons.Rounded.WorkspacePremium, "Models", onNavigateToModelHub)
-            TopBarIcon(Icons.Rounded.Settings, "Settings", onNavigateToSettings)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onOpenDrawer) {
+                Icon(
+                    imageVector = Icons.Rounded.Menu,
+                    contentDescription = "Open menu",
+                    tint = MiasColors.TextLo,
+                )
+            }
+            StatusPill(
+                brainState = state.brainState,
+                cognitionState = state.cognitionState,
+            )
+        }
+        IconButton(onClick = onNavigateToModelHub) {
+            Icon(
+                imageVector = Icons.Rounded.WorkspacePremium,
+                contentDescription = "Models",
+                tint = MiasColors.TextLo,
+            )
         }
     }
 }
 
-@Composable
-private fun TopBarIcon(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    description: String,
-    onClick: () -> Unit,
-) {
-    IconButton(onClick = onClick) {
-        Icon(
-            imageVector = icon,
-            contentDescription = description,
-            tint = MiasColors.TextLo,
-        )
-    }
-}
+// ── Home content composables ──────────────────────────────────────────────────
 
 @Composable
 private fun ActiveModelRow(name: String) {
@@ -354,4 +599,3 @@ private fun formatRelative(timestamp: Long): String {
         else -> DateFormat.getDateInstance(DateFormat.SHORT).format(Date(timestamp))
     }
 }
-
