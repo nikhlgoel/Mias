@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
+import dev.mias.app.bootstrap.ModelWarmup
 import dev.mias.app.bootstrap.PreferencesBootstrapper
 import dev.mias.app.bootstrap.ToolBootstrapper
 import dev.mias.core.modelhub.bootstrap.ModelBootstrapper
@@ -30,6 +31,9 @@ class MiasApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var toolBootstrapper: ToolBootstrapper
 
+    @Inject
+    lateinit var modelWarmup: ModelWarmup
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
@@ -43,6 +47,9 @@ class MiasApplication : Application(), Configuration.Provider {
         // bug was fixed, and any future cases where assignment was skipped.
         appScope.launch {
             modelBootstrapper.prepareFirstRunModels(autoDownload = false)
+            // After roles are settled, warm the models so the first message is
+            // fast. Runs on the IO-bound default scope, never the main thread.
+            modelWarmup.warm()
         }
     }
 

@@ -64,7 +64,7 @@ fun KnowledgeScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     val pickDocument = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent(),
+        ActivityResultContracts.OpenDocument(),
     ) { uri -> if (uri != null) viewModel.addDocument(uri) }
 
     // Surface status/errors briefly, then clear so they don't stick around.
@@ -168,7 +168,7 @@ fun KnowledgeScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "No documents yet.\nAdd a .txt or .md file and Mias can answer from it.",
+                        text = "No documents yet.\nAdd a PDF, .txt or .md file and Mias can answer from it.",
                         style = MiasTypography.BodyMedium,
                         color = MiasColors.TextSecondary,
                         textAlign = TextAlign.Center,
@@ -189,7 +189,13 @@ fun KnowledgeScreen(
 
         // Add (FAB) — shows a spinner while a file is being ingested/embedded.
         FloatingActionButton(
-            onClick = { if (!state.isIngesting) pickDocument.launch("text/*") },
+            onClick = {
+                if (!state.isIngesting) {
+                    pickDocument.launch(
+                        arrayOf("application/pdf", "text/plain", "text/markdown", "text/*"),
+                    )
+                }
+            },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .windowInsetsPadding(WindowInsets.navigationBars)

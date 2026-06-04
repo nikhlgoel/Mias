@@ -76,7 +76,8 @@ class KnowledgeViewModel @Inject constructor(
             try {
                 val (name, text) = readUri(uri)
                 if (text.isBlank()) {
-                    _error.value = "Couldn't read any text from that file. Use a .txt or .md file."
+                    _error.value = "Couldn't read any text from that file. Scanned or image-only " +
+                        "PDFs aren't supported yet — try a text PDF, .txt or .md."
                     return@launch
                 }
                 when (val result = repository.ingest(name, text)) {
@@ -106,7 +107,10 @@ class KnowledgeViewModel @Inject constructor(
         viewModelScope.launch { _embeddingReady.value = repository.isEmbeddingReady() }
     }
 
-    /** Read a picked document's display name and UTF-8 text off the main thread. */
+    /**
+     * Read a picked document's display name and text off the main thread.
+     * Handles PDFs (PdfBox text extraction) and plain text / markdown.
+     */
     private suspend fun readUri(uri: Uri): Pair<String, String> = withContext(Dispatchers.IO) {
         val name = runCatching {
             context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
@@ -115,8 +119,17 @@ class KnowledgeViewModel @Inject constructor(
             }
         }.getOrNull() ?: "Document"
 
+        val mime = runCatching { context.contentResolver.getType(uri) }.getOrNull()
+        val isPdf = mime == "application/pdf" || name.endsWith(".pdf", ignoreCase = true)
+
         val text = runCatching {
-            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                if (isPdf) {
+                    dev.mias.app.util.PdfTextExtractor.extract(context, stream)
+                } else {
+                    stream.bufferedReader().readText()
+                }
+            }
         }.getOrNull().orEmpty()
 
         name to text

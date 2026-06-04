@@ -124,6 +124,9 @@ android {
 }
 
 dependencies {
+    // PDF text extraction for the knowledge base (on-device, no network).
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+
     // Core modules
     implementation(project(":core:common"))
     implementation(project(":core:inference"))

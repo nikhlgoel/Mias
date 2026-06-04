@@ -29,6 +29,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
@@ -36,6 +38,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -291,10 +294,14 @@ fun ChatScreen(
         val requestCameraPermission = rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission(),
         ) { granted -> if (granted) takePhoto.launch(null) }
+        val pickDocument = rememberLauncherForActivityResult(
+            ActivityResultContracts.OpenDocument(),
+        ) { uri -> if (uri != null) viewModel.attachDocument(uri) }
         var attachSheetOpen by remember { mutableStateOf(false) }
 
         if (attachSheetOpen) {
-            AttachmentSheet(
+            ComposerSheet(
+                selectedSkill = state.forcedSkill,
                 onDismiss = { attachSheetOpen = false },
                 onPickGallery = {
                     attachSheetOpen = false
@@ -312,6 +319,16 @@ fun ChatScreen(
                     ) == PackageManager.PERMISSION_GRANTED
                     if (granted) takePhoto.launch(null)
                     else requestCameraPermission.launch(Manifest.permission.CAMERA)
+                },
+                onPickDocument = {
+                    attachSheetOpen = false
+                    pickDocument.launch(
+                        arrayOf("application/pdf", "text/plain", "text/markdown", "text/*"),
+                    )
+                },
+                onSelectSkill = { skill ->
+                    viewModel.setForcedSkill(skill)
+                    attachSheetOpen = false
                 },
             )
         }
@@ -362,6 +379,51 @@ fun ChatScreen(
                     }
                 }
             }
+            // Transient banner after attaching a document from the composer.
+            state.attachNotice?.let { notice ->
+                LaunchedEffect(notice) {
+                    kotlinx.coroutines.delay(2600)
+                    viewModel.clearAttachNotice()
+                }
+                Text(
+                    text = notice,
+                    style = MiasTypography.LabelMedium,
+                    color = MiasColors.Heather,
+                    modifier = Modifier.padding(start = 8.dp, bottom = 6.dp),
+                )
+            }
+            // Active skill chip (set from the "+" menu). Tap to clear → Auto.
+            if (state.forcedSkill != null) {
+                Row(
+                    modifier = Modifier
+                        .padding(bottom = 8.dp)
+                        .clip(MiasShapes.Full)
+                        .background(MiasColors.HeatherContainer)
+                        .clickable { viewModel.setForcedSkill(null) }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Rounded.Bolt,
+                        contentDescription = null,
+                        tint = MiasColors.Heather,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = skillLabel(state.forcedSkill!!),
+                        style = MiasTypography.LabelMedium,
+                        color = MiasColors.TextHi,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        Icons.Rounded.Close,
+                        contentDescription = "Clear skill",
+                        tint = MiasColors.TextLo,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
             if (state.attachedImage != null) {
                 AttachedImageStrip(
                     image = state.attachedImage!!,
@@ -381,9 +443,8 @@ fun ChatScreen(
                         isProcessing = state.isProcessing,
                         enabled = !state.isProcessing,
                         onStop = viewModel::stopGeneration,
-                        onAttach = if (state.hasVisionModel) {
-                            { attachSheetOpen = true }
-                        } else null,
+                        // Always available — photos, files, and skills.
+                        onAttach = { attachSheetOpen = true },
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
@@ -781,10 +842,13 @@ private val SUGGESTIONS = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AttachmentSheet(
+private fun ComposerSheet(
+    selectedSkill: String?,
     onDismiss: () -> Unit,
     onPickGallery: () -> Unit,
     onCapture: () -> Unit,
+    onPickDocument: () -> Unit,
+    onSelectSkill: (String?) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
@@ -792,28 +856,89 @@ private fun AttachmentSheet(
         sheetState = sheetState,
         containerColor = MiasColors.Surface4,
     ) {
-        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
-            Text(
-                text = "Attach an image",
-                style = MiasTypography.LabelLarge,
-                color = MiasColors.TextLo,
-            )
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .windowInsetsPadding(WindowInsets.navigationBars),
+        ) {
+            Text("Add", style = MiasTypography.LabelLarge, color = MiasColors.TextLo)
             Spacer(modifier = Modifier.height(8.dp))
             AttachmentOption(
                 icon = Icons.Rounded.PhotoLibrary,
-                label = "Choose from gallery",
-                hint = "Pick any image already on this device",
+                label = "Add photo",
+                hint = "Pick an image from this device",
                 onClick = onPickGallery,
             )
             AttachmentOption(
                 icon = Icons.Rounded.PhotoCamera,
                 label = "Take a photo",
-                hint = "Capture with the camera right now",
+                hint = "Capture with the camera now",
                 onClick = onCapture,
             )
+            AttachmentOption(
+                icon = Icons.Rounded.Description,
+                label = "Add document",
+                hint = "PDF, .txt or .md — Mias can answer from it",
+                onClick = onPickDocument,
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Skills", style = MiasTypography.LabelLarge, color = MiasColors.TextLo)
+            Spacer(modifier = Modifier.height(8.dp))
+            // Bias the model toward a specific tool, or Auto (let it decide).
+            val skills = listOf(
+                null to "Auto",
+                "web_search" to "Web search",
+                "calculator" to "Calculator",
+                "datetime" to "Date & time",
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                skills.forEach { (id, label) ->
+                    SkillChip(
+                        label = label,
+                        selected = selectedSkill == id,
+                        onClick = { onSelectSkill(id) },
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(20.dp))
         }
     }
+}
+
+@Composable
+private fun SkillChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(MiasShapes.Full)
+            .background(if (selected) MiasColors.Heather.copy(alpha = 0.22f) else MiasColors.Surface2)
+            .border(
+                1.dp,
+                if (selected) MiasColors.Heather else MiasColors.OutlineSoft,
+                MiasShapes.Full,
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MiasTypography.LabelMedium,
+            color = if (selected) MiasColors.TextHi else MiasColors.TextLo,
+        )
+    }
+}
+
+private fun skillLabel(skill: String): String = when (skill) {
+    "web_search" -> "Web search"
+    "calculator" -> "Calculator"
+    "datetime" -> "Date & time"
+    else -> skill
 }
 
 @Composable

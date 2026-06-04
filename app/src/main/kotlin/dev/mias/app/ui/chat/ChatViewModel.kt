@@ -86,6 +86,10 @@ data class ChatUiState(
     val personas: List<Persona> = Personas.ALL,
     val selectedPersona: Persona = Personas.DEFAULT,
     val ragActive: Boolean = false,
+    /** Forced tool from the composer menu (null = Auto). */
+    val forcedSkill: String? = null,
+    /** Transient banner after attaching a document from chat. */
+    val attachNotice: String? = null,
 )
 
 sealed interface ChatEvent {
@@ -129,6 +133,12 @@ class ChatViewModel @Inject constructor(
     /** Whether the local knowledge base feeds into answers (persisted preference). */
     private val _useDocuments = MutableStateFlow(true)
 
+    /** A tool the user explicitly chose from the composer ("+") menu; null = Auto. */
+    private val _forcedSkill = MutableStateFlow<String?>(null)
+
+    /** Transient banner shown after attaching a document from chat. */
+    private val _attachNotice = MutableStateFlow<String?>(null)
+
     /**
      * Real creation time of this conversation. Captured once — from the loaded
      * conversation, or the first persisted message — and never reset, so
@@ -170,6 +180,14 @@ class ChatViewModel @Inject constructor(
         val title: String?,
     )
 
+    private data class SessionFlags(
+        val brainState: BrainState,
+        val cognitionState: CognitionState,
+        val persona: Persona,
+        val forcedSkill: String?,
+        val attachNotice: String?,
+    )
+
     val uiState: StateFlow<ChatUiState> = combine(
         combine(_messages, _attachedImage, _generatedTitle) { msgs, img, title ->
             MessagesSnapshot(msgs, img, title)
@@ -180,16 +198,17 @@ class ChatViewModel @Inject constructor(
             orchestrator.brainState,
             orchestrator.cognitionState,
             _selectedPersona,
-        ) { b, c, persona -> Triple(b, c, persona) },
+            _forcedSkill,
+            _attachNotice,
+        ) { b, c, persona, skill, notice -> SessionFlags(b, c, persona, skill, notice) },
         chatModelSelection,
-    ) { snapshot, input, processing, brainCogPersona, info ->
-        val (brain, cognition, persona) = brainCogPersona
+    ) { snapshot, input, processing, flags, info ->
         ChatUiState(
             messages = snapshot.messages,
             inputText = input,
             isProcessing = processing,
-            brainState = brain,
-            cognitionState = cognition,
+            brainState = flags.brainState,
+            cognitionState = flags.cognitionState,
             conversationTitle = snapshot.title
                 ?: snapshot.messages.firstOrNull { it.type == BubbleType.USER }?.text?.take(40)
                 ?: "New Conversation",
@@ -199,8 +218,10 @@ class ChatViewModel @Inject constructor(
             attachedImage = snapshot.attachedImage,
             hasVisionModel = info.hasVisionModel,
             personas = Personas.ALL,
-            selectedPersona = persona,
+            selectedPersona = flags.persona,
             ragActive = info.ragActive,
+            forcedSkill = flags.forcedSkill,
+            attachNotice = flags.attachNotice,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -222,6 +243,58 @@ class ChatViewModel @Inject constructor(
     /** Switch the active persona (system-prompt preset); persisted across launches. */
     fun selectPersona(id: String) {
         viewModelScope.launch { miasPreferences.setPersonaId(id) }
+    }
+
+    /** Choose a tool to favor for upcoming messages, or null for Auto. */
+    fun setForcedSkill(skill: String?) {
+        _forcedSkill.value = skill
+    }
+
+    fun clearAttachNotice() {
+        _attachNotice.value = null
+    }
+
+    /**
+     * Add a picked document to the local knowledge base from the chat composer.
+     * Reuses the same RAG ingestion as the Knowledge screen; once stored, future
+     * answers can draw on it. Reads off the main thread; reports via a banner.
+     */
+    fun attachDocument(uri: Uri) {
+        viewModelScope.launch {
+            _attachNotice.value = "Adding document…"
+            try {
+                val (name, text) = withContext(Dispatchers.IO) { readDocument(uri) }
+                if (text.isBlank()) {
+                    _attachNotice.value = "Couldn't read text from that file."
+                    return@launch
+                }
+                _attachNotice.value = when (val r = documentRepository.ingest(name, text)) {
+                    is MiasResult.Success -> "Added \"${r.data.name}\" — I can answer from it now"
+                    is MiasResult.Error -> r.message
+                }
+            } catch (e: Exception) {
+                _attachNotice.value = "Couldn't add that file: ${e.message}"
+            }
+        }
+    }
+
+    private fun readDocument(uri: Uri): Pair<String, String> {
+        val name = runCatching {
+            context.contentResolver.query(uri, null, null, null, null)?.use { c ->
+                val idx = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (idx >= 0 && c.moveToFirst()) c.getString(idx) else null
+            }
+        }.getOrNull() ?: "Document"
+
+        val mime = runCatching { context.contentResolver.getType(uri) }.getOrNull()
+        val isPdf = mime == "application/pdf" || name.endsWith(".pdf", ignoreCase = true)
+        val text = runCatching {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                if (isPdf) dev.mias.app.util.PdfTextExtractor.extract(context, stream)
+                else stream.bufferedReader().readText()
+            }
+        }.getOrNull().orEmpty()
+        return name to text
     }
 
     fun onInputChange(text: String) {
@@ -307,7 +380,11 @@ class ChatViewModel @Inject constructor(
                     .filter { it.isNotBlank() }
                     .joinToString("\n\n")
 
-                val systemPrompt = _selectedPersona.value.systemPrompt
+                val skillHint = _forcedSkill.value?.let { skill ->
+                    "\n\nThe user has explicitly requested the \"$skill\" tool for this " +
+                        "message. Use it by replying with the tool-call JSON for \"$skill\"."
+                }.orEmpty()
+                val systemPrompt = _selectedPersona.value.systemPrompt + skillHint
 
                 val metadata = buildMap<String, String> {
                     structuredIntent?.let { si ->

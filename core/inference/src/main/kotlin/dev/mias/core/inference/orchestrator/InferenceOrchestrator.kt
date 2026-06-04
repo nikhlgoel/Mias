@@ -80,6 +80,22 @@ class InferenceOrchestrator @Inject constructor(
      */
     private val generationMutex = Mutex()
 
+    /**
+     * Serializes model load/unload so a background warm-up can't race a
+     * foreground send on the same (single-slot) native engine.
+     */
+    private val loadMutex = Mutex()
+
+    /**
+     * Eagerly load the primary chat model (and, indirectly, warm the engine) so
+     * the first real message doesn't pay the multi-hundred-MB load cost. Safe to
+     * call repeatedly and best-effort — failures are swallowed; the next real
+     * request will surface any genuine problem.
+     */
+    suspend fun warmUp() {
+        runCatching { ensureModelLoaded(primaryEngine, BrainState.GEMMA_NPU) }
+    }
+
     /** Process a stimulus through the appropriate brain. */
     fun process(
         stimulus: Stimulus,
@@ -241,14 +257,14 @@ class InferenceOrchestrator @Inject constructor(
     private suspend fun ensureModelLoaded(
         engine: InferenceEngine,
         brainState: BrainState,
-    ): ModelReadiness {
-        if (brainState == BrainState.DEGRADED) return ModelReadiness.NoModelAssigned
+    ): ModelReadiness = loadMutex.withLock {
+        if (brainState == BrainState.DEGRADED) return@withLock ModelReadiness.NoModelAssigned
 
         val role = when (brainState) {
             BrainState.MOBILELLM_SURVIVAL -> ModelRole.SURVIVAL
             BrainState.QWEN_DESKTOP, BrainState.QWEN_WAKING -> ModelRole.CODE
             BrainState.GEMMA_NPU -> ModelRole.CHAT
-            BrainState.DEGRADED -> return ModelReadiness.NoModelAssigned
+            BrainState.DEGRADED -> return@withLock ModelReadiness.NoModelAssigned
         }
 
         // First try the role-specific model, then any CHAT model, then any
@@ -257,7 +273,7 @@ class InferenceOrchestrator @Inject constructor(
         val model = modelManager.getModelForRole(role)
             ?: modelManager.getModelForRole(ModelRole.CHAT)
             ?: modelManager.getModelForRole(ModelRole.SURVIVAL)
-            ?: return ModelReadiness.NoModelAssigned
+            ?: return@withLock ModelReadiness.NoModelAssigned
 
         // If the *same* model is already bound to this engine, skip the
         // reload — InferenceEngine.isModelLoaded alone is not enough because
@@ -265,7 +281,7 @@ class InferenceOrchestrator @Inject constructor(
         // since last call".
         val currentlyLoaded = loadedModelByEngine[engine]
         if (currentlyLoaded == model.id && engine.isModelLoaded()) {
-            return ModelReadiness.Ready(model.card.name)
+            return@withLock ModelReadiness.Ready(model.card.name)
         }
 
         // A different model needs to be loaded — unload first so the engine
@@ -275,7 +291,7 @@ class InferenceOrchestrator @Inject constructor(
             loadedModelByEngine.remove(engine)
         }
 
-        return when (val result = engine.loadModel(model.localPath)) {
+        when (val result = engine.loadModel(model.localPath)) {
             is MiasResult.Success -> {
                 loadedModelByEngine[engine] = model.id
                 modelManager.markUsed(model.id)
