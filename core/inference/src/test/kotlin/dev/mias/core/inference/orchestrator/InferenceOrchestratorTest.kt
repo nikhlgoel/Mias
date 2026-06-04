@@ -2,14 +2,18 @@
 
 import com.google.common.truth.Truth.assertThat
 import dev.mias.core.common.model.BrainState
+import dev.mias.core.common.model.Stimulus
+import dev.mias.core.common.model.StimulusType
 import dev.mias.core.inference.InferenceEngine
 import dev.mias.core.inference.engine.GoogleAiEdgeEngine
 import dev.mias.core.inference.react.ReActEngine
+import dev.mias.core.modelhub.manager.ModelManager
 import dev.mias.core.security.GuardrailProcessor
 import dev.mias.core.thermal.TawsAction
 import dev.mias.core.thermal.TawsGovernor
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -31,6 +35,8 @@ class InferenceOrchestratorTest {
     private lateinit var reActEngine: ReActEngine
     private lateinit var tawsGovernor: TawsGovernor
     private lateinit var guardrailProcessor: GuardrailProcessor
+    private lateinit var modelManager: ModelManager
+    private lateinit var roleClassifier: RoleClassifier
     private lateinit var orchestrator: InferenceOrchestrator
 
     @BeforeEach
@@ -40,6 +46,8 @@ class InferenceOrchestratorTest {
         reActEngine = mockk(relaxed = true)
         tawsGovernor = mockk(relaxed = true)
         guardrailProcessor = mockk(relaxed = true)
+        modelManager = mockk(relaxed = true)
+        roleClassifier = mockk(relaxed = true)
 
         orchestrator = InferenceOrchestrator(
             primaryEngine = primaryEngine,
@@ -47,19 +55,24 @@ class InferenceOrchestratorTest {
             reActEngine = reActEngine,
             tawsGovernor = tawsGovernor,
             guardrailProcessor = guardrailProcessor,
+            modelManager = modelManager,
+            roleClassifier = roleClassifier,
         )
     }
 
-    /** Helper to call private selectEngine via reflection. */
-    private fun callSelectEngine(action: TawsAction): Pair<InferenceEngine, BrainState> {
-        val method = InferenceOrchestrator::class.java.getDeclaredMethod(
-            "selectEngine",
-            TawsAction::class.java,
-        )
-        method.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
-        return method.invoke(orchestrator, action) as Pair<InferenceEngine, BrainState>
-    }
+    /**
+     * Call the now-internal suspend [InferenceOrchestrator.selectEngine] directly.
+     * A relaxed [roleClassifier] returns null, so role inference falls through to
+     * the keyword heuristic — CHAT for this neutral stimulus, which keeps the NPU
+     * path eligible exactly as the routing tests expect.
+     */
+    private fun callSelectEngine(action: TawsAction): Pair<InferenceEngine, BrainState> =
+        runBlocking {
+            orchestrator.selectEngine(
+                action,
+                Stimulus(type = StimulusType.USER_MESSAGE, content = "hello"),
+            )
+        }
 
     @Nested
     @DisplayName("CONTINUE_PRIMARY / THROTTLE_PRIMARY")

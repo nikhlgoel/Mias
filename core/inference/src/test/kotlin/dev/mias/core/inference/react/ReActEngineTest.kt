@@ -1,10 +1,11 @@
-﻿package dev.mias.core.inference.react
+package dev.mias.core.inference.react
 
 import com.google.common.truth.Truth.assertThat
 import dev.mias.core.common.MiasResult
 import dev.mias.core.inference.InferenceEngine
-import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
@@ -23,7 +24,7 @@ class ReActEngineTest {
     @BeforeEach
     fun setUp() {
         toolRegistry = ToolRegistry()
-        reActEngine = ReActEngine(toolRegistry)
+        reActEngine = ReActEngine(toolRegistry, Dispatchers.Unconfined)
         mockEngine = mockk(relaxed = true)
     }
 
@@ -34,34 +35,34 @@ class ReActEngineTest {
         @Test
         fun `stops after MAX_ITERATIONS and emits fallback FinalAnswer`() = runTest {
             // Model always returns a non-final action so the loop would run forever
-            // without the max-step guard
+            // without the max-step guard.
             val nonFinalJson = """
-                {"thought": "still thinking", "action": "some_tool", "action_input": {}, "is_final": false}
+                {"thought": "still thinking", "action": "some_tool", "action_input": {}, "is_final": false, "should_say": ""}
             """.trimIndent()
 
-            coEvery { mockEngine.generateStream(any(), any()) } returns flowOf(
+            every { mockEngine.generateStream(any(), any(), any()) } returns flowOf(
                 MiasResult.Success(nonFinalJson),
             )
 
-            // Register a dummy tool so executeAction doesn't return "not available"
-            toolRegistry.register("some_tool") { mapOf<String, String>() -> "ok" }
+            // Register a dummy tool so executeAction doesn't return "not available".
+            toolRegistry.register("some_tool") { "ok" }
 
             val steps = reActEngine.execute(
                 engine = mockEngine,
                 systemPrompt = "test",
                 userPrompt = "do something",
-                maxIterations = 3, // Use small number for test speed
+                maxIterations = 3,
             ).toList()
 
-            // The last step should be the fallback FinalAnswer from max iterations
             val finalSteps = steps.filterIsInstance<ReActStep.FinalAnswer>()
             assertThat(finalSteps).isNotEmpty()
-            assertThat(finalSteps.last().response).contains("thinking about this for a while")
+            // Loop-limit fallback message (no should_say was ever produced).
+            assertThat(finalSteps.last().response).contains("couldn't reach a complete answer")
         }
 
         @Test
-        fun `MAX_ITERATIONS constant is 7`() {
-            assertThat(ReActEngine.MAX_ITERATIONS).isEqualTo(7)
+        fun `MAX_ITERATIONS constant is 3`() {
+            assertThat(ReActEngine.MAX_ITERATIONS).isEqualTo(3)
         }
     }
 
@@ -80,14 +81,14 @@ class ReActEngineTest {
             toolRegistry.register("verbose_tool") { longOutput }
 
             val actionJson = """
-                {"thought": "need data", "action": "verbose_tool", "action_input": {}, "is_final": false}
+                {"thought": "need data", "action": "verbose_tool", "action_input": {}, "is_final": false, "should_say": ""}
             """.trimIndent()
             val finalJson = """
-                {"thought": "done", "action": "respond_user", "action_input": {"response": "here"}, "is_final": true}
+                {"thought": "done", "action": "respond_user", "action_input": {"response": "here"}, "is_final": true, "should_say": "here"}
             """.trimIndent()
 
             var callCount = 0
-            coEvery { mockEngine.generateStream(any(), any()) } answers {
+            every { mockEngine.generateStream(any(), any(), any()) } answers {
                 callCount++
                 if (callCount == 1) flowOf(MiasResult.Success(actionJson))
                 else flowOf(MiasResult.Success(finalJson))
@@ -112,14 +113,14 @@ class ReActEngineTest {
             toolRegistry.register("short_tool") { shortOutput }
 
             val actionJson = """
-                {"thought": "need data", "action": "short_tool", "action_input": {}, "is_final": false}
+                {"thought": "need data", "action": "short_tool", "action_input": {}, "is_final": false, "should_say": ""}
             """.trimIndent()
             val finalJson = """
-                {"thought": "done", "action": "respond_user", "action_input": {"response": "here"}, "is_final": true}
+                {"thought": "done", "action": "respond_user", "action_input": {"response": "here"}, "is_final": true, "should_say": "here"}
             """.trimIndent()
 
             var callCount = 0
-            coEvery { mockEngine.generateStream(any(), any()) } answers {
+            every { mockEngine.generateStream(any(), any(), any()) } answers {
                 callCount++
                 if (callCount == 1) flowOf(MiasResult.Success(actionJson))
                 else flowOf(MiasResult.Success(finalJson))
@@ -146,14 +147,14 @@ class ReActEngineTest {
             toolRegistry.register("real_tool") { "result" }
 
             val actionJson = """
-                {"thought": "use fake", "action": "hallucinated_tool", "action_input": {}, "is_final": false}
+                {"thought": "use fake", "action": "hallucinated_tool", "action_input": {}, "is_final": false, "should_say": ""}
             """.trimIndent()
             val finalJson = """
-                {"thought": "ok", "action": "respond_user", "action_input": {"response": "done"}, "is_final": true}
+                {"thought": "ok", "action": "respond_user", "action_input": {"response": "done"}, "is_final": true, "should_say": "done"}
             """.trimIndent()
 
             var callCount = 0
-            coEvery { mockEngine.generateStream(any(), any()) } answers {
+            every { mockEngine.generateStream(any(), any(), any()) } answers {
                 callCount++
                 if (callCount == 1) flowOf(MiasResult.Success(actionJson))
                 else flowOf(MiasResult.Success(finalJson))
@@ -177,12 +178,12 @@ class ReActEngineTest {
     inner class FinalAnswerTests {
 
         @Test
-        fun `emits FinalAnswer when is_final is true`() = runTest {
+        fun `emits FinalAnswer from should_say when is_final is true`() = runTest {
             val finalJson = """
-                {"thought": "I know the answer", "action": "respond_user", "action_input": {"response": "Hello!"}, "is_final": true}
+                {"thought": "I know the answer", "action": "respond_user", "action_input": {}, "is_final": true, "should_say": "Hello!"}
             """.trimIndent()
 
-            coEvery { mockEngine.generateStream(any(), any()) } returns flowOf(
+            every { mockEngine.generateStream(any(), any(), any()) } returns flowOf(
                 MiasResult.Success(finalJson),
             )
 
@@ -198,12 +199,12 @@ class ReActEngineTest {
         }
 
         @Test
-        fun `emits FinalAnswer with thought when no response key`() = runTest {
+        fun `emits FinalAnswer with thought when no should_say or response key`() = runTest {
             val finalJson = """
-                {"thought": "The answer is 42", "action": "respond_user", "action_input": {}, "is_final": true}
+                {"thought": "The answer is 42", "action": "respond_user", "action_input": {}, "is_final": true, "should_say": ""}
             """.trimIndent()
 
-            coEvery { mockEngine.generateStream(any(), any()) } returns flowOf(
+            every { mockEngine.generateStream(any(), any(), any()) } returns flowOf(
                 MiasResult.Success(finalJson),
             )
 
@@ -220,7 +221,7 @@ class ReActEngineTest {
 
         @Test
         fun `emits FinalAnswer on engine error`() = runTest {
-            coEvery { mockEngine.generateStream(any(), any()) } returns flowOf(
+            every { mockEngine.generateStream(any(), any(), any()) } returns flowOf(
                 MiasResult.Error("OOM: out of memory"),
             )
 

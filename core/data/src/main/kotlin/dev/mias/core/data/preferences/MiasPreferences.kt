@@ -25,9 +25,11 @@ data class MiasPrefs(
     val desktopHost: String = "",
     val desktopPort: Int = DEFAULT_DESKTOP_PORT,
     val desktopToken: String = "",
+    val personaId: String = DEFAULT_PERSONA_ID,
 ) {
     companion object {
         const val DEFAULT_DESKTOP_PORT: Int = 8401
+        const val DEFAULT_PERSONA_ID: String = "default"
     }
 }
 
@@ -41,12 +43,17 @@ class MiasPreferences @Inject constructor(
         val DESKTOP_HOST = stringPreferencesKey("desktop_host")
         val DESKTOP_PORT = intPreferencesKey("desktop_port")
         val DESKTOP_TOKEN = stringPreferencesKey("desktop_token")
+        val PERSONA_ID = stringPreferencesKey("persona_id")
     }
 
     val prefsFlow: Flow<MiasPrefs> = context.dataStore.data.map { it.toMiasPrefs() }
 
     suspend fun setHuggingFaceToken(token: String) {
         context.dataStore.edit { it[Keys.HF_TOKEN] = token.trim() }
+    }
+
+    suspend fun setPersonaId(id: String) {
+        context.dataStore.edit { it[Keys.PERSONA_ID] = id }
     }
 
     suspend fun setDesktopEndpoint(host: String, port: Int, token: String) {
@@ -62,5 +69,6 @@ class MiasPreferences @Inject constructor(
         desktopHost = this[Keys.DESKTOP_HOST].orEmpty(),
         desktopPort = this[Keys.DESKTOP_PORT] ?: MiasPrefs.DEFAULT_DESKTOP_PORT,
         desktopToken = this[Keys.DESKTOP_TOKEN].orEmpty(),
+        personaId = this[Keys.PERSONA_ID] ?: MiasPrefs.DEFAULT_PERSONA_ID,
     )
 }

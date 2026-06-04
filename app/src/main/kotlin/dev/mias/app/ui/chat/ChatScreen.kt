@@ -39,6 +39,7 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Face
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Share
@@ -186,6 +187,7 @@ fun ChatScreen(
             onBack = onNavigateBack,
             onToggleReAct = viewModel::toggleReActSteps,
             onSelectModel = viewModel::selectChatModel,
+            onSelectPersona = viewModel::selectPersona,
             onShare = shareConversation,
         )
 
@@ -402,10 +404,13 @@ private fun ChatTopBar(
     onBack: () -> Unit,
     onToggleReAct: () -> Unit,
     onSelectModel: (String) -> Unit,
+    onSelectPersona: (String) -> Unit = {},
     onShare: () -> Unit = {},
 ) {
     var pickerOpen by remember { mutableStateOf(false) }
+    var personaSheetOpen by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val personaSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val activeModel = state.chatModels.firstOrNull { it.id == state.activeChatModelId }
         ?: state.chatModels.firstOrNull()
@@ -442,6 +447,15 @@ private fun ChatTopBar(
             }
 
             Spacer(modifier = Modifier.weight(1f))
+
+            IconButton(onClick = { personaSheetOpen = true }) {
+                Icon(
+                    imageVector = Icons.Rounded.Face,
+                    contentDescription = "Choose persona",
+                    tint = MiasColors.TextSecondary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
 
             if (state.messages.isNotEmpty()) {
                 IconButton(onClick = onShare) {
@@ -499,6 +513,86 @@ private fun ChatTopBar(
                 },
             )
         }
+    }
+
+    if (personaSheetOpen) {
+        ModalBottomSheet(
+            onDismissRequest = { personaSheetOpen = false },
+            sheetState = personaSheetState,
+            containerColor = MiasColors.Background,
+        ) {
+            PersonaPicker(
+                personas = state.personas,
+                selectedId = state.selectedPersona.id,
+                onPick = { id ->
+                    onSelectPersona(id)
+                    scope.launch { personaSheetState.hide() }.invokeOnCompletion {
+                        personaSheetOpen = false
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun PersonaPicker(
+    personas: List<dev.mias.core.common.model.Persona>,
+    selectedId: String,
+    onPick: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.navigationBars)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = "Persona",
+            style = MiasTypography.LabelMedium,
+            color = MiasColors.TextSecondary,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+        )
+        personas.forEach { persona ->
+            val selected = persona.id == selectedId
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+                    .clip(MiasShapes.Card)
+                    .background(if (selected) MiasColors.SurfaceGlass else MiasColors.Surface2)
+                    .border(
+                        1.dp,
+                        if (selected) MiasColors.Heather else MiasColors.OutlineSoft,
+                        MiasShapes.Card,
+                    )
+                    .clickable { onPick(persona.id) }
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = persona.name,
+                        style = MiasTypography.LabelLarge,
+                        color = MiasColors.TextPrimary,
+                    )
+                    Text(
+                        text = persona.tagline,
+                        style = MiasTypography.BodySmall,
+                        color = MiasColors.TextSecondary,
+                    )
+                }
+                if (selected) {
+                    Icon(
+                        imageVector = Icons.Rounded.CheckCircle,
+                        contentDescription = null,
+                        tint = MiasColors.Heather,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 

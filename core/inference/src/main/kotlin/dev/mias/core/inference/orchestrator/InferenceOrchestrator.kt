@@ -202,7 +202,9 @@ class InferenceOrchestrator @Inject constructor(
         }
     }
 
-    private suspend fun selectEngine(tawsAction: TawsAction, stimulus: Stimulus): Pair<InferenceEngine, BrainState> =
+    // internal (not private) so engine-routing can be unit-tested directly
+    // rather than through fragile reflection on a suspend function.
+    internal suspend fun selectEngine(tawsAction: TawsAction, stimulus: Stimulus): Pair<InferenceEngine, BrainState> =
         when (tawsAction) {
             TawsAction.CONTINUE_PRIMARY, TawsAction.THROTTLE_PRIMARY -> {
                 val role = inferRole(stimulus)

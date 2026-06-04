@@ -13,6 +13,8 @@ import dev.mias.core.common.getOrDefault
 import dev.mias.core.common.getOrNull
 import dev.mias.core.common.model.BrainState
 import dev.mias.core.common.model.CognitionState
+import dev.mias.core.common.model.Persona
+import dev.mias.core.common.model.Personas
 import dev.mias.core.common.model.Stimulus
 import dev.mias.core.common.model.StimulusType
 import dev.mias.core.data.Conversation
@@ -20,6 +22,7 @@ import dev.mias.core.data.ConversationRepository
 import dev.mias.core.data.Message
 import dev.mias.core.data.Role
 import dev.mias.core.data.hindsight.HindsightMemory
+import dev.mias.core.data.preferences.MiasPreferences
 import dev.mias.core.common.MiasResult
 import dev.mias.core.inference.orchestrator.InferenceOrchestrator
 import dev.mias.core.inference.react.ReActStep
@@ -79,6 +82,8 @@ data class ChatUiState(
     val activeChatModelId: String? = null,
     val attachedImage: Bitmap? = null,
     val hasVisionModel: Boolean = false,
+    val personas: List<Persona> = Personas.ALL,
+    val selectedPersona: Persona = Personas.DEFAULT,
 )
 
 sealed interface ChatEvent {
@@ -94,6 +99,7 @@ class ChatViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
     private val modelManager: ModelManager,
     private val visionEngine: MediaPipeVisionEngine,
+    private val miasPreferences: MiasPreferences,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -113,6 +119,9 @@ class ChatViewModel @Inject constructor(
      */
     private val _generatedTitle = MutableStateFlow<String?>(null)
     private var titleJob: Job? = null
+
+    /** The active persona (system-prompt preset). Persisted via DataStore. */
+    private val _selectedPersona = MutableStateFlow(Personas.DEFAULT)
 
     /**
      * Real creation time of this conversation. Captured once — from the loaded
@@ -154,15 +163,20 @@ class ChatViewModel @Inject constructor(
         },
         _inputText,
         _isProcessing,
-        combine(orchestrator.brainState, orchestrator.cognitionState) { b, c -> b to c },
+        combine(
+            orchestrator.brainState,
+            orchestrator.cognitionState,
+            _selectedPersona,
+        ) { b, c, persona -> Triple(b, c, persona) },
         chatModelSelection,
-    ) { snapshot, input, processing, brainCog, info ->
+    ) { snapshot, input, processing, brainCogPersona, info ->
+        val (brain, cognition, persona) = brainCogPersona
         ChatUiState(
             messages = snapshot.messages,
             inputText = input,
             isProcessing = processing,
-            brainState = brainCog.first,
-            cognitionState = brainCog.second,
+            brainState = brain,
+            cognitionState = cognition,
             conversationTitle = snapshot.title
                 ?: snapshot.messages.firstOrNull { it.type == BubbleType.USER }?.text?.take(40)
                 ?: "New Conversation",
@@ -171,6 +185,8 @@ class ChatViewModel @Inject constructor(
             activeChatModelId = info.activeChatModelId,
             attachedImage = snapshot.attachedImage,
             hasVisionModel = info.hasVisionModel,
+            personas = Personas.ALL,
+            selectedPersona = persona,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -180,6 +196,17 @@ class ChatViewModel @Inject constructor(
 
     init {
         loadExistingConversation()
+        // Keep the active persona in sync with the persisted preference.
+        viewModelScope.launch {
+            miasPreferences.prefsFlow.collect { prefs ->
+                _selectedPersona.value = Personas.byId(prefs.personaId)
+            }
+        }
+    }
+
+    /** Switch the active persona (system-prompt preset); persisted across launches. */
+    fun selectPersona(id: String) {
+        viewModelScope.launch { miasPreferences.setPersonaId(id) }
     }
 
     fun onInputChange(text: String) {
@@ -252,7 +279,7 @@ class ChatViewModel @Inject constructor(
                     ?.toPromptString()
                     ?: ""
 
-                val systemPrompt = InferenceOrchestrator.DEFAULT_SYSTEM_PROMPT
+                val systemPrompt = _selectedPersona.value.systemPrompt
 
                 val metadata = buildMap<String, String> {
                     structuredIntent?.let { si ->
