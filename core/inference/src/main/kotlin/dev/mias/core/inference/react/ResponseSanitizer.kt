@@ -59,9 +59,46 @@ object ResponseSanitizer {
             }
         }
 
-        // No usable JSON — strip fences / control headers and return as prose.
-        return SanitizedResponse(cleanupPlain(trimmed), null)
+        // No cleanly-parseable JSON. The model may still have emitted *malformed*
+        // JSON (truncated braces, leading prose, etc.) where a clean parse fails
+        // but the should_say value is recoverable — strip the residue.
+        val cleaned = stripJsonResidue(cleanupPlain(trimmed))
+        return SanitizedResponse(cleaned, null)
     }
+
+    /**
+     * Last-resort cleaner for text that isn't valid JSON but carries JSON
+     * residue. Pulls out a `should_say` value if present; otherwise removes
+     * dangling braces, control keys (`is_final`, `action`, `thought`, …) and
+     * the punctuation around them, leaving only the conversational text.
+     */
+    fun stripJsonResidue(input: String): String {
+        if (input.isBlank()) return input
+        // 1. If a should_say value is present, that *is* the reply.
+        SHOULD_SAY_VALUE.find(input)?.groups?.get(1)?.value?.let { value ->
+            return unescapeJson(value).trim()
+        }
+        // 2. Otherwise scrub dangling structural fragments.
+        var out = input
+            .replace(MARKDOWN_JSON_FENCE, "")
+            .replace(STRUCTURAL_KEY, "")     // "is_final": false , "action": "x" , …
+            .replace(DANGLING_PUNCT, " ")    // leftover { } [ ] : , around them
+            .replace(Regex("\\s+"), " ")
+            .trim()
+        // Trim a leading/trailing brace or comma the regexes may have left.
+        out = out.trim('{', '}', ',', ' ', '"')
+        return out.trim()
+    }
+
+    private fun unescapeJson(s: String): String = s
+        .replace("\\n", "\n").replace("\\t", "\t").replace("\\\"", "\"").replace("\\\\", "\\")
+
+    private val SHOULD_SAY_VALUE =
+        Regex("\"should_say\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
+    private val MARKDOWN_JSON_FENCE = Regex("```[a-zA-Z]*|```")
+    private val STRUCTURAL_KEY =
+        Regex("\"(is_final|action|action_input|thought|response|should_say)\"\\s*:\\s*(\"[^\"]*\"|true|false|null|\\{[^}]*\\}|\\[[^\\]]*\\])?")
+    private val DANGLING_PUNCT = Regex("[{}\\[\\]]|^[\\s,:]+|[\\s,:]+$")
 
     private fun firstStringField(obj: JsonObject, keys: List<String>): String? {
         for (key in keys) {

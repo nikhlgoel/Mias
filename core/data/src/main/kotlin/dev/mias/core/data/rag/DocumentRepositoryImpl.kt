@@ -33,7 +33,11 @@ class DocumentRepositoryImpl @Inject constructor(
 
     override fun observeDocumentCount(): Flow<Int> = dao.observeDocumentCount().flowOn(ioDispatcher)
 
-    override suspend fun ingest(name: String, text: String): MiasResult<Document> =
+    override suspend fun ingest(
+        name: String,
+        text: String,
+        conversationId: String?,
+    ): MiasResult<Document> =
         withContext(ioDispatcher) {
             runCatchingMias {
                 val pieces = TextChunker.chunk(text)
@@ -71,6 +75,7 @@ class DocumentRepositoryImpl @Inject constructor(
                     addedAt = now,
                     charCount = text.length,
                     chunkCount = chunks.size,
+                    conversationId = conversationId,
                 )
                 dao.insertDocumentWithChunks(document, chunks)
                 document.toDomain()
@@ -82,20 +87,33 @@ class DocumentRepositoryImpl @Inject constructor(
             runCatchingMias { dao.deleteDocument(id) }
         }
 
-    override suspend fun retrieve(query: String, topK: Int): String =
+    override suspend fun retrieve(
+        query: String,
+        conversationId: String?,
+        topK: Int,
+    ): RetrievedContext =
         withContext(ioDispatcher) {
             runCatching {
-                if (query.isBlank()) return@runCatching ""
+                if (query.isBlank()) return@runCatching RetrievedContext.EMPTY
                 val queryVec = when (val r = embeddingProvider.getEmbedding(query)) {
                     is MiasResult.Success -> r.data
-                    is MiasResult.Error -> return@runCatching ""
+                    is MiasResult.Error -> return@runCatching RetrievedContext.EMPTY
                 }
-                val chunks = dao.getAllChunks()
-                if (chunks.isEmpty()) return@runCatching ""
+
+                // Scope: global documents (conversationId == null) plus any
+                // belonging to this conversation.
+                val docs = dao.getAllDocuments().associateBy { it.id }
+                val inScopeDocIds = docs.values
+                    .filter { it.conversationId == null || it.conversationId == conversationId }
+                    .map { it.id }
+                    .toSet()
+                if (inScopeDocIds.isEmpty()) return@runCatching RetrievedContext.EMPTY
+
+                val chunks = dao.getAllChunks().filter { it.documentId in inScopeDocIds }
+                if (chunks.isEmpty()) return@runCatching RetrievedContext.EMPTY
 
                 val scored = chunks.mapNotNull { chunk ->
                     val vec = chunk.embedding?.toFloatArray() ?: return@mapNotNull null
-                    // Guard against a dimension mismatch if the embedding model changed.
                     if (vec.size != queryVec.size) return@mapNotNull null
                     chunk to vec.cosineSimilarity(queryVec)
                 }
@@ -105,13 +123,19 @@ class DocumentRepositoryImpl @Inject constructor(
                     .take(topK)
                     .filter { it.second >= MIN_RELEVANCE }
 
-                if (top.isEmpty()) return@runCatching ""
+                if (top.isEmpty()) return@runCatching RetrievedContext.EMPTY
 
-                buildString {
+                val promptText = buildString {
                     appendLine("## From your documents")
                     top.forEach { (chunk, _) -> appendLine("- ${chunk.text.trim()}") }
                 }.trim()
-            }.getOrDefault("")
+
+                val sources = top
+                    .mapNotNull { (chunk, _) -> docs[chunk.documentId]?.name }
+                    .distinct()
+
+                RetrievedContext(promptText = promptText, sources = sources)
+            }.getOrDefault(RetrievedContext.EMPTY)
         }
 
     override suspend fun isEmbeddingReady(): Boolean =
@@ -122,6 +146,7 @@ class DocumentRepositoryImpl @Inject constructor(
         name = name,
         addedAt = addedAt,
         chunkCount = chunkCount,
+        conversationId = conversationId,
     )
 
     companion object {

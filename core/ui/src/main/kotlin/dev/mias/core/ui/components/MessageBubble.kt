@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material3.Icon
@@ -74,6 +75,8 @@ fun MessageBubble(
     image: Bitmap? = null,
     /** Parsed reasoning ("thought"); shown in a collapsible box above the reply. */
     reasoning: String? = null,
+    /** Document names this answer drew on (RAG citations). */
+    sources: List<String> = emptyList(),
     /** Long-press handler (e.g. copy the message). No-op tap; null disables it. */
     onLongPress: (() -> Unit)? = null,
 ) {
@@ -174,6 +177,27 @@ fun MessageBubble(
                                 color = textColor,
                             )
                         }
+                    }
+                }
+
+                // RAG citations — which documents this answer drew on.
+                if (type == BubbleType.Mias && sources.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.Description,
+                            contentDescription = null,
+                            tint = MiasColors.Heather,
+                            modifier = Modifier.size(13.dp),
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = sources.joinToString(" · "),
+                            style = MiasTypography.LabelSmall,
+                            color = MiasColors.TextLo,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
                     }
                 }
             }

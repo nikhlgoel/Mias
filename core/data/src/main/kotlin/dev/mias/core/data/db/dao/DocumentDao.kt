@@ -15,6 +15,9 @@ interface DocumentDao {
     @Query("SELECT * FROM documents ORDER BY addedAt DESC")
     fun observeDocuments(): Flow<List<DocumentEntity>>
 
+    @Query("SELECT * FROM documents")
+    suspend fun getAllDocuments(): List<DocumentEntity>
+
     @Query("SELECT COUNT(*) FROM documents")
     fun observeDocumentCount(): Flow<Int>
 

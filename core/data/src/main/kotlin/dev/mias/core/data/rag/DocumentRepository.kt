@@ -9,7 +9,19 @@ data class Document(
     val name: String,
     val addedAt: Long,
     val chunkCount: Int,
+    /** Null = global; otherwise the chat this document is scoped to. */
+    val conversationId: String? = null,
 )
+
+/** Retrieved RAG context plus the document names it was drawn from (for citations). */
+data class RetrievedContext(
+    val promptText: String,
+    val sources: List<String>,
+) {
+    companion object {
+        val EMPTY = RetrievedContext("", emptyList())
+    }
+}
 
 /**
  * Local-only RAG store: ingest user text, embed it, and retrieve the most
@@ -21,17 +33,29 @@ interface DocumentRepository {
 
     fun observeDocumentCount(): Flow<Int>
 
-    /** Chunk, embed, and store [text]. Fails clearly if no embedding model is available. */
-    suspend fun ingest(name: String, text: String): MiasResult<Document>
+    /**
+     * Chunk, embed, and store [text]. Fails clearly if no embedding model is
+     * available. [conversationId] scopes the document to a single chat; null
+     * makes it global (available to every chat).
+     */
+    suspend fun ingest(
+        name: String,
+        text: String,
+        conversationId: String? = null,
+    ): MiasResult<Document>
 
     suspend fun deleteDocument(id: String): MiasResult<Unit>
 
     /**
-     * Retrieve the passages most relevant to [query], formatted for the prompt.
-     * Returns an empty string when there are no documents, no embedding model,
-     * or nothing relevant — callers can always concatenate it safely.
+     * Retrieve the passages most relevant to [query] from global documents plus
+     * any scoped to [conversationId], with their source names for citations.
+     * Returns [RetrievedContext.EMPTY] when nothing applies — always safe to use.
      */
-    suspend fun retrieve(query: String, topK: Int = DEFAULT_TOP_K): String
+    suspend fun retrieve(
+        query: String,
+        conversationId: String? = null,
+        topK: Int = DEFAULT_TOP_K,
+    ): RetrievedContext
 
     /** Whether embeddings can currently be produced. */
     suspend fun isEmbeddingReady(): Boolean

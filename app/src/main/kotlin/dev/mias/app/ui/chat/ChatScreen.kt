@@ -228,6 +228,7 @@ fun ChatScreen(
                                 isStreaming = message.isStreaming,
                                 image = message.image,
                                 reasoning = message.reasoning,
+                                sources = message.sources,
                                 onLongPress = { copyMessage(message.text) },
                             )
                         }

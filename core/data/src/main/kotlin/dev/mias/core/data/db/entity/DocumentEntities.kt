@@ -16,6 +16,12 @@ data class DocumentEntity(
     val addedAt: Long,
     val charCount: Int,
     val chunkCount: Int,
+    /**
+     * Scope: null = global (available to every chat); a conversation id = only
+     * retrievable within that chat. Documents added from the Knowledge screen
+     * are global; documents attached from a specific chat are scoped to it.
+     */
+    val conversationId: String? = null,
 )
 
 /**

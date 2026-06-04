@@ -27,18 +27,27 @@ object StreamingReActParser {
 
     private val FORM_FEED: Char = 12.toChar()
 
+    // Structural keys that mark the buffer as (forming/partial) JSON, so we must
+    // never spill the raw text into the chat body.
+    private val JSON_MARKERS = listOf(
+        "\"should_say\"", "\"is_final\"", "\"action\"", "\"action_input\"", "\"thought\"",
+    )
+
     fun parse(buffer: String): StreamState {
         val thinking = THOUGHT.find(buffer)?.groupValues?.getOrNull(1)?.let { unescape(it) }.orEmpty()
         val say = SHOULD_SAY.find(buffer)?.groupValues?.getOrNull(1)?.let { unescape(it) }
 
+        val looksJson = buffer.trimStart().startsWith("{") ||
+            JSON_MARKERS.any { it in buffer }
+
         val visible = when {
-            // JSON tool-call form: surface should_say once it appears.
+            // JSON form: surface ONLY the should_say value, never the structure.
             say != null -> say
-            // A JSON object is still forming (tool call) — don't leak braces;
-            // the thought (if any) carries the activity until should_say lands.
-            buffer.trimStart().startsWith("{") -> ""
-            // Plain-language reply (the common case now that grammar is off):
-            // stream the text straight through.
+            // JSON forming/partial — show nothing in the body until should_say
+            // lands (the thought box carries the activity meanwhile). This is
+            // what stops fragments like `,"is_final":false,...}` from leaking.
+            looksJson -> ""
+            // Genuine plain-language reply — stream it straight through.
             else -> buffer
         }
         return StreamState(thinking = thinking.trim(), visible = visible)

@@ -7,11 +7,15 @@ import dev.mias.core.common.MiasResult
 import dev.mias.core.common.di.IoDispatcher
 import dev.mias.core.inference.orchestrator.InferenceOrchestrator
 import dev.mias.core.inference.react.ReActStep
+import dev.mias.core.inference.react.ResponseSanitizer
+import dev.mias.core.inference.react.StreamingReActParser
 import dev.mias.core.speech.SpeechEngine
 import dev.mias.core.speech.SpeechState
 import dev.mias.core.speech.TtsEngine
+import dev.mias.core.common.model.Personas
 import dev.mias.core.common.model.Stimulus
 import dev.mias.core.common.model.StimulusType
+import dev.mias.core.data.preferences.MiasPreferences
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,8 +30,13 @@ class VoiceChatViewModel @Inject constructor(
     private val speechEngine: SpeechEngine,
     private val ttsEngine: TtsEngine,
     private val orchestrator: InferenceOrchestrator,
+    private val miasPreferences: MiasPreferences,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
+
+    /** Active persona's system prompt, kept in sync with the saved preference. */
+    @Volatile
+    private var personaPrompt: String = Personas.DEFAULT.systemPrompt
 
     private val _isListening = MutableStateFlow(false)
     val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
@@ -43,6 +52,12 @@ class VoiceChatViewModel @Inject constructor(
     val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
 
     init {
+        // Keep the voice persona in sync with the user's selection.
+        viewModelScope.launch {
+            miasPreferences.prefsFlow.collect { prefs ->
+                personaPrompt = Personas.byId(prefs.personaId).systemPrompt
+            }
+        }
         // Observe SpeechEngine result directly since StateFlow casting blocked .value
         viewModelScope.launch {
             speechEngine.result.filterNotNull().collectLatest { result ->
@@ -107,22 +122,29 @@ class VoiceChatViewModel @Inject constructor(
         _isProcessing.value = true
 
         viewModelScope.launch {
-            val responseBuilder = StringBuilder()
+            // Accumulate the RAW stream privately and only ever surface the
+            // parsed, cleaned conversational text — never structural JSON or an
+            // echoed system prompt. While the visible part is still empty the
+            // screen shows its "Thinking…" state, not the raw tokens.
+            val rawBuffer = StringBuilder()
             val stimulus = Stimulus(
                 type = StimulusType.USER_MESSAGE,
                 content = text,
             )
             try {
-                orchestrator.process(stimulus).collect { step ->
+                orchestrator.process(stimulus, systemPrompt = personaPrompt).collect { step ->
                     when (step) {
                         is ReActStep.FinalAnswer -> {
-                            responseBuilder.append(step.response)
-                            _aiResponse.value = responseBuilder.toString()
-                            ttsEngine.speak(step.response, flush = true)
+                            val clean = stripInstructionEcho(
+                                ResponseSanitizer.sanitize(step.response).chatText,
+                            )
+                            _aiResponse.value = clean
+                            if (clean.isNotBlank()) ttsEngine.speak(clean, flush = true)
                         }
                         is ReActStep.TokenChunk -> {
-                            responseBuilder.append(step.text)
-                            _aiResponse.value = responseBuilder.toString()
+                            rawBuffer.append(step.text)
+                            val visible = StreamingReActParser.parse(rawBuffer.toString()).visible
+                            _aiResponse.value = stripInstructionEcho(visible)
                         }
                         else -> Unit
                     }
@@ -133,9 +155,38 @@ class VoiceChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Defensive filter: drop any line that echoes the system prompt, so the
+     * persona instructions can never appear on the voice screen even if a weak
+     * model regurgitates them.
+     */
+    private fun stripInstructionEcho(text: String): String {
+        if (text.isBlank()) return text
+        return text.lineSequence()
+            .filterNot { line ->
+                val l = line.lowercase()
+                INSTRUCTION_SIGNATURES.any { it in l }
+            }
+            .joinToString("\n")
+            .trim()
+    }
+
     override fun onCleared() {
         super.onCleared()
         speechEngine.release()
         ttsEngine.release()
+    }
+
+    companion object {
+        /** Lowercase fragments that identify a leaked system-prompt line. */
+        private val INSTRUCTION_SIGNATURES = listOf(
+            "you are mias",
+            "personal assistant that runs",
+            "runs entirely on",
+            "speak with a calm",
+            "think through problems",
+            "trusted colleague",
+            "reply directly in plain",
+        )
     }
 }

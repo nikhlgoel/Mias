@@ -26,6 +26,7 @@ object DataModule {
                 MiasDatabase.MIGRATION_1_2,
                 MiasDatabase.MIGRATION_2_3,
                 MiasDatabase.MIGRATION_3_4,
+                MiasDatabase.MIGRATION_4_5,
             )
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()

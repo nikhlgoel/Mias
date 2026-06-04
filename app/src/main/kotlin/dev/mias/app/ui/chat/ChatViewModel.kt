@@ -24,6 +24,7 @@ import dev.mias.core.data.Role
 import dev.mias.core.data.hindsight.HindsightMemory
 import dev.mias.core.data.preferences.MiasPreferences
 import dev.mias.core.data.rag.DocumentRepository
+import dev.mias.core.data.rag.RetrievedContext
 import dev.mias.core.common.MiasResult
 import dev.mias.core.inference.orchestrator.InferenceOrchestrator
 import dev.mias.core.inference.react.ReActStep
@@ -70,6 +71,8 @@ data class ChatMessage(
     val imagePath: String? = null,
     /** Parsed reasoning for an assistant turn. Stored, not replayed to the model. */
     val reasoning: String? = null,
+    /** Document names this answer drew on (RAG citations). */
+    val sources: List<String> = emptyList(),
 )
 
 data class ChatUiState(
@@ -301,9 +304,11 @@ class ChatViewModel @Inject constructor(
                     _attachNotice.value = "Couldn't read text from that file."
                     return@launch
                 }
-                _attachNotice.value = when (val r = documentRepository.ingest(name, text)) {
-                    is MiasResult.Success -> "Added \"${r.data.name}\" — I can answer from it now"
-                    is MiasResult.Error -> r.message
+                // Scope chat-attached documents to this conversation.
+                val ingestResult = documentRepository.ingest(name, text, conversationId)
+                _attachNotice.value = when (ingestResult) {
+                    is MiasResult.Success -> "Added \"${ingestResult.data.name}\" — I can answer from it now"
+                    is MiasResult.Error -> ingestResult.message
                 }
             } catch (e: Exception) {
                 _attachNotice.value = "Couldn't add that file: ${e.message}"
@@ -401,14 +406,17 @@ class ChatViewModel @Inject constructor(
                     ?.toPromptString()
                     ?: ""
 
-                // Retrieve relevant passages from the user's documents (RAG).
-                // Best-effort: empty string when disabled, no docs, or no
-                // embedding model — never blocks or fails the turn.
-                val ragContext = if (_useDocuments.value) {
-                    runCatching { documentRepository.retrieve(cleanedText) }.getOrDefault("")
+                // Retrieve relevant passages from the user's documents (RAG),
+                // scoped to global + this conversation. Best-effort: empty when
+                // disabled, no docs, or no embedding model — never blocks a turn.
+                val rag = if (_useDocuments.value) {
+                    runCatching { documentRepository.retrieve(cleanedText, conversationId) }
+                        .getOrNull() ?: RetrievedContext.EMPTY
                 } else {
-                    ""
+                    RetrievedContext.EMPTY
                 }
+                val ragContext = rag.promptText
+                val turnSources = rag.sources
 
                 // Forced skill: run the tool ourselves and feed the result in,
                 // rather than relying on a small model to emit the tool-call JSON.
@@ -500,6 +508,7 @@ class ChatViewModel @Inject constructor(
                                     type = BubbleType.Mias,
                                     isStreaming = false,
                                     reasoning = thinking,
+                                    sources = turnSources,
                                 )
                                 updatedList
                             } else {
@@ -510,6 +519,7 @@ class ChatViewModel @Inject constructor(
                                     timestamp = formatTime(System.currentTimeMillis()),
                                     isStreaming = false,
                                     reasoning = thinking,
+                                    sources = turnSources,
                                 )
                             }
                         }

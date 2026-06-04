@@ -27,7 +27,7 @@ import dev.mias.core.data.db.entity.RawFactEntity
         DocumentEntity::class,
         DocumentChunkEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class MiasDatabase : RoomDatabase() {
@@ -91,6 +91,16 @@ abstract class MiasDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS index_document_chunks_documentId " +
                         "ON document_chunks(documentId)",
                 )
+            }
+        }
+
+        /**
+         * v4 → v5: add `documents.conversationId` so a document can be scoped to
+         * a single chat. Existing rows get NULL = global (the prior behavior).
+         */
+        val MIGRATION_4_5: Migration = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE documents ADD COLUMN conversationId TEXT")
             }
         }
     }
