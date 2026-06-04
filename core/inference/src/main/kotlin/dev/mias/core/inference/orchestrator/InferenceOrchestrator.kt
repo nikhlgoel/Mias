@@ -7,6 +7,7 @@ import dev.mias.core.common.model.Stimulus
 import dev.mias.core.inference.InferenceEngine
 import dev.mias.core.inference.engine.GoogleAiEdgeEngine
 import dev.mias.core.inference.engine.LlamaCppEngine
+import dev.mias.core.inference.react.ChatTemplate
 import dev.mias.core.inference.react.ReActEngine
 import dev.mias.core.inference.react.ReActStep
 import dev.mias.core.modelhub.manager.ModelManager
@@ -104,8 +105,8 @@ class InferenceOrchestrator @Inject constructor(
 
         val (engine, newState) = selectEngine(tawsAction, stimulus)
         val previousState = _brainState.value
-        when (val readiness = ensureModelLoaded(engine, newState)) {
-            is ModelReadiness.Ready -> Unit
+        val modelName: String = when (val readiness = ensureModelLoaded(engine, newState)) {
+            is ModelReadiness.Ready -> readiness.modelName
             is ModelReadiness.NoModelAssigned -> {
                 emit(
                     ReActStep.FinalAnswer(
@@ -128,12 +129,18 @@ class InferenceOrchestrator @Inject constructor(
             }
         }
 
+        // Format the prompt for the loaded model's family (ChatML for Qwen,
+        // Phi format for Phi, plain otherwise) — markedly better replies than a
+        // one-size-fits-all prompt.
+        val templateKind = ChatTemplate.forModel(modelName)
+
         generationMutex.withLock {
             reActEngine.execute(
                 engine = engine,
                 systemPrompt = systemPrompt,
                 userPrompt = stimulus.content,
                 hindsightContext = hindsightContext,
+                templateKind = templateKind,
             ).onStart {
                 _brainState.value = newState
                 _cognitionState.value = CognitionState.THINKING
@@ -224,7 +231,7 @@ class InferenceOrchestrator @Inject constructor(
         }
 
     private sealed interface ModelReadiness {
-        data object Ready : ModelReadiness
+        data class Ready(val modelName: String) : ModelReadiness
         data object NoModelAssigned : ModelReadiness
         data class LoadFailed(val modelName: String, val reason: String) : ModelReadiness
     }
@@ -256,7 +263,7 @@ class InferenceOrchestrator @Inject constructor(
         // since last call".
         val currentlyLoaded = loadedModelByEngine[engine]
         if (currentlyLoaded == model.id && engine.isModelLoaded()) {
-            return ModelReadiness.Ready
+            return ModelReadiness.Ready(model.card.name)
         }
 
         // A different model needs to be loaded — unload first so the engine
@@ -270,7 +277,7 @@ class InferenceOrchestrator @Inject constructor(
             is MiasResult.Success -> {
                 loadedModelByEngine[engine] = model.id
                 modelManager.markUsed(model.id)
-                ModelReadiness.Ready
+                ModelReadiness.Ready(model.card.name)
             }
             is MiasResult.Error -> ModelReadiness.LoadFailed(
                 modelName = model.card.name,

@@ -40,6 +40,8 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Today
@@ -114,6 +116,28 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
     val haptics = LocalHapticFeedback.current
+    val shareContext = LocalContext.current
+
+    val shareConversation: () -> Unit = {
+        val transcript = state.messages
+            .filter { it.type == BubbleType.USER || it.type == BubbleType.Mias }
+            .joinToString("\n\n") { m ->
+                val who = if (m.type == BubbleType.USER) "You" else "Mias"
+                "$who: ${m.text}"
+            }
+        if (transcript.isNotBlank()) {
+            val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(android.content.Intent.EXTRA_TEXT, transcript)
+                putExtra(android.content.Intent.EXTRA_SUBJECT, state.conversationTitle)
+            }
+            runCatching {
+                shareContext.startActivity(
+                    android.content.Intent.createChooser(send, "Share conversation"),
+                )
+            }
+        }
+    }
 
     val copyMessage: (String) -> Unit = remember(clipboard, haptics) {
         { text ->
@@ -162,6 +186,7 @@ fun ChatScreen(
             onBack = onNavigateBack,
             onToggleReAct = viewModel::toggleReActSteps,
             onSelectModel = viewModel::selectChatModel,
+            onShare = shareConversation,
         )
 
         // ── Messages Area ──
@@ -300,6 +325,41 @@ fun ChatScreen(
                 .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
+            // Contextual "Regenerate" — only when idle and the last turn was an
+            // assistant reply the user might want re-rolled.
+            val canRegenerate = !state.isProcessing &&
+                state.messages.lastOrNull()?.type == BubbleType.Mias
+            androidx.compose.animation.AnimatedVisibility(visible = canRegenerate) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .clip(MiasShapes.Full)
+                            .background(MiasColors.Surface3)
+                            .border(1.dp, MiasColors.OutlineSoft, MiasShapes.Full)
+                            .clickable { viewModel.regenerate() }
+                            .padding(horizontal = 14.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = null,
+                            tint = MiasColors.TextLo,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Regenerate",
+                            style = MiasTypography.LabelMedium,
+                            color = MiasColors.TextLo,
+                        )
+                    }
+                }
+            }
             if (state.attachedImage != null) {
                 AttachedImageStrip(
                     image = state.attachedImage!!,
@@ -342,6 +402,7 @@ private fun ChatTopBar(
     onBack: () -> Unit,
     onToggleReAct: () -> Unit,
     onSelectModel: (String) -> Unit,
+    onShare: () -> Unit = {},
 ) {
     var pickerOpen by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -381,6 +442,17 @@ private fun ChatTopBar(
             }
 
             Spacer(modifier = Modifier.weight(1f))
+
+            if (state.messages.isNotEmpty()) {
+                IconButton(onClick = onShare) {
+                    Icon(
+                        imageVector = Icons.Rounded.Share,
+                        contentDescription = "Share conversation",
+                        tint = MiasColors.TextSecondary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
 
             IconButton(onClick = onToggleReAct) {
                 Icon(

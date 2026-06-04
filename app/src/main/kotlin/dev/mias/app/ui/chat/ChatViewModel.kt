@@ -501,6 +501,24 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch { saveConversation() }
     }
 
+    /**
+     * Re-run the last user turn. Drops the last user message and everything
+     * after it (the assistant reply), then replays it through [onSend] so the
+     * whole pipeline — model load, streaming, persistence — is reused exactly.
+     * No-op while generating or before the first user message.
+     */
+    fun regenerate() {
+        if (_isProcessing.value) return
+        val msgs = _messages.value
+        val lastUserIdx = msgs.indexOfLast { it.type == BubbleType.USER }
+        if (lastUserIdx < 0) return
+        val userText = msgs[lastUserIdx].text
+        // Keep everything before the last user turn; re-send that prompt fresh.
+        _messages.value = msgs.subList(0, lastUserIdx).toList()
+        _inputText.value = userText
+        onSend()
+    }
+
     fun toggleReActSteps() {
         _showReActSteps.update { !it }
     }

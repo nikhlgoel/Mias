@@ -24,10 +24,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -56,6 +58,7 @@ fun ChatsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
+    var pendingRename by remember { mutableStateOf<Conversation?>(null) }
 
     Box(
         modifier = modifier
@@ -112,6 +115,7 @@ fun ChatsScreen(
                         ConversationRow(
                             conv = conv,
                             onClick = { onOpenConversation(conv.id) },
+                            onRename = { pendingRename = conv },
                             onDelete = { pendingDeleteId = conv.id },
                         )
                     }
@@ -129,6 +133,31 @@ fun ChatsScreen(
             contentColor = MiasColors.TextPrimary,
         ) {
             Icon(Icons.Rounded.Add, contentDescription = "New chat")
+        }
+
+        pendingRename?.let { conv ->
+            var draft by remember(conv.id) { mutableStateOf(conv.title) }
+            AlertDialog(
+                onDismissRequest = { pendingRename = null },
+                title = { Text("Rename conversation") },
+                text = {
+                    OutlinedTextField(
+                        value = draft,
+                        onValueChange = { draft = it },
+                        singleLine = true,
+                        label = { Text("Title") },
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.renameConversation(conv.id, draft)
+                        pendingRename = null
+                    }) { Text("Save") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingRename = null }) { Text("Cancel") }
+                },
+            )
         }
 
         if (pendingDeleteId != null) {
@@ -154,6 +183,7 @@ fun ChatsScreen(
 private fun ConversationRow(
     conv: Conversation,
     onClick: () -> Unit,
+    onRename: () -> Unit,
     onDelete: () -> Unit,
 ) {
     GlassCard(
@@ -174,6 +204,14 @@ private fun ConversationRow(
                     text = "${relativeTime(conv.updatedAt)} · $messageLabel",
                     style = MiasTypography.BodySmall,
                     color = MiasColors.TextSecondary,
+                )
+            }
+            IconButton(onClick = onRename) {
+                Icon(
+                    Icons.Rounded.Edit,
+                    contentDescription = "Rename",
+                    tint = MiasColors.TextSecondary,
+                    modifier = Modifier.size(18.dp),
                 )
             }
             IconButton(onClick = onDelete) {

@@ -45,41 +45,35 @@ class ReActEngine @Inject constructor(
         systemPrompt: String,
         userPrompt: String,
         hindsightContext: String = "",
+        templateKind: ChatTemplateKind = ChatTemplateKind.PLAIN,
         maxIterations: Int = MAX_ITERATIONS,
     ): Flow<ReActStep> = flow {
         val conversationBuffer = StringBuilder()
 
-        // Build the full prompt
-        conversationBuffer.append(systemPrompt)
-        if (hindsightContext.isNotBlank()) {
-            conversationBuffer.append("\n\n$hindsightContext")
-        }
-
-        // List the real tools so the model uses exact action names rather
-        // than free-text phrases (the cause of unroutable actions).
+        // Assemble the system block: persona + memory + tool contract. The
+        // user message is kept separate so the per-model template can wrap each
+        // turn in the control tokens the model was trained on.
         val toolCatalogue = toolRegistry.describeForPrompt()
-        if (toolCatalogue.isNotBlank()) {
-            conversationBuffer.append("\n\nAvailable tools:\n$toolCatalogue")
+        val systemBlock = buildString {
+            append(systemPrompt)
+            if (hindsightContext.isNotBlank()) append("\n\n").append(hindsightContext)
+            if (toolCatalogue.isNotBlank()) {
+                append("\n\nAvailable tools:\n").append(toolCatalogue)
+                // Plain-text-first contract: a normal reply needs no JSON; the
+                // schema is only for an actual tool call. (Forcing JSON via a
+                // GBNF grammar previously made mobile sampling crawl.)
+                append(
+                    "\n\nReply directly in plain, natural language. Only if you " +
+                        "genuinely need one of the tools above, instead output a single " +
+                        "JSON object: {\"thought\":\"<why>\",\"action\":\"<exact tool " +
+                        "name>\",\"action_input\":{...},\"is_final\":false,\"should_say\":" +
+                        "\"<short note to the user>\"}.",
+                )
+            } else {
+                append("\n\nReply directly in plain, natural language.")
+            }
         }
-
-        conversationBuffer.append("\n\nUser: $userPrompt")
-        // Plain-text-first contract. The previous version forced every reply
-        // through a GBNF-constrained JSON schema, which made grammar-masked
-        // sampling crawl on mobile CPUs (effectively "stuck thinking") and hid
-        // the answer until the trailing should_say field. Now the model answers
-        // normally and only emits JSON when it actually needs a tool.
-        if (toolCatalogue.isNotBlank()) {
-            conversationBuffer.append(
-                "\n\nReply directly in plain, natural language. Only if you " +
-                    "genuinely need one of the tools above, instead output a single " +
-                    "JSON object: {\"thought\":\"<why>\",\"action\":\"<exact tool " +
-                    "name>\",\"action_input\":{...},\"is_final\":false,\"should_say\":" +
-                    "\"<short note to the user>\"}.",
-            )
-        } else {
-            conversationBuffer.append("\n\nReply directly in plain, natural language.")
-        }
-        conversationBuffer.append("\n\nAssistant:")
+        conversationBuffer.append(ChatTemplate.build(templateKind, systemBlock, userPrompt))
 
         var iterations = 0
         var lastThought = ""
