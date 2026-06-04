@@ -161,12 +161,19 @@ fun HomeScreen(
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
-                                ) { onNavigateToChat(null) },
+                                ) {
+                                    // No dead-end: with nothing installed, go to
+                                    // Models instead of an empty chat that can only
+                                    // report "no model available".
+                                    if (state.isReady) onNavigateToChat(null)
+                                    else onNavigateToModelHub()
+                                },
                         )
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "Tap to start a new chat",
+                        text = if (state.isReady) "Tap to start a new chat"
+                        else "Tap to add your first model",
                         style = MiasTypography.BodyMedium,
                         color = MiasColors.TextLo,
                         textAlign = TextAlign.Center,

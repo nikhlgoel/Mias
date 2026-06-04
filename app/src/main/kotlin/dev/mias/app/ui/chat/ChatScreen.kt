@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Today
@@ -51,6 +53,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,6 +62,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -104,6 +111,24 @@ fun ChatScreen(
     val speechState by speechViewModel.isListening.collectAsStateWithLifecycle()
     val transcription by speechViewModel.transcription.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val clipboard = LocalClipboardManager.current
+    val haptics = LocalHapticFeedback.current
+
+    val copyMessage: (String) -> Unit = remember(clipboard, haptics) {
+        { text ->
+            if (text.isNotBlank()) {
+                clipboard.setText(AnnotatedString(text))
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            }
+        }
+    }
+
+    // Show a jump-to-latest button only when the user has scrolled up away
+    // from the newest message.
+    val showScrollToBottom by remember {
+        derivedStateOf { listState.canScrollForward }
+    }
 
     LaunchedEffect(transcription) {
         if (transcription.isNotBlank()) {
@@ -173,6 +198,7 @@ fun ChatScreen(
                                 isStreaming = message.isStreaming,
                                 image = message.image,
                                 reasoning = message.reasoning,
+                                onLongPress = { copyMessage(message.text) },
                             )
                         }
                     }
@@ -191,6 +217,38 @@ fun ChatScreen(
                     }
 
                     item { Spacer(modifier = Modifier.height(8.dp)) }
+                }
+            }
+
+            // Jump-to-latest button, bottom-right of the message list.
+            androidx.compose.animation.AnimatedVisibility(
+                visible = showScrollToBottom,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 12.dp, bottom = 12.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MiasColors.Surface3)
+                        .border(1.dp, MiasColors.OutlineSoft, CircleShape)
+                        .clickable {
+                            scope.launch {
+                                val size = state.messages.size
+                                if (size > 0) listState.animateScrollToItem(size - 1)
+                            }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.KeyboardArrowDown,
+                        contentDescription = "Jump to latest",
+                        tint = MiasColors.TextLo,
+                        modifier = Modifier.size(22.dp),
+                    )
                 }
             }
         }

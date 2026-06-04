@@ -14,6 +14,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -61,6 +62,7 @@ import dev.mias.core.ui.theme.MiasTypography
  * render an animated cursor (▍) at the end of text instead of a separate
  * dot row, matching modern chat conventions.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun MessageBubble(
     text: String,
@@ -72,6 +74,8 @@ fun MessageBubble(
     image: Bitmap? = null,
     /** Parsed reasoning ("thought"); shown in a collapsible box above the reply. */
     reasoning: String? = null,
+    /** Long-press handler (e.g. copy the message). No-op tap; null disables it. */
+    onLongPress: (() -> Unit)? = null,
 ) {
     val alignment = if (type == BubbleType.USER) Alignment.CenterEnd else Alignment.CenterStart
 
@@ -111,6 +115,16 @@ fun MessageBubble(
                 modifier = Modifier
                     .clip(bubbleShape)
                     .background(background)
+                    .then(
+                        if (onLongPress != null) {
+                            Modifier.combinedClickable(
+                                onClick = {},
+                                onLongClick = onLongPress,
+                            )
+                        } else {
+                            Modifier
+                        },
+                    )
                     .padding(
                         start = if (image != null) 6.dp else 14.dp,
                         end = if (image != null) 6.dp else 14.dp,
