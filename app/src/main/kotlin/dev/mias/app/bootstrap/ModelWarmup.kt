@@ -22,14 +22,21 @@ class ModelWarmup @Inject constructor(
     private val orchestrator: InferenceOrchestrator,
     private val embeddingProvider: EmbeddingProvider,
 ) {
+    /**
+     * Startup warm-up — embeddings only. The embedding model is small and
+     * unblocks Hindsight memory + RAG, which run before generation on every
+     * message. We deliberately do NOT load the larger chat model here: that's
+     * deferred to [warmChatModel], triggered when a chat actually opens, so the
+     * app doesn't burn RAM/battery loading weights the user may never use.
+     */
     suspend fun warm() {
-        // Embedding model first: it's small and unblocks Hindsight memory + RAG
-        // retrieval, both of which run before generation on every message.
         runCatching {
             if (embeddingProvider.isReady()) embeddingProvider.getEmbedding(WARM_TEXT)
         }.onFailure { Log.d(TAG, "Embedding warm-up skipped: ${it.message}") }
+    }
 
-        // Then the chat model, so the first real send streams immediately.
+    /** Warm the chat model — call when the user enters a chat, not at startup. */
+    suspend fun warmChatModel() {
         runCatching { orchestrator.warmUp() }
             .onFailure { Log.d(TAG, "Chat model warm-up skipped: ${it.message}") }
     }

@@ -123,12 +123,10 @@ class KnowledgeViewModel @Inject constructor(
         val isPdf = mime == "application/pdf" || name.endsWith(".pdf", ignoreCase = true)
 
         val text = runCatching {
-            context.contentResolver.openInputStream(uri)?.use { stream ->
-                if (isPdf) {
-                    dev.mias.app.util.PdfTextExtractor.extract(context, stream)
-                } else {
-                    stream.bufferedReader().readText()
-                }
+            if (isPdf) {
+                dev.mias.app.util.PdfTextExtractor.extract(context, uri)
+            } else {
+                context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
             }
         }.getOrNull().orEmpty()
 

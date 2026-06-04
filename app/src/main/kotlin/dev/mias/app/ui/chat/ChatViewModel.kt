@@ -28,6 +28,7 @@ import dev.mias.core.common.MiasResult
 import dev.mias.core.inference.orchestrator.InferenceOrchestrator
 import dev.mias.core.inference.react.ReActStep
 import dev.mias.core.inference.react.ResponseSanitizer
+import dev.mias.core.inference.react.ToolRegistry
 import dev.mias.core.inference.react.StreamingReActParser
 import dev.mias.core.inference.vision.MediaPipeVisionEngine
 import dev.mias.core.language.IntentExtractor
@@ -107,6 +108,7 @@ class ChatViewModel @Inject constructor(
     private val visionEngine: MediaPipeVisionEngine,
     private val miasPreferences: MiasPreferences,
     private val documentRepository: DocumentRepository,
+    private val toolRegistry: ToolRegistry,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -231,6 +233,10 @@ class ChatViewModel @Inject constructor(
 
     init {
         loadExistingConversation()
+        // Opening a chat is a strong signal the user is about to send — warm the
+        // chat model now (idempotent, load-mutex-guarded) so the first message
+        // streams immediately instead of waiting on the weights to load.
+        viewModelScope.launch { orchestrator.warmUp() }
         // Keep persona + knowledge-base preference in sync with persistence.
         viewModelScope.launch {
             miasPreferences.prefsFlow.collect { prefs ->
@@ -248,6 +254,33 @@ class ChatViewModel @Inject constructor(
     /** Choose a tool to favor for upcoming messages, or null for Auto. */
     fun setForcedSkill(skill: String?) {
         _forcedSkill.value = skill
+    }
+
+    /**
+     * Deterministically run a forced tool and format its result for the prompt.
+     * The user's text is supplied under every common parameter name so the tool
+     * picks the one it needs. Bounded by a timeout and never throws.
+     */
+    private suspend fun runSkill(skill: String, userText: String): String {
+        val handler = toolRegistry.resolve(skill)?.let { toolRegistry.get(it) } ?: return ""
+        val input = mapOf(
+            "query" to userText,
+            "expression" to userText,
+            "input" to userText,
+            "text" to userText,
+        )
+        val result = runCatching {
+            kotlinx.coroutines.withTimeoutOrNull(SKILL_TIMEOUT_MS) { handler.execute(input) }
+        }.getOrNull()
+        if (result.isNullOrBlank()) return ""
+        return "## ${skillDisplayName(skill)} result\n$result"
+    }
+
+    private fun skillDisplayName(skill: String): String = when (skill) {
+        "web_search" -> "Web search"
+        "calculator" -> "Calculator"
+        "datetime" -> "Date & time"
+        else -> skill
     }
 
     fun clearAttachNotice() {
@@ -289,9 +322,10 @@ class ChatViewModel @Inject constructor(
         val mime = runCatching { context.contentResolver.getType(uri) }.getOrNull()
         val isPdf = mime == "application/pdf" || name.endsWith(".pdf", ignoreCase = true)
         val text = runCatching {
-            context.contentResolver.openInputStream(uri)?.use { stream ->
-                if (isPdf) dev.mias.app.util.PdfTextExtractor.extract(context, stream)
-                else stream.bufferedReader().readText()
+            if (isPdf) {
+                dev.mias.app.util.PdfTextExtractor.extract(context, uri)
+            } else {
+                context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
             }
         }.getOrNull().orEmpty()
         return name to text
@@ -376,15 +410,18 @@ class ChatViewModel @Inject constructor(
                     ""
                 }
 
-                val retrievalContext = listOf(ragContext, hindsightContext)
+                // Forced skill: run the tool ourselves and feed the result in,
+                // rather than relying on a small model to emit the tool-call JSON.
+                // Deterministic — the chosen tool always runs.
+                val skillContext = _forcedSkill.value?.let { skill ->
+                    runSkill(skill, cleanedText)
+                }.orEmpty()
+
+                val retrievalContext = listOf(skillContext, ragContext, hindsightContext)
                     .filter { it.isNotBlank() }
                     .joinToString("\n\n")
 
-                val skillHint = _forcedSkill.value?.let { skill ->
-                    "\n\nThe user has explicitly requested the \"$skill\" tool for this " +
-                        "message. Use it by replying with the tool-call JSON for \"$skill\"."
-                }.orEmpty()
-                val systemPrompt = _selectedPersona.value.systemPrompt + skillHint
+                val systemPrompt = _selectedPersona.value.systemPrompt
 
                 val metadata = buildMap<String, String> {
                     structuredIntent?.let { si ->
@@ -912,6 +949,7 @@ class ChatViewModel @Inject constructor(
 
     companion object {
         private const val MAX_ATTACH_DIM: Int = 1024
+        private const val SKILL_TIMEOUT_MS: Long = 15_000L
         private const val ATTACHMENT_QUALITY: Int = 85
     }
 }

@@ -126,6 +126,8 @@ android {
 dependencies {
     // PDF text extraction for the knowledge base (on-device, no network).
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+    // On-device OCR fallback for scanned/image-only PDFs (bundled model, offline).
+    implementation("com.google.mlkit:text-recognition:16.0.1")
 
     // Core modules
     implementation(project(":core:common"))
