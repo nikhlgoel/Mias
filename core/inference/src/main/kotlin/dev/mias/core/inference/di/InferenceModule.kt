@@ -25,5 +25,7 @@ object InferenceModule {
 
     @Provides
     @Singleton
-    fun provideEmbeddingProvider(engine: dev.mias.core.inference.engine.EmbeddingEngine): dev.mias.core.common.model.EmbeddingProvider = engine
+    fun provideEmbeddingProvider(
+        provider: dev.mias.core.inference.engine.AutoEmbeddingProvider,
+    ): dev.mias.core.common.model.EmbeddingProvider = provider
 }

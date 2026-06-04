@@ -23,6 +23,7 @@ import dev.mias.core.data.Message
 import dev.mias.core.data.Role
 import dev.mias.core.data.hindsight.HindsightMemory
 import dev.mias.core.data.preferences.MiasPreferences
+import dev.mias.core.data.rag.DocumentRepository
 import dev.mias.core.common.MiasResult
 import dev.mias.core.inference.orchestrator.InferenceOrchestrator
 import dev.mias.core.inference.react.ReActStep
@@ -84,6 +85,7 @@ data class ChatUiState(
     val hasVisionModel: Boolean = false,
     val personas: List<Persona> = Personas.ALL,
     val selectedPersona: Persona = Personas.DEFAULT,
+    val ragActive: Boolean = false,
 )
 
 sealed interface ChatEvent {
@@ -100,6 +102,7 @@ class ChatViewModel @Inject constructor(
     private val modelManager: ModelManager,
     private val visionEngine: MediaPipeVisionEngine,
     private val miasPreferences: MiasPreferences,
+    private val documentRepository: DocumentRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -123,6 +126,9 @@ class ChatViewModel @Inject constructor(
     /** The active persona (system-prompt preset). Persisted via DataStore. */
     private val _selectedPersona = MutableStateFlow(Personas.DEFAULT)
 
+    /** Whether the local knowledge base feeds into answers (persisted preference). */
+    private val _useDocuments = MutableStateFlow(true)
+
     /**
      * Real creation time of this conversation. Captured once — from the loaded
      * conversation, or the first persisted message — and never reset, so
@@ -140,14 +146,21 @@ class ChatViewModel @Inject constructor(
         val chatModels: List<InstalledModel>,
         val activeChatModelId: String?,
         val hasVisionModel: Boolean,
+        val ragActive: Boolean,
     )
 
     private val chatModelSelection: kotlinx.coroutines.flow.Flow<ChatModelInfo> =
-        combine(modelManager.installedModels, modelManager.roleAssignments) { installed, assignments ->
+        combine(
+            modelManager.installedModels,
+            modelManager.roleAssignments,
+            documentRepository.observeDocumentCount(),
+            miasPreferences.prefsFlow,
+        ) { installed, assignments, docCount, prefs ->
             ChatModelInfo(
                 chatModels = installed.filter { ModelRole.CHAT in it.card.roles },
                 activeChatModelId = assignments[ModelRole.CHAT],
                 hasVisionModel = installed.any { ModelRole.VISION in it.card.roles },
+                ragActive = prefs.useDocuments && docCount > 0,
             )
         }
 
@@ -187,6 +200,7 @@ class ChatViewModel @Inject constructor(
             hasVisionModel = info.hasVisionModel,
             personas = Personas.ALL,
             selectedPersona = persona,
+            ragActive = info.ragActive,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -196,10 +210,11 @@ class ChatViewModel @Inject constructor(
 
     init {
         loadExistingConversation()
-        // Keep the active persona in sync with the persisted preference.
+        // Keep persona + knowledge-base preference in sync with persistence.
         viewModelScope.launch {
             miasPreferences.prefsFlow.collect { prefs ->
                 _selectedPersona.value = Personas.byId(prefs.personaId)
+                _useDocuments.value = prefs.useDocuments
             }
         }
     }
@@ -279,6 +294,19 @@ class ChatViewModel @Inject constructor(
                     ?.toPromptString()
                     ?: ""
 
+                // Retrieve relevant passages from the user's documents (RAG).
+                // Best-effort: empty string when disabled, no docs, or no
+                // embedding model — never blocks or fails the turn.
+                val ragContext = if (_useDocuments.value) {
+                    runCatching { documentRepository.retrieve(cleanedText) }.getOrDefault("")
+                } else {
+                    ""
+                }
+
+                val retrievalContext = listOf(ragContext, hindsightContext)
+                    .filter { it.isNotBlank() }
+                    .joinToString("\n\n")
+
                 val systemPrompt = _selectedPersona.value.systemPrompt
 
                 val metadata = buildMap<String, String> {
@@ -304,7 +332,7 @@ class ChatViewModel @Inject constructor(
                 orchestrator.process(
                     stimulus = stimulus,
                     systemPrompt = systemPrompt,
-                    hindsightContext = hindsightContext,
+                    hindsightContext = retrievalContext,
                 ).collect { step ->
                 when (step) {
                     is ReActStep.Thought -> {

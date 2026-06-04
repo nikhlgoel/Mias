@@ -448,6 +448,17 @@ private fun ChatTopBar(
 
             Spacer(modifier = Modifier.weight(1f))
 
+            if (state.ragActive) {
+                Icon(
+                    imageVector = Icons.Rounded.Description,
+                    contentDescription = "Answering from your documents",
+                    tint = MiasColors.Heather,
+                    modifier = Modifier
+                        .padding(end = 4.dp)
+                        .size(18.dp),
+                )
+            }
+
             IconButton(onClick = { personaSheetOpen = true }) {
                 Icon(
                     imageVector = Icons.Rounded.Face,

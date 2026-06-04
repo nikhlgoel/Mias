@@ -22,7 +22,11 @@ object DataModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MiasDatabase =
         Room.databaseBuilder(context, MiasDatabase::class.java, "mias-db")
-            .addMigrations(MiasDatabase.MIGRATION_1_2, MiasDatabase.MIGRATION_2_3)
+            .addMigrations(
+                MiasDatabase.MIGRATION_1_2,
+                MiasDatabase.MIGRATION_2_3,
+                MiasDatabase.MIGRATION_3_4,
+            )
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
 
@@ -33,7 +37,17 @@ object DataModule {
     fun provideHindsightDao(db: MiasDatabase): HindsightDao = db.hindsightDao()
 
     @Provides
+    fun provideDocumentDao(db: MiasDatabase): dev.mias.core.data.db.dao.DocumentDao =
+        db.documentDao()
+
+    @Provides
     @Singleton
     fun provideConversationRepository(impl: ConversationRepositoryImpl): ConversationRepository =
         impl
+
+    @Provides
+    @Singleton
+    fun provideDocumentRepository(
+        impl: dev.mias.core.data.rag.DocumentRepositoryImpl,
+    ): dev.mias.core.data.rag.DocumentRepository = impl
 }

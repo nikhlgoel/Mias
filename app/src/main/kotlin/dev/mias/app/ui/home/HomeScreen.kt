@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Mic
@@ -69,6 +70,7 @@ fun HomeScreen(
     onNavigateToChats: () -> Unit = {},
     onNavigateToVoice: () -> Unit = {},
     onNavigateToVision: () -> Unit = {},
+    onNavigateToKnowledge: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
@@ -96,6 +98,10 @@ fun HomeScreen(
                 onVision = {
                     scope.launch { drawerState.close() }
                     onNavigateToVision()
+                },
+                onKnowledge = {
+                    scope.launch { drawerState.close() }
+                    onNavigateToKnowledge()
                 },
                 onModels = {
                     scope.launch { drawerState.close() }
@@ -193,6 +199,7 @@ private fun DrawerContent(
     onSeeAllChats: () -> Unit,
     onVoice: () -> Unit,
     onVision: () -> Unit,
+    onKnowledge: () -> Unit,
     onModels: () -> Unit,
     onSettings: () -> Unit,
 ) {
@@ -341,6 +348,11 @@ private fun DrawerContent(
             icon = Icons.Rounded.PhotoCamera,
             label = "Visual chat",
             onClick = onVision,
+        )
+        DrawerNavItem(
+            icon = Icons.AutoMirrored.Rounded.MenuBook,
+            label = "Knowledge",
+            onClick = onKnowledge,
         )
         DrawerNavItem(
             icon = Icons.Rounded.WorkspacePremium,

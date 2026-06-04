@@ -8,4 +8,11 @@ import dev.mias.core.common.MiasResult
  */
 interface EmbeddingProvider {
     suspend fun getEmbedding(text: String): MiasResult<FloatArray>
+
+    /**
+     * Whether embeddings can currently be produced (e.g. an embedding model is
+     * installed and loadable). Default true for simple/direct implementations;
+     * overridden by providers that lazily load a model.
+     */
+    suspend fun isReady(): Boolean = true
 }
