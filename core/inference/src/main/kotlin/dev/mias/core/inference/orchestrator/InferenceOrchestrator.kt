@@ -68,8 +68,12 @@ class InferenceOrchestrator @Inject constructor(
      * forever and the orchestrator never picks up a newly-installed or
      * newly-assigned model in the same process. Maps engine identity → the
      * model id currently bound to that engine.
+     *
+     * ConcurrentHashMap because it's read lock-free by [summarizeTitle] while a
+     * background [warmUp] (which doesn't hold the generation lock) may be
+     * writing it from another dispatcher — a plain map would risk CME.
      */
-    private val loadedModelByEngine = mutableMapOf<InferenceEngine, String>()
+    private val loadedModelByEngine = java.util.concurrent.ConcurrentHashMap<InferenceEngine, String>()
 
     /**
      * Serializes all access to the native inference context. The llama.cpp

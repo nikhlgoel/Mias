@@ -27,10 +27,11 @@ object StreamingReActParser {
 
     private val FORM_FEED: Char = 12.toChar()
 
-    // Structural keys that mark the buffer as (forming/partial) JSON, so we must
-    // never spill the raw text into the chat body.
+    // Keys unique to our ReAct schema. Kept deliberately specific (not generic
+    // words like "action"/"thought") so a plain reply that merely quotes such a
+    // word isn't misread as JSON and hidden from the bubble.
     private val JSON_MARKERS = listOf(
-        "\"should_say\"", "\"is_final\"", "\"action\"", "\"action_input\"", "\"thought\"",
+        "\"should_say\"", "\"is_final\"", "\"action_input\"",
     )
 
     fun parse(buffer: String): StreamState {
