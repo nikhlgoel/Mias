@@ -1,3 +1,4 @@
+// JNI bridge for on-device llama.cpp inference (chat + embeddings).
 #include <jni.h>
 #include <string>
 #include <vector>
@@ -22,6 +23,12 @@ static std::mutex llama_mutex;
 // the generation loops each iteration so the stop button can break out
 // instantly mid-inference.
 static std::atomic<bool> g_abort_generation{false};
+
+// Repetition-penalty sampler settings. Small on-device models otherwise fall
+// into runaway loops emitting gibberish clusters. 1.0 disables; ~1.15–1.2 is a
+// good range, applied over the last N tokens.
+static const int32_t REPEAT_LAST_N = 64;
+static const float REPEAT_PENALTY = 1.17f;
 
 // Chat-template stop markers. llama_vocab_is_eog only catches tokens the GGUF
 // explicitly tags as end-of-generation; many conversions leave ChatML / Phi
@@ -73,6 +80,10 @@ static llama_sampler *build_local_sampler(const llama_vocab *vocab, const char *
             LOGE("GBNF grammar failed to parse; running unconstrained");
         }
     }
+    // Repetition penalty first so it adjusts logits before truncation. Without
+    // it, small models fall into runaway loops emitting gibberish clusters.
+    llama_sampler_chain_add(chain, llama_sampler_init_penalties(
+        REPEAT_LAST_N, REPEAT_PENALTY, /*freq*/ 0.0f, /*present*/ 0.0f));
     llama_sampler_chain_add(chain, llama_sampler_init_top_k(40));
     llama_sampler_chain_add(chain, llama_sampler_init_top_p(0.9f, 1));
     llama_sampler_chain_add(chain, llama_sampler_init_temp(0.7f));
@@ -131,9 +142,11 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeLoadModel(JNIEnv *env, 
         return JNI_FALSE;
     }
 
-    // Initialize sampler chain
+    // Initialize sampler chain. Penalty first to suppress repetition loops.
     llama_sampler_chain_params sparams = llama_sampler_chain_default_params();
     sampler = llama_sampler_chain_init(sparams);
+    llama_sampler_chain_add(sampler, llama_sampler_init_penalties(
+        REPEAT_LAST_N, REPEAT_PENALTY, /*freq*/ 0.0f, /*present*/ 0.0f));
     llama_sampler_chain_add(sampler, llama_sampler_init_temp(0.7f));
     llama_sampler_chain_add(sampler, llama_sampler_init_top_p(0.9f, 1));
     llama_sampler_chain_add(sampler, llama_sampler_init_top_k(40));

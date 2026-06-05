@@ -53,6 +53,8 @@ fun MiasInputBar(
     isProcessing: Boolean = false,
     onStop: (() -> Unit)? = null,
     onAttach: (() -> Unit)? = null,
+    onVoice: (() -> Unit)? = null,
+    isListening: Boolean = false,
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -115,7 +117,8 @@ fun MiasInputBar(
 
         Spacer(modifier = Modifier.width(4.dp))
 
-        // Trailing affordance — stop / send / mic. Only one is visible at a time.
+        // Trailing affordance — exactly one control at a time:
+        //   processing → stop ; has text → send ; empty → the single mic.
         when {
             isProcessing -> AccentCircleButton(
                 icon = Icons.Rounded.Stop,
@@ -132,14 +135,15 @@ fun MiasInputBar(
                 },
                 enabled = enabled,
             )
-            else -> IconButton(
-                onClick = { /* Voice handled by the screen-level mic button */ },
+            onVoice != null -> IconButton(
+                onClick = onVoice,
                 modifier = Modifier.size(40.dp),
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Mic,
-                    contentDescription = "Voice",
-                    tint = MiasColors.TextLo,
+                    contentDescription = if (isListening) "Stop listening" else "Voice input",
+                    // Red while recording so the single mic clearly shows state.
+                    tint = if (isListening) MiasColors.ErrorTone else MiasColors.TextLo,
                 )
             }
         }

@@ -98,12 +98,10 @@ import dev.mias.core.ui.components.AnimatedOrb
 import dev.mias.core.ui.components.BubbleType
 import dev.mias.core.ui.components.MiasInputBar
 import dev.mias.core.ui.components.MessageBubble
-import dev.mias.core.ui.components.SpeechButton
 import dev.mias.core.ui.components.StatusPill
 import dev.mias.core.ui.components.ThinkingDots
 import dev.mias.core.ui.theme.MiasColors
 import dev.mias.core.ui.theme.MiasTypography
-import dev.mias.core.speech.SpeechState
 import dev.mias.core.speech.SpeechViewModel
 
 @Composable
@@ -436,23 +434,21 @@ fun ChatScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Bottom,
             ) {
-                Box(modifier = Modifier.weight(1f)) {
-                    MiasInputBar(
-                        value = state.inputText,
-                        onValueChange = viewModel::onInputChange,
-                        onSend = viewModel::onSend,
-                        isProcessing = state.isProcessing,
-                        enabled = !state.isProcessing,
-                        onStop = viewModel::stopGeneration,
-                        // Always available — photos, files, and skills.
-                        onAttach = { attachSheetOpen = true },
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                SpeechButton(
-                    state = if (speechState) SpeechState.LISTENING else SpeechState.IDLE,
-                    onStartListening = { speechViewModel.startListening() },
-                    onStopListening = { speechViewModel.stopListening() },
+                MiasInputBar(
+                    value = state.inputText,
+                    onValueChange = viewModel::onInputChange,
+                    onSend = viewModel::onSend,
+                    isProcessing = state.isProcessing,
+                    enabled = !state.isProcessing,
+                    onStop = viewModel::stopGeneration,
+                    // Always available — photos, files, and skills.
+                    onAttach = { attachSheetOpen = true },
+                    // Single, integrated mic — toggles speech-to-text.
+                    onVoice = {
+                        if (speechState) speechViewModel.stopListening()
+                        else speechViewModel.startListening()
+                    },
+                    isListening = speechState,
                 )
             }
         }

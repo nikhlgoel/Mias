@@ -548,6 +548,25 @@ class ChatViewModel @Inject constructor(
                         currentThinkingText = parsed.thinking
                         currentVisibleResponse = parsed.visible
 
+                        // Circuit-breaker: if the model falls into a runaway
+                        // repetition loop (gibberish clusters), trim the loop and
+                        // stop generation rather than streaming garbage forever.
+                        if (isRunawayRepetition(rawBuffer.toString())) {
+                            val trimmed = trimRepetition(currentVisibleResponse)
+                            _messages.update { list ->
+                                val idx = list.indexOfFirst { it.id == streamingMsgId }
+                                if (idx >= 0) {
+                                    val updated = list.toMutableList()
+                                    updated[idx] = updated[idx].copy(text = trimmed)
+                                    updated
+                                } else {
+                                    list
+                                }
+                            }
+                            stopGeneration()
+                            return@collect
+                        }
+
                         if (streamingMsgId == null) {
                             streamingMsgId = UUID.randomUUID().toString()
                             _messages.update {
@@ -957,9 +976,67 @@ class ChatViewModel @Inject constructor(
         return formatter.format(Date(timestamp))
     }
 
+    /**
+     * Detect a runaway repetition loop in the streamed text. Looks at the tail
+     * for three classic failure shapes: a single character repeated many times,
+     * very low character diversity over a long span, and a short cluster
+     * repeated consecutively. The native repeat-penalty handles most cases; this
+     * is the belt-and-suspenders circuit-breaker.
+     */
+    private fun isRunawayRepetition(text: String): Boolean {
+        val tail = text.takeLast(REP_TAIL)
+        if (tail.length < 48) return false
+
+        // (a) a single non-space char repeated 12+ times in a row
+        var run = 1
+        var maxRun = 1
+        for (i in 1 until tail.length) {
+            if (tail[i] == tail[i - 1] && !tail[i].isWhitespace()) {
+                run++
+                if (run > maxRun) maxRun = run
+            } else {
+                run = 1
+            }
+        }
+        if (maxRun >= 12) return true
+
+        // (b) gibberish clusters — long tail, almost no distinct characters
+        val distinct = tail.filterNot { it.isWhitespace() }.toSet().size
+        if (distinct in 1..5) return true
+
+        // (c) a 2–6 char cluster repeated 6+ times at the end
+        for (p in 2..6) {
+            if (tail.length < p * 6) continue
+            val unitStart = tail.length - p
+            var count = 0
+            var idx = tail.length
+            while (idx - p >= 0 && tail.regionMatches(idx - p, tail, unitStart, p)) {
+                count++
+                idx -= p
+            }
+            if (count >= 6) return true
+        }
+        return false
+    }
+
+    /** Drop a trailing repeated run so the saved message isn't garbage. */
+    private fun trimRepetition(text: String): String {
+        var out = text.trimEnd()
+        if (out.isNotEmpty()) {
+            val last = out.last()
+            var end = out.length
+            while (end > 0 && out[end - 1] == last) end--
+            if (out.length - end >= 6) out = out.substring(0, end)
+        }
+        return out.trimEnd().ifBlank {
+            "I got stuck repeating myself there — could you rephrase that?"
+        }
+    }
+
     companion object {
         private const val MAX_ATTACH_DIM: Int = 1024
         private const val SKILL_TIMEOUT_MS: Long = 15_000L
+        private const val REP_TAIL: Int = 80
         private const val ATTACHMENT_QUALITY: Int = 85
     }
 }
