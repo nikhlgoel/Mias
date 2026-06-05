@@ -41,6 +41,20 @@
 -keep class com.google.mediapipe.** { *; }
 -dontwarn com.google.mediapipe.**
 
+# ─── PdfBox-Android (PDF text extraction) ───
+# JPXFilter optionally calls the JPEG2000 decoder; we don't ship it (JP2 in
+# PDFs is rare), so suppress the missing-class warning that fails R8 fullMode.
+-dontwarn com.gemalto.jp2.**
+# PdfBox loads its filters/fonts reflectively — keep them so release builds can
+# still parse PDFs after minification.
+-keep class com.tom_roush.pdfbox.** { *; }
+-keep class com.tom_roush.fontbox.** { *; }
+-dontwarn com.tom_roush.**
+
+# ─── ML Kit text recognition (on-device OCR) ───
+-keep class com.google.mlkit.** { *; }
+-dontwarn com.google.mlkit.**
+
 # ─── Coroutines ───
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
