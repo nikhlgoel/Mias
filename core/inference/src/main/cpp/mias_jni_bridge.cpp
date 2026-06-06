@@ -106,10 +106,16 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeInit(JNIEnv *env, jobje
 extern "C" JNIEXPORT jboolean JNICALL
 Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeLoadModel(JNIEnv *env, jobject thiz, jstring jpath) {
     std::lock_guard<std::mutex> lock(llama_mutex);
-    
+
+    // Self-heal: if a model is already bound (e.g. a state desync, or switching
+    // models without an explicit unload), free it and load the requested one
+    // rather than failing with "already loaded". Makes model switching robust.
     if (model != nullptr) {
-        LOGE("Model already loaded");
-        return JNI_FALSE;
+        LOGI("A model is already loaded; freeing it before loading the new one");
+        if (sampler != nullptr) { llama_sampler_free(sampler); sampler = nullptr; }
+        if (ctx != nullptr) { llama_free(ctx); ctx = nullptr; }
+        llama_model_free(model);
+        model = nullptr;
     }
 
     const char *path = env->GetStringUTFChars(jpath, nullptr);
@@ -200,7 +206,9 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerate(JNIEnv *env, j
         return env->NewStringUTF("");
     }
 
-    // 2. Decode prompt batch
+    // 2. Decode prompt batch. Clear the KV cache first — the full prompt is sent
+    // every call, so generation must start from an empty cache.
+    llama_memory_clear(llama_get_memory(ctx), true);
     llama_batch batch = llama_batch_get_one(prompt_tokens.data(), prompt_tokens.size());
     if (llama_decode(ctx, batch) != 0) {
         LOGE("llama_decode failed");
@@ -309,7 +317,12 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerateStream(JNIEnv *
         return;
     }
 
-    // 2. Decode batch
+    // 2. Decode batch. Clear the KV cache first: each call sends the COMPLETE
+    // prompt (system + history + user), so the cache must start empty. Without
+    // this, positions accumulate across turns — after a few messages n_past
+    // exceeds n_ctx and decode yields nothing (empty replies), and a brand-new
+    // conversation inherits the previous chat's cache (stale answers).
+    llama_memory_clear(llama_get_memory(ctx), true);
     llama_batch batch = llama_batch_get_one(prompt_tokens.data(), prompt_tokens.size());
     if (llama_decode(ctx, batch) != 0) {
         LOGE("llama_decode failed for streaming prompt");
@@ -488,7 +501,9 @@ Java_dev_mias_core_inference_engine_EmbeddingEngine_nativeGetEmbedding(JNIEnv *e
     }
     tokens.resize(n_tokens);
 
-    // 2. Decode batch
+    // 2. Decode batch. Clear first so each embedding is computed independently
+    // (no carry-over from the previous text).
+    llama_memory_clear(llama_get_memory(emb_ctx), true);
     llama_batch batch = llama_batch_get_one(tokens.data(), tokens.size());
     if (llama_decode(emb_ctx, batch) != 0) {
         LOGE("llama_decode failed for embedding");

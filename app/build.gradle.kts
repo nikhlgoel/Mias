@@ -4,6 +4,7 @@
  * Release: #001 (first public build)
  * This is the first step of the application. Package name may change on future major platform ports.
  */
+import java.io.File
 import java.util.Properties
 
 plugins {
@@ -22,6 +23,16 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
+// Version is sourced from version.properties (single source of truth) and is
+// auto-bumped after each successful signed release build (see the
+// packageRelease hook below).
+val versionPropsFile = rootProject.file("version.properties")
+val versionProps = Properties().apply {
+    if (versionPropsFile.exists()) versionPropsFile.inputStream().use { load(it) }
+}
+val appVersionCode = (versionProps.getProperty("VERSION_CODE") ?: "1").toInt()
+val appVersionName = versionProps.getProperty("VERSION_NAME") ?: "1.0.0"
+
 android {
     namespace = "dev.mias.app"
     compileSdk = 36
@@ -30,8 +41,8 @@ android {
         applicationId = "io.mias.app"
         minSdk = 30
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -75,10 +86,17 @@ android {
     signingConfigs {
         create("release") {
             if (keystorePropertiesFile.exists()) {
-                storeFile = file(keystoreProperties["storeFile"] as String)
+                // storeFile is resolved relative to the repo root (where
+                // keystore.properties and the .jks live), not the app module.
+                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
                 storePassword = keystoreProperties["storePassword"] as String
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
+                // v2 is required to install on modern Android; v3 adds key
+                // rotation support. v1 (JAR) is unnecessary at minSdk 30.
+                enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }
@@ -120,6 +138,49 @@ android {
         unitTests {
             isIncludeAndroidResources = true
         }
+    }
+
+    // Name release APKs "Mias_<versionName>.apk" (e.g. Mias_1.0.0.apk) instead
+    // of the default app-release.apk. Debug builds keep their default name.
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            if (variant.buildType.name == "release") {
+                (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl)
+                    .outputFileName = "Mias_${variant.versionName}.apk"
+            }
+        }
+    }
+}
+
+// After a successful signed RELEASE packaging, bump the version for the *next*
+// build: increment VERSION_CODE and the patch of VERSION_NAME in
+// version.properties. doLast runs only when packageRelease succeeds, so a
+// failed/aborted build never advances the version.
+tasks.matching { it.name == "packageRelease" }.configureEach {
+    // Capture only the path (a String) so the task action stays
+    // configuration-cache compatible — referencing the script-level File would
+    // pull in the build-script object, which the config cache can't serialize.
+    val versionFilePath = versionPropsFile.absolutePath
+    doLast {
+        val file = File(versionFilePath)
+        val props = Properties().apply {
+            if (file.exists()) file.inputStream().use { load(it) }
+        }
+        val nextCode = (props.getProperty("VERSION_CODE") ?: "1").toInt() + 1
+        val name = props.getProperty("VERSION_NAME") ?: "1.0.0"
+        val parts = name.split(".")
+        val nextName = if (parts.size == 3 && parts.all { it.toIntOrNull() != null }) {
+            "${parts[0]}.${parts[1]}.${parts[2].toInt() + 1}"
+        } else {
+            name
+        }
+        props.setProperty("VERSION_CODE", nextCode.toString())
+        props.setProperty("VERSION_NAME", nextName)
+        file.outputStream().use {
+            props.store(it, "Auto-bumped after a successful signed release build")
+        }
+        println("Mias: next build will be $nextName (versionCode $nextCode)")
     }
 }
 

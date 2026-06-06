@@ -157,8 +157,17 @@ fun ModelCard(
                         status = state.status,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    val speedSuffix = if (
+                        state.status == DownloadStatus.DOWNLOADING && state.speedBytesPerSec > 0
+                    ) {
+                        " · ${formatSize(state.speedBytesPerSec)}/s"
+                    } else {
+                        ""
+                    }
                     Text(
-                        text = "${(state.progressFraction * 100).toInt()}% · ${formatSize(state.bytesDownloaded)} / ${formatSize(modelCard.sizeBytes)}",
+                        text = "${(state.progressFraction * 100).toInt()}% · " +
+                            "${formatSize(state.bytesDownloaded)} / ${formatSize(modelCard.sizeBytes)}" +
+                            speedSuffix,
                         style = MiasTypography.LabelSmall,
                         color = MiasColors.TextSecondary,
                         modifier = Modifier.padding(top = 4.dp),

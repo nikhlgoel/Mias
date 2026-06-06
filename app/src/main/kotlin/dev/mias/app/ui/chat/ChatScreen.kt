@@ -563,6 +563,15 @@ private fun ChatTopBar(
                     .padding(start = 16.dp, end = 16.dp, bottom = 4.dp),
             )
         }
+
+        // Context-window meter — how full the model's window is for this chat.
+        if (state.messages.isNotEmpty()) {
+            ContextMeter(
+                used = state.contextUsedTokens,
+                window = state.contextWindowTokens,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 6.dp),
+            )
+        }
     }
 
     if (pickerOpen) {
@@ -599,6 +608,52 @@ private fun ChatTopBar(
                         personaSheetOpen = false
                     }
                 },
+            )
+        }
+    }
+}
+
+/**
+ * Slim context-window meter with color levels: green (room), amber (filling),
+ * red (near the model's limit). Helps the user see when a long chat is
+ * approaching the on-device model's window.
+ */
+@Composable
+private fun ContextMeter(used: Int, window: Int, modifier: Modifier = Modifier) {
+    val fraction = (used.toFloat() / window.coerceAtLeast(1)).coerceIn(0f, 1f)
+    val barColor = when {
+        fraction < 0.60f -> MiasColors.SuccessTone
+        fraction < 0.85f -> androidx.compose.ui.graphics.Color(0xFFE0A100)
+        else -> MiasColors.ErrorTone
+    }
+    fun fmt(n: Int): String = if (n >= 1000) "%.1fk".format(n / 1000f) else n.toString()
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Context", style = MiasTypography.LabelSmall, color = MiasColors.TextMuted)
+            Text(
+                text = "${fmt(used)} / ${fmt(window)} · ${(fraction * 100).toInt()}%",
+                style = MiasTypography.LabelSmall,
+                color = if (fraction >= 0.85f) MiasColors.ErrorTone else MiasColors.TextMuted,
+            )
+        }
+        Spacer(modifier = Modifier.height(3.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(MiasShapes.Full)
+                .background(MiasColors.Surface2),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fraction)
+                    .height(4.dp)
+                    .clip(MiasShapes.Full)
+                    .background(barColor),
             )
         }
     }

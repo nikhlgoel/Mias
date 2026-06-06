@@ -33,8 +33,21 @@ class LlamaCppEngine @Inject constructor() : InferenceEngine {
             // MB and allocates the KV cache, which blocks for seconds and ANRs the
             // UI if run on the caller's (Main) dispatcher.
             runCatchingMias {
+                // Foolproof pre-check: a missing or truncated file means the
+                // download never finished or was corrupted. Surface that clearly
+                // instead of a generic native "failed to bind".
+                val file = java.io.File(modelPath)
+                if (!file.exists() || file.length() < MIN_VALID_MODEL_BYTES) {
+                    throw IllegalStateException(
+                        "Model file is missing or incomplete (${file.length()} bytes). " +
+                            "The download may have failed — delete and re-download it.",
+                    )
+                }
                 if (!nativeLoadModel(modelPath)) {
-                    throw IllegalStateException("Failed to bind llama.cpp to GGUF model path: $modelPath")
+                    throw IllegalStateException(
+                        "Couldn't load the model — the file may be corrupted or an " +
+                            "unsupported format. Re-download it from Models.",
+                    )
                 }
                 isLoaded = true
             }
@@ -105,6 +118,9 @@ class LlamaCppEngine @Inject constructor() : InferenceEngine {
     private external fun nativeUnload()
 
     companion object {
+        /** Smallest plausible GGUF; anything under this is a failed/partial download. */
+        private const val MIN_VALID_MODEL_BYTES = 1_000_000L // 1 MB
+
         init {
             try {
                 System.loadLibrary("mias_inference")

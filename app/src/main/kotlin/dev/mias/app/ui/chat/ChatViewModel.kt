@@ -94,6 +94,9 @@ data class ChatUiState(
     val forcedSkill: String? = null,
     /** Transient banner after attaching a document from chat. */
     val attachNotice: String? = null,
+    /** Estimated tokens of the conversation context, and the model's window. */
+    val contextUsedTokens: Int = 0,
+    val contextWindowTokens: Int = 4096,
 )
 
 sealed interface ChatEvent {
@@ -208,6 +211,13 @@ class ChatViewModel @Inject constructor(
         ) { b, c, persona, skill, notice -> SessionFlags(b, c, persona, skill, notice) },
         chatModelSelection,
     ) { snapshot, input, processing, flags, info ->
+        // Rough context estimate (~4 chars/token): persona + scaffolding +
+        // everything in the conversation + the pending input, versus the model's
+        // window. Lets the user see how full the context is getting.
+        val systemChars = flags.persona.systemPrompt.length
+        val convChars = snapshot.messages.sumOf { it.text.length + (it.reasoning?.length ?: 0) }
+        val usedTokens = SYSTEM_SCAFFOLD_TOKENS +
+            (systemChars + convChars + input.length) / CHARS_PER_TOKEN
         ChatUiState(
             messages = snapshot.messages,
             inputText = input,
@@ -227,6 +237,8 @@ class ChatViewModel @Inject constructor(
             ragActive = info.ragActive,
             forcedSkill = flags.forcedSkill,
             attachNotice = flags.attachNotice,
+            contextUsedTokens = usedTokens.coerceAtMost(CONTEXT_WINDOW_TOKENS),
+            contextWindowTokens = CONTEXT_WINDOW_TOKENS,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -284,6 +296,16 @@ class ChatViewModel @Inject constructor(
         "calculator" -> "Calculator"
         "datetime" -> "Date & time"
         else -> skill
+    }
+
+    /**
+     * Heuristic: does this query need up-to-the-minute info the model can't know
+     * from training? If so we auto-run web search so the user actually gets
+     * current results instead of "I don't have live data".
+     */
+    private fun needsFreshInfo(text: String): Boolean {
+        val l = text.lowercase()
+        return FRESH_INFO_KEYWORDS.any { it in l }
     }
 
     fun clearAttachNotice() {
@@ -418,12 +440,15 @@ class ChatViewModel @Inject constructor(
                 val ragContext = rag.promptText
                 val turnSources = rag.sources
 
-                // Forced skill: run the tool ourselves and feed the result in,
-                // rather than relying on a small model to emit the tool-call JSON.
-                // Deterministic — the chosen tool always runs.
-                val skillContext = _forcedSkill.value?.let { skill ->
-                    runSkill(skill, cleanedText)
-                }.orEmpty()
+                // Run a tool ourselves and feed the result in, rather than relying
+                // on a small model to emit the tool-call JSON. Either the user
+                // forced a skill, or the query clearly needs fresh info (news,
+                // "latest", dates…) → auto web search. Deterministic.
+                val skillContext = when {
+                    _forcedSkill.value != null -> runSkill(_forcedSkill.value!!, cleanedText)
+                    needsFreshInfo(cleanedText) -> runSkill("web_search", cleanedText)
+                    else -> ""
+                }
 
                 val retrievalContext = listOf(skillContext, ragContext, hindsightContext)
                     .filter { it.isNotBlank() }
@@ -1037,6 +1062,21 @@ class ChatViewModel @Inject constructor(
         private const val MAX_ATTACH_DIM: Int = 1024
         private const val SKILL_TIMEOUT_MS: Long = 15_000L
         private const val REP_TAIL: Int = 80
+
+        /** Native context window (must match cparams.n_ctx in the JNI bridge). */
+        private const val CONTEXT_WINDOW_TOKENS: Int = 4096
+        /** Rough English token heuristic for the context meter. */
+        private const val CHARS_PER_TOKEN: Int = 4
+        /** Fixed overhead for tool catalogue + JSON instruction + chat template. */
+        private const val SYSTEM_SCAFFOLD_TOKENS: Int = 220
+
+        /** Terms that signal the user wants current/live info → auto web search. */
+        private val FRESH_INFO_KEYWORDS = listOf(
+            "latest", "news", "current", "currently", "today", "tonight",
+            "right now", "recent", "recently", "this week", "this month",
+            "this year", "update on", "what's happening", "whats happening",
+            "live", "stock price", "weather", "score", "2024", "2025", "2026",
+        )
         private const val ATTACHMENT_QUALITY: Int = 85
     }
 }

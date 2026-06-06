@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import dev.mias.core.ui.theme.MiasColors
+import androidx.compose.foundation.shape.RoundedCornerShape
 import dev.mias.core.ui.theme.MiasShapes
 import dev.mias.core.ui.theme.MiasTypography
 
@@ -58,12 +59,15 @@ fun MiasInputBar(
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
 
+    // A fixed 24.dp corner (not a full capsule): when the field grows to several
+    // lines, a capsule's deep curve would clip the +/send buttons at the corners.
+    val barShape = RoundedCornerShape(24.dp)
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(MiasShapes.Full)
+            .clip(barShape)
             .background(MiasColors.Surface3)
-            .border(1.dp, MiasColors.OutlineSoft, MiasShapes.Full)
+            .border(1.dp, MiasColors.OutlineSoft, barShape)
             .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
