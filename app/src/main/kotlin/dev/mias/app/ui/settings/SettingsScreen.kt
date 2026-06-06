@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -68,7 +69,10 @@ fun SettingsScreen(
             .fillMaxSize()
             .background(MiasColors.Background)
             .windowInsetsPadding(WindowInsets.statusBars)
-            .verticalScroll(rememberScrollState()),
+            .verticalScroll(rememberScrollState())
+            // The activity uses adjustNothing (Compose owns insets), so the form
+            // must pad for the keyboard itself or the lower fields get covered.
+            .imePadding(),
     ) {
         Row(
             modifier = Modifier

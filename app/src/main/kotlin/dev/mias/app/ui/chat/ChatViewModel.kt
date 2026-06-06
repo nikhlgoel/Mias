@@ -1070,12 +1070,15 @@ class ChatViewModel @Inject constructor(
         /** Fixed overhead for tool catalogue + JSON instruction + chat template. */
         private const val SYSTEM_SCAFFOLD_TOKENS: Int = 220
 
-        /** Terms that signal the user wants current/live info → auto web search. */
+        /**
+         * Strong signals that the user wants current/live info → auto web search.
+         * Deliberately specific: common words like "today"/"current"/"live" are
+         * excluded so ordinary chats don't trigger a needless network round-trip.
+         */
         private val FRESH_INFO_KEYWORDS = listOf(
-            "latest", "news", "current", "currently", "today", "tonight",
-            "right now", "recent", "recently", "this week", "this month",
-            "this year", "update on", "what's happening", "whats happening",
-            "live", "stock price", "weather", "score", "2024", "2025", "2026",
+            "latest", "news", "breaking", "headlines", "right now",
+            "this week", "update on", "what's happening", "whats happening",
+            "stock price", "share price", "weather", "2025", "2026",
         )
         private const val ATTACHMENT_QUALITY: Int = 85
     }
