@@ -11,7 +11,10 @@ import dev.mias.core.inference.react.ChatTemplate
 import dev.mias.core.inference.react.ReActEngine
 import dev.mias.core.inference.react.ReActStep
 import dev.mias.core.modelhub.manager.ModelManager
+import dev.mias.core.modelhub.model.ModelCard
 import dev.mias.core.modelhub.model.ModelRole
+import dev.mias.core.modelhub.model.capabilityProfile
+import dev.mias.core.resilience.DeviceHealthMonitor
 import dev.mias.core.thermal.TawsAction
 import dev.mias.core.thermal.TawsGovernor
 import kotlinx.coroutines.flow.Flow
@@ -45,7 +48,11 @@ class InferenceOrchestrator @Inject constructor(
     private val guardrailProcessor: GuardrailProcessor,
     private val modelManager: ModelManager,
     private val roleClassifier: RoleClassifier,
+    private val deviceHealthMonitor: DeviceHealthMonitor,
 ) {
+    /** Per-session adaptive demotion of models that can't sustain the agentic loop. */
+    private val agentReliability = AgentReliabilityTracker()
+
     private val _brainState = MutableStateFlow(BrainState.GEMMA_NPU)
     val brainState: StateFlow<BrainState> = _brainState.asStateFlow()
 
@@ -125,8 +132,8 @@ class InferenceOrchestrator @Inject constructor(
 
         val (engine, newState) = selectEngine(tawsAction, stimulus)
         val previousState = _brainState.value
-        val modelName: String = when (val readiness = ensureModelLoaded(engine, newState)) {
-            is ModelReadiness.Ready -> readiness.modelName
+        val card: ModelCard = when (val readiness = ensureModelLoaded(engine, newState)) {
+            is ModelReadiness.Ready -> readiness.card
             is ModelReadiness.NoModelAssigned -> {
                 emit(
                     ReActStep.FinalAnswer(
@@ -152,7 +159,24 @@ class InferenceOrchestrator @Inject constructor(
         // Format the prompt for the loaded model's family (ChatML for Qwen,
         // Phi format for Phi, plain otherwise) — markedly better replies than a
         // one-size-fits-all prompt.
-        val templateKind = ChatTemplate.forModel(modelName)
+        val templateKind = ChatTemplate.forModel(card.name)
+
+        // Decide how to run this turn (agentic-preferred) from three signals:
+        // the model's competence, the device's static tier, and the live
+        // thermal/battery action. A model that keeps failing the agentic loop
+        // is demoted to deterministic for the rest of the session.
+        val profile = card.capabilityProfile()
+        val deviceTier = DeviceTier.from(deviceHealthMonitor.health.value)
+        val baseMode = ExecutionPolicy.decide(profile, deviceTier, tawsAction)
+        val mode = if (baseMode == ExecutionMode.AGENTIC && agentReliability.isDemoted(card.id)) {
+            ExecutionMode.DETERMINISTIC
+        } else {
+            baseMode
+        }
+        val useGrammar = ExecutionPolicy.shouldUseGrammar(mode, deviceTier)
+        val reliabilitySink = AgentReliabilitySink { success ->
+            agentReliability.record(card.id, success)
+        }
 
         generationMutex.withLock {
             reActEngine.execute(
@@ -161,6 +185,9 @@ class InferenceOrchestrator @Inject constructor(
                 userPrompt = stimulus.content,
                 hindsightContext = hindsightContext,
                 templateKind = templateKind,
+                allowToolCalls = mode == ExecutionMode.AGENTIC,
+                useGrammar = useGrammar,
+                reliabilitySink = reliabilitySink,
             ).onStart {
                 _brainState.value = newState
                 _cognitionState.value = CognitionState.THINKING
@@ -253,7 +280,7 @@ class InferenceOrchestrator @Inject constructor(
         }
 
     private sealed interface ModelReadiness {
-        data class Ready(val modelName: String) : ModelReadiness
+        data class Ready(val card: ModelCard) : ModelReadiness
         data object NoModelAssigned : ModelReadiness
         data class LoadFailed(val modelName: String, val reason: String) : ModelReadiness
     }
@@ -285,7 +312,7 @@ class InferenceOrchestrator @Inject constructor(
         // since last call".
         val currentlyLoaded = loadedModelByEngine[engine]
         if (currentlyLoaded == model.id && engine.isModelLoaded()) {
-            return@withLock ModelReadiness.Ready(model.card.name)
+            return@withLock ModelReadiness.Ready(model.card)
         }
 
         // A different model needs to be loaded — unload first so the engine
@@ -299,7 +326,7 @@ class InferenceOrchestrator @Inject constructor(
             is MiasResult.Success -> {
                 loadedModelByEngine[engine] = model.id
                 modelManager.markUsed(model.id)
-                ModelReadiness.Ready(model.card.name)
+                ModelReadiness.Ready(model.card)
             }
             is MiasResult.Error -> ModelReadiness.LoadFailed(
                 modelName = model.card.name,

@@ -61,10 +61,38 @@ object ResponseSanitizer {
 
         // No cleanly-parseable JSON. The model may still have emitted *malformed*
         // JSON (truncated braces, leading prose, etc.) where a clean parse fails
-        // but the should_say value is recoverable — strip the residue.
-        val cleaned = stripJsonResidue(cleanupPlain(trimmed))
+        // but the should_say value is recoverable — strip the residue, then drop
+        // any leaked ReAct meta-reasoning preamble.
+        val cleaned = stripMetaReasoning(stripJsonResidue(cleanupPlain(trimmed)))
         return SanitizedResponse(cleaned, null)
     }
+
+    /**
+     * Remove leading ReAct meta-reasoning that a weak model narrates as prose
+     * instead of as JSON — e.g. "I will use web_search to…", "The user is
+     * asking for…", "I have access to the tools listed above…". The
+     * deterministic prompt already discourages this; this is the belt-and-
+     * suspenders cleanup for the cases it still slips through (see SS2/SS3).
+     *
+     * Conservative by design: it only strips *leading* sentences that clearly
+     * match scaffolding patterns, and only when substantive text remains after.
+     * If stripping would empty the message, the original is kept — better an
+     * imperfect answer than a blank bubble.
+     */
+    fun stripMetaReasoning(input: String): String {
+        if (input.isBlank()) return input
+        val stripped = META_REASONING_LEAD.replaceFirst(input.trimStart(), "").trim()
+        return stripped.ifBlank { input.trim() }
+    }
+
+    // One-or-more leading sentences that open with agent-scaffolding phrasing.
+    private val META_REASONING_LEAD = Regex(
+        "^(?:\\s*(?:i will use|i'll use|i am going to use|i need to (?:gather|search|use|" +
+            "fetch|find|look|check)|let me (?:search|use|gather|look|check)|the user (?:is " +
+            "asking|wants|needs|asked|would like)|i have access to|i am a large language " +
+            "model|i should (?:use|search|gather))\\b[^.!?\\n]*[.!?\\n]+)+",
+        RegexOption.IGNORE_CASE,
+    )
 
     /**
      * Last-resort cleaner for text that isn't valid JSON but carries JSON

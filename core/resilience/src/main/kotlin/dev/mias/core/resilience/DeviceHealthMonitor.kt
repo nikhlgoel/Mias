@@ -57,6 +57,9 @@ class DeviceHealthMonitor @Inject constructor(
             cpuCores = Runtime.getRuntime().availableProcessors(),
             processId = Process.myPid(),
             isLowMemory = memInfo.lowMemory,
+            // Static OEM classification (RAM-constrained device per the platform).
+            // Distinct from the transient [isLowMemory] pressure flag.
+            isLowRamDevice = activityManager.isLowRamDevice,
         )
     }
 
@@ -83,4 +86,6 @@ data class DeviceHealth(
     val cpuCores: Int,
     val processId: Int,
     val isLowMemory: Boolean = false,
+    /** Static platform classification: a low-RAM (Go-edition / constrained) device. */
+    val isLowRamDevice: Boolean = false,
 )

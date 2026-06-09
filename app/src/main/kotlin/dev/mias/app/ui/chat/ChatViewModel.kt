@@ -1,9 +1,13 @@
 ﻿package dev.mias.app.ui.chat
 
+import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Environment
+import android.provider.MediaStore
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -33,6 +37,8 @@ import dev.mias.core.inference.react.ToolRegistry
 import dev.mias.core.inference.react.StreamingReActParser
 import dev.mias.core.inference.vision.MediaPipeVisionEngine
 import dev.mias.core.language.IntentExtractor
+import dev.mias.core.language.IntentType
+import dev.mias.core.language.StructuredIntent
 import dev.mias.core.modelhub.manager.ModelManager
 import dev.mias.core.modelhub.model.InstalledModel
 import dev.mias.core.modelhub.model.ModelRole
@@ -73,6 +79,26 @@ data class ChatMessage(
     val reasoning: String? = null,
     /** Document names this answer drew on (RAG citations). */
     val sources: List<String> = emptyList(),
+    /**
+     * A file the assistant produced from this turn. Present only for
+     * file-generation intents. The file is written for real on save — the
+     * message never *claims* a file exists until [FileArtifact.saved] is true.
+     */
+    val fileArtifact: FileArtifact? = null,
+)
+
+/**
+ * A generated file offered on an assistant message. Honest by construction:
+ * the content is shown in the bubble; the file is only written when the user
+ * saves it (or, for an explicit "export/save" request, written immediately and
+ * surfaced with Open/Share). No phantom "I made a file" claims.
+ */
+data class FileArtifact(
+    val fileName: String,
+    val content: String,
+    val saved: Boolean = false,
+    /** content:// URI once written, for Open/Share. */
+    val savedUri: String? = null,
 )
 
 data class ChatUiState(
@@ -308,6 +334,110 @@ class ChatViewModel @Inject constructor(
         return FRESH_INFO_KEYWORDS.any { it in l }
     }
 
+    // ── Honest file generation ──────────────────────────────────────────
+
+    private fun isFileGenIntent(intent: StructuredIntent?): Boolean =
+        intent?.intentType == IntentType.FILE_GENERATION
+
+    private fun isExplicitExport(text: String): Boolean {
+        val l = text.lowercase()
+        return EXPLICIT_EXPORT_KEYWORDS.any { it in l }
+    }
+
+    /**
+     * Pick a filename: honour an explicit one in the request ("report.csv"),
+     * else infer the extension from the produced content.
+     */
+    private fun deriveFileName(userText: String, content: String): String {
+        FILENAME_IN_TEXT.find(userText)?.value?.let { return it.substringAfterLast('/').substringAfterLast('\\') }
+        val lower = content.trimStart().lowercase()
+        val ext = when {
+            lower.startsWith("<!doctype html") || lower.startsWith("<html") || "<body" in lower -> "html"
+            lower.startsWith("{") || lower.startsWith("[") -> "json"
+            content.lineSequence().take(4).count { it.count { c -> c == ',' } >= 2 } >= 2 -> "csv"
+            else -> "md"
+        }
+        val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+        return "mias-$stamp.$ext"
+    }
+
+    private fun mimeFor(fileName: String): String = when {
+        fileName.endsWith(".md", true) -> "text/markdown"
+        fileName.endsWith(".txt", true) -> "text/plain"
+        fileName.endsWith(".json", true) -> "application/json"
+        fileName.endsWith(".csv", true) -> "text/csv"
+        fileName.endsWith(".html", true) -> "text/html"
+        else -> "application/octet-stream"
+    }
+
+    /** Write a saveable artifact to public Documents and reveal Open/Share. */
+    fun saveFile(messageId: String) {
+        viewModelScope.launch {
+            val artifact = _messages.value.firstOrNull { it.id == messageId }?.fileArtifact
+                ?: return@launch
+            if (artifact.saved) return@launch
+            val uri = exportToMediaStore(artifact.fileName, artifact.content)
+            if (uri == null) {
+                _attachNotice.value = "Couldn't save ${artifact.fileName}."
+                return@launch
+            }
+            _messages.update { list ->
+                list.map {
+                    if (it.id == messageId) {
+                        it.copy(fileArtifact = artifact.copy(saved = true, savedUri = uri.toString()))
+                    } else {
+                        it
+                    }
+                }
+            }
+            _attachNotice.value = "Saved ${artifact.fileName} to Documents/MiasExports"
+        }
+    }
+
+    fun openFile(messageId: String) = launchFileIntent(messageId) { uri, artifact ->
+        Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, mimeFor(artifact.fileName))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    }
+
+    fun shareFile(messageId: String) = launchFileIntent(messageId) { uri, artifact ->
+        Intent.createChooser(
+            Intent(Intent.ACTION_SEND).apply {
+                type = mimeFor(artifact.fileName)
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            },
+            "Share ${artifact.fileName}",
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
+    private fun launchFileIntent(messageId: String, build: (Uri, FileArtifact) -> Intent) {
+        val artifact = _messages.value.firstOrNull { it.id == messageId }?.fileArtifact ?: return
+        val uri = artifact.savedUri?.let { runCatching { Uri.parse(it) }.getOrNull() } ?: return
+        runCatching { context.startActivity(build(uri, artifact)) }
+            .onFailure { _attachNotice.value = "No app available for that file." }
+    }
+
+    private suspend fun exportToMediaStore(fileName: String, content: String): Uri? =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val resolver = context.contentResolver
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, mimeFor(fileName))
+                    put(
+                        MediaStore.MediaColumns.RELATIVE_PATH,
+                        Environment.DIRECTORY_DOCUMENTS + "/MiasExports",
+                    )
+                }
+                val uri = resolver.insert(MediaStore.Files.getContentUri("external"), values)
+                    ?: return@runCatching null
+                resolver.openOutputStream(uri)?.use { it.write(content.toByteArray(Charsets.UTF_8)) }
+                uri
+            }.getOrNull()
+        }
+
     fun clearAttachNotice() {
         _attachNotice.value = null
     }
@@ -524,6 +654,22 @@ class ChatViewModel @Inject constructor(
                         finalResponse = sanitized.chatText
                         val thinking = currentThinkingText.ifBlank { sanitized.reasoningText.orEmpty() }
                             .ifBlank { null }
+
+                        // Honest file generation: if this was a file-gen intent,
+                        // offer the produced text as a real saveable file. The
+                        // bubble shows the content; nothing claims a file exists.
+                        val artifact = if (isFileGenIntent(structuredIntent) &&
+                            sanitized.chatText.isNotBlank()
+                        ) {
+                            FileArtifact(
+                                fileName = deriveFileName(cleanedText, sanitized.chatText),
+                                content = sanitized.chatText,
+                            )
+                        } else {
+                            null
+                        }
+                        val finalMsgId = streamingMsgId ?: UUID.randomUUID().toString()
+
                         _messages.update { currentList ->
                             val existingIndex = currentList.indexOfFirst { it.id == streamingMsgId }
                             if (existingIndex >= 0) {
@@ -534,22 +680,30 @@ class ChatViewModel @Inject constructor(
                                     isStreaming = false,
                                     reasoning = thinking,
                                     sources = turnSources,
+                                    fileArtifact = artifact,
                                 )
                                 updatedList
                             } else {
                                 currentList + ChatMessage(
-                                    id = UUID.randomUUID().toString(),
+                                    id = finalMsgId,
                                     text = sanitized.chatText,
                                     type = BubbleType.Mias,
                                     timestamp = formatTime(System.currentTimeMillis()),
                                     isStreaming = false,
                                     reasoning = thinking,
                                     sources = turnSources,
+                                    fileArtifact = artifact,
                                 )
                             }
                         }
                         streamingMsgId = null
                         _events.tryEmit(ChatEvent.ScrollToBottom)
+
+                        // Explicit "save/export" request → write immediately and
+                        // surface Open/Share; otherwise wait for a "Save" tap.
+                        if (artifact != null && isExplicitExport(cleanedText)) {
+                            saveFile(finalMsgId)
+                        }
                     }
 
                     is ReActStep.ModelSwitch -> {
@@ -1080,6 +1234,17 @@ class ChatViewModel @Inject constructor(
             "this week", "update on", "what's happening", "whats happening",
             "stock price", "share price", "weather", "2025", "2026",
         )
+
+        /** Phrases that mean "write this to a file now" → auto-save the artifact. */
+        private val EXPLICIT_EXPORT_KEYWORDS = listOf(
+            "save", "export", "download", "write to file", "write a file",
+            "create a file", "make a file", "save as", "save to",
+        )
+
+        /** An explicit filename mentioned in the request, e.g. "report.csv". */
+        private val FILENAME_IN_TEXT =
+            Regex("[\\w./\\\\-]+\\.(?:md|txt|csv|html|json)", RegexOption.IGNORE_CASE)
+
         private const val ATTACHMENT_QUALITY: Int = 85
     }
 }

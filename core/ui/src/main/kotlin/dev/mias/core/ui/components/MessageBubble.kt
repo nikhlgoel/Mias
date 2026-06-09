@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Psychology
@@ -77,6 +78,13 @@ fun MessageBubble(
     reasoning: String? = null,
     /** Document names this answer drew on (RAG citations). */
     sources: List<String> = emptyList(),
+    /** Filename of a generated, saveable file artifact (null = none). */
+    fileName: String? = null,
+    /** Whether that artifact has been written to disk yet. */
+    fileSaved: Boolean = false,
+    onSaveFile: (() -> Unit)? = null,
+    onOpenFile: (() -> Unit)? = null,
+    onShareFile: (() -> Unit)? = null,
     /** Long-press handler (e.g. copy the message). No-op tap; null disables it. */
     onLongPress: (() -> Unit)? = null,
 ) {
@@ -200,6 +208,17 @@ fun MessageBubble(
                         )
                     }
                 }
+
+                // Honest file artifact — produced content offered as a real file.
+                if (type == BubbleType.Mias && fileName != null) {
+                    FileArtifactRow(
+                        fileName = fileName,
+                        saved = fileSaved,
+                        onSave = onSaveFile,
+                        onOpen = onOpenFile,
+                        onShare = onShareFile,
+                    )
+                }
             }
 
             if (timestamp != null) {
@@ -291,6 +310,66 @@ private fun ThinkingProcessBox(reasoning: String, isStreaming: Boolean) {
             )
         }
     }
+}
+
+/**
+ * Compact action row for a generated file. Before saving it offers a single
+ * "Save file" tap; after saving it confirms and offers Open / Share. The file
+ * content itself is already shown in the bubble body, so this never *claims*
+ * anything that isn't true.
+ */
+@Composable
+private fun FileArtifactRow(
+    fileName: String,
+    saved: Boolean,
+    onSave: (() -> Unit)?,
+    onOpen: (() -> Unit)?,
+    onShare: (() -> Unit)?,
+) {
+    Spacer(modifier = Modifier.height(8.dp))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Rounded.InsertDriveFile,
+            contentDescription = null,
+            tint = MiasColors.Heather,
+            modifier = Modifier.size(14.dp),
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = fileName,
+            style = MiasTypography.LabelMedium,
+            color = MiasColors.TextLo,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        if (!saved) {
+            FileAction(label = "Save file", onClick = onSave)
+        } else {
+            Text(
+                text = "Saved",
+                style = MiasTypography.LabelSmall,
+                color = MiasColors.SuccessTone,
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            FileAction(label = "Open", onClick = onOpen)
+            Spacer(modifier = Modifier.width(12.dp))
+            FileAction(label = "Share", onClick = onShare)
+        }
+    }
+}
+
+@Composable
+private fun FileAction(label: String, onClick: (() -> Unit)?) {
+    Text(
+        text = label,
+        style = MiasTypography.LabelMedium,
+        color = MiasColors.Heather,
+        modifier = Modifier
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+            .padding(vertical = 2.dp),
+    )
 }
 
 @Composable

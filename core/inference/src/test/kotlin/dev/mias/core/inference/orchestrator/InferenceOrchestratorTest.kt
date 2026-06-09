@@ -8,6 +8,7 @@ import dev.mias.core.inference.InferenceEngine
 import dev.mias.core.inference.engine.GoogleAiEdgeEngine
 import dev.mias.core.inference.react.ReActEngine
 import dev.mias.core.modelhub.manager.ModelManager
+import dev.mias.core.resilience.DeviceHealthMonitor
 import dev.mias.core.security.GuardrailProcessor
 import dev.mias.core.thermal.TawsAction
 import dev.mias.core.thermal.TawsGovernor
@@ -37,6 +38,7 @@ class InferenceOrchestratorTest {
     private lateinit var guardrailProcessor: GuardrailProcessor
     private lateinit var modelManager: ModelManager
     private lateinit var roleClassifier: RoleClassifier
+    private lateinit var deviceHealthMonitor: DeviceHealthMonitor
     private lateinit var orchestrator: InferenceOrchestrator
 
     @BeforeEach
@@ -48,6 +50,7 @@ class InferenceOrchestratorTest {
         guardrailProcessor = mockk(relaxed = true)
         modelManager = mockk(relaxed = true)
         roleClassifier = mockk(relaxed = true)
+        deviceHealthMonitor = mockk(relaxed = true)
 
         orchestrator = InferenceOrchestrator(
             primaryEngine = primaryEngine,
@@ -57,6 +60,7 @@ class InferenceOrchestratorTest {
             guardrailProcessor = guardrailProcessor,
             modelManager = modelManager,
             roleClassifier = roleClassifier,
+            deviceHealthMonitor = deviceHealthMonitor,
         )
     }
 

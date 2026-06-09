@@ -227,6 +227,11 @@ fun ChatScreen(
                                 image = message.image,
                                 reasoning = message.reasoning,
                                 sources = message.sources,
+                                fileName = message.fileArtifact?.fileName,
+                                fileSaved = message.fileArtifact?.saved == true,
+                                onSaveFile = { viewModel.saveFile(message.id) },
+                                onOpenFile = { viewModel.openFile(message.id) },
+                                onShareFile = { viewModel.shareFile(message.id) },
                                 onLongPress = { copyMessage(message.text) },
                             )
                         }

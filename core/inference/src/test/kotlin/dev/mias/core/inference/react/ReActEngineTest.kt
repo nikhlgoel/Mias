@@ -3,6 +3,7 @@ package dev.mias.core.inference.react
 import com.google.common.truth.Truth.assertThat
 import dev.mias.core.common.MiasResult
 import dev.mias.core.inference.InferenceEngine
+import dev.mias.core.inference.orchestrator.AgentReliabilitySink
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -56,8 +57,12 @@ class ReActEngineTest {
 
             val finalSteps = steps.filterIsInstance<ReActStep.FinalAnswer>()
             assertThat(finalSteps).isNotEmpty()
-            // Loop-limit fallback message (no should_say was ever produced).
-            assertThat(finalSteps.last().response).contains("couldn't reach a complete answer")
+            // The loop didn't converge → it recovers with a clean plain pass.
+            // The recovered answer must be non-empty and free of raw JSON.
+            val recovered = finalSteps.last().response
+            assertThat(recovered).isNotEmpty()
+            assertThat(recovered).doesNotContain("is_final")
+            assertThat(recovered).doesNotContain("should_say")
         }
 
         @Test
@@ -234,6 +239,106 @@ class ReActEngineTest {
             val finals = steps.filterIsInstance<ReActStep.FinalAnswer>()
             assertThat(finals).hasSize(1)
             assertThat(finals.first().response).contains("OOM: out of memory")
+        }
+    }
+
+    @Nested
+    @DisplayName("deterministic mode (allowToolCalls = false)")
+    inner class DeterministicModeTests {
+
+        @Test
+        fun `streams a plain reply and never advertises tools`() = runTest {
+            val prompts = mutableListOf<String>()
+            every { mockEngine.generateStream(any(), any(), any()) } answers {
+                prompts.add(firstArg())
+                flowOf(MiasResult.Success("The capital of France is Paris."))
+            }
+            // A registered tool must NOT leak into the prompt in deterministic mode.
+            toolRegistry.register("web_search", "Search the web") { "results" }
+
+            val steps = reActEngine.execute(
+                engine = mockEngine,
+                systemPrompt = "test",
+                userPrompt = "What is the capital of France?",
+                allowToolCalls = false,
+            ).toList()
+
+            val finals = steps.filterIsInstance<ReActStep.FinalAnswer>()
+            assertThat(finals).hasSize(1)
+            assertThat(finals.first().response).isEqualTo("The capital of France is Paris.")
+            assertThat(prompts).hasSize(1)
+            assertThat(prompts.single()).doesNotContain("Available tools")
+            assertThat(prompts.single()).doesNotContain("web_search")
+        }
+
+        @Test
+        fun `never executes a tool`() = runTest {
+            var toolCalled = false
+            toolRegistry.register("web_search") {
+                toolCalled = true
+                "results"
+            }
+            every { mockEngine.generateStream(any(), any(), any()) } returns flowOf(
+                MiasResult.Success("answer"),
+            )
+
+            reActEngine.execute(
+                engine = mockEngine,
+                systemPrompt = "s",
+                userPrompt = "u",
+                allowToolCalls = false,
+            ).toList()
+
+            assertThat(toolCalled).isFalse()
+        }
+    }
+
+    @Nested
+    @DisplayName("reliability sink")
+    inner class ReliabilitySinkTests {
+
+        @Test
+        fun `records success when the loop converges`() = runTest {
+            val outcomes = mutableListOf<Boolean>()
+            val sink = AgentReliabilitySink { outcomes.add(it) }
+            val finalJson = """
+                {"thought": "ok", "action": "respond_user", "action_input": {}, "is_final": true, "should_say": "hi"}
+            """.trimIndent()
+            every { mockEngine.generateStream(any(), any(), any()) } returns flowOf(
+                MiasResult.Success(finalJson),
+            )
+
+            reActEngine.execute(
+                engine = mockEngine,
+                systemPrompt = "s",
+                userPrompt = "u",
+                reliabilitySink = sink,
+            ).toList()
+
+            assertThat(outcomes).containsExactly(true)
+        }
+
+        @Test
+        fun `records failure when the loop never converges`() = runTest {
+            val outcomes = mutableListOf<Boolean>()
+            val sink = AgentReliabilitySink { outcomes.add(it) }
+            val nonFinal = """
+                {"thought": "...", "action": "some_tool", "action_input": {}, "is_final": false, "should_say": ""}
+            """.trimIndent()
+            toolRegistry.register("some_tool") { "ok" }
+            every { mockEngine.generateStream(any(), any(), any()) } returns flowOf(
+                MiasResult.Success(nonFinal),
+            )
+
+            reActEngine.execute(
+                engine = mockEngine,
+                systemPrompt = "s",
+                userPrompt = "u",
+                maxIterations = 2,
+                reliabilitySink = sink,
+            ).toList()
+
+            assertThat(outcomes).containsExactly(false)
         }
     }
 }

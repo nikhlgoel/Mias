@@ -44,6 +44,8 @@ dependencies {
     implementation(project(":core:thermal"))
     implementation(project(":core:security"))
     implementation(project(":core:model-hub"))
+    // DeviceHealthMonitor — device-tier signal for the execution-mode policy.
+    implementation(project(":core:resilience"))
 
     // On-device inference powered by llama.cpp JNI
     implementation(libs.kotlinx.coroutines.android)

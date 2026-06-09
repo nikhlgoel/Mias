@@ -3,8 +3,10 @@
 import dev.mias.core.common.MiasResult
 import dev.mias.core.common.di.IoDispatcher
 import dev.mias.core.inference.InferenceEngine
+import dev.mias.core.inference.orchestrator.AgentReliabilitySink
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -47,7 +49,33 @@ class ReActEngine @Inject constructor(
         hindsightContext: String = "",
         templateKind: ChatTemplateKind = ChatTemplateKind.PLAIN,
         maxIterations: Int = MAX_ITERATIONS,
+        /**
+         * Whether the model is competent enough to drive the tool loop itself.
+         * When false (weak model / low-tier device / thermal stress) we run a
+         * single deterministic pass with NO tool catalogue in the prompt — the
+         * advertising of tools a weak model can't call is exactly what made it
+         * hallucinate tool use and leak its reasoning.
+         */
+        allowToolCalls: Boolean = true,
+        /** Constrain agentic output with the GBNF JSON grammar (HIGH-tier only). */
+        useGrammar: Boolean = false,
+        /** Receives whether the agentic loop converged (for adaptive demotion). */
+        reliabilitySink: AgentReliabilitySink? = null,
     ): Flow<ReActStep> = flow {
+        // ── Deterministic path ───────────────────────────────────────────
+        // No tool catalogue, no JSON contract, no loop: the app has already
+        // injected any tool results as reference material. The model just
+        // writes one clean, grounded answer.
+        if (!allowToolCalls) {
+            val plainPrompt = ChatTemplate.build(
+                templateKind,
+                plainSystemBlock(systemPrompt, hindsightContext),
+                userPrompt,
+            )
+            streamPlainAnswer(engine, plainPrompt)
+            return@flow
+        }
+
         val conversationBuffer = StringBuilder()
 
         // Assemble the system block: persona + memory + tool contract. The
@@ -60,8 +88,7 @@ class ReActEngine @Inject constructor(
             if (toolCatalogue.isNotBlank()) {
                 append("\n\nAvailable tools:\n").append(toolCatalogue)
                 // Plain-text-first contract: a normal reply needs no JSON; the
-                // schema is only for an actual tool call. (Forcing JSON via a
-                // GBNF grammar previously made mobile sampling crawl.)
+                // schema is only for an actual tool call.
                 append(
                     "\n\nReply directly in plain, natural language. Only if you " +
                         "genuinely need one of the tools above, instead output a single " +
@@ -76,7 +103,6 @@ class ReActEngine @Inject constructor(
         conversationBuffer.append(ChatTemplate.build(templateKind, systemBlock, userPrompt))
 
         var iterations = 0
-        var lastThought = ""
         var lastShouldSay = ""
         var lastObservation = ""
 
@@ -91,11 +117,10 @@ class ReActEngine @Inject constructor(
                 // Capped per turn so a slow on-device CPU can't grind through a
                 // 1024-token response before the user sees anything.
                 maxTokens = MAX_RESPONSE_TOKENS,
-                // No GBNF grammar: token-level JSON masking made sampling
-                // pathologically slow on mobile CPUs. The lenient parser
-                // (StreamingReActParser / parseReActOutput) handles both plain
-                // prose and the optional tool-call JSON instead.
-                grammar = null,
+                // GBNF grammar only on HIGH-tier hardware ([useGrammar]). Token-
+                // level JSON masking is slow on weak CPUs, so MID-tier agentic
+                // relies on the lenient parser + per-turn fallback instead.
+                grammar = if (useGrammar) REACT_GRAMMAR else null,
             ).collect { result ->
                 when (result) {
                     is MiasResult.Success -> {
@@ -133,7 +158,6 @@ class ReActEngine @Inject constructor(
             }
 
             // Emit the thought
-            if (parsed.thought.isNotBlank()) lastThought = parsed.thought
             parsed.shouldSay?.takeIf { it.isNotBlank() }?.let { lastShouldSay = it }
             emit(ReActStep.Thought(parsed.thought))
 
@@ -145,6 +169,8 @@ class ReActEngine @Inject constructor(
                     ?: parsed.actionInput["response"]
                     ?: parsed.actionInput["text"]
                     ?: parsed.thought
+                // The agentic loop converged on a real answer.
+                reliabilitySink?.record(true)
                 emit(ReActStep.FinalAnswer(response))
                 return@flow
             }
@@ -164,17 +190,87 @@ class ReActEngine @Inject constructor(
             conversationBuffer.append("\n\nContinue reasoning. Respond with JSON.")
         }
 
-        // Loop limit reached without an explicit final turn. Prefer the
-        // model's most recent user-facing text; otherwise share the partial
-        // reasoning rather than disappearing into silence.
-        val fallback = lastShouldSay.takeIf { it.isNotBlank() }
-            ?: buildString {
-                append("I considered this carefully but couldn't reach a complete answer ")
-                append("in the time available. Here is what I had so far:")
-                if (lastThought.isNotBlank()) append("\n\nLine of thought: $lastThought")
-                if (lastObservation.isNotBlank()) append("\n\nLast finding: $lastObservation")
+        // Loop limit reached without an explicit final turn → the agentic loop
+        // didn't converge. Note the miss (for per-session adaptive demotion),
+        // then recover with a clean, grounded answer rather than dumping the
+        // partial reasoning at the user.
+        reliabilitySink?.record(false)
+
+        val recovered = lastShouldSay.takeIf { it.isNotBlank() }
+        if (recovered != null) {
+            emit(ReActStep.FinalAnswer(recovered))
+            return@flow
+        }
+        // No user-facing text was ever produced: do one plain pass grounded on
+        // whatever memory + observations were gathered during the loop.
+        val reference = listOf(hindsightContext, lastObservation)
+            .filter { it.isNotBlank() }
+            .joinToString("\n\n")
+        val recoveryPrompt = ChatTemplate.build(
+            templateKind,
+            plainSystemBlock(systemPrompt, reference),
+            userPrompt,
+        )
+        streamPlainAnswer(engine, recoveryPrompt)
+    }
+
+    /**
+     * Build a plain (no-tools) system block: persona + optional reference
+     * material + a grounding contract. The "don't describe steps or tools"
+     * line is deliberate — it suppresses the meta-reasoning a weak model would
+     * otherwise narrate ("I will use web_search…", "the user is asking…").
+     */
+    private fun plainSystemBlock(systemPrompt: String, reference: String): String = buildString {
+        append(systemPrompt)
+        if (reference.isNotBlank()) {
+            append(
+                "\n\nReference material — base your answer on it and cite as [1], [2]; " +
+                    "if it does not contain the answer, say you could not find it:\n",
+            )
+            append(reference)
+        }
+        append(
+            "\n\nAnswer the user directly in clear, natural language. Do not describe " +
+                "your steps or mention tools — just give the answer.",
+        )
+    }
+
+    /**
+     * Single non-agentic generation: stream the deltas through as
+     * [ReActStep.TokenChunk]s, then emit one sanitized [ReActStep.FinalAnswer].
+     * Used for the deterministic path and the agentic recovery fallback.
+     */
+    private suspend fun FlowCollector<ReActStep>.streamPlainAnswer(
+        engine: InferenceEngine,
+        prompt: String,
+    ) {
+        val buffer = StringBuilder()
+        var errorResult: String? = null
+        engine.generateStream(prompt, maxTokens = MAX_RESPONSE_TOKENS, grammar = null)
+            .collect { result ->
+                when (result) {
+                    is MiasResult.Success -> {
+                        val delta = result.data
+                        if (delta.isNotEmpty()) {
+                            buffer.append(delta)
+                            emit(ReActStep.TokenChunk(delta))
+                        }
+                    }
+                    is MiasResult.Error -> errorResult = result.message
+                }
             }
-        emit(ReActStep.FinalAnswer(fallback))
+        if (errorResult != null) {
+            emit(
+                ReActStep.FinalAnswer(
+                    "I'm not able to respond right now. Details: $errorResult. " +
+                        "Please try again in a moment.",
+                ),
+            )
+            return
+        }
+        val clean = ResponseSanitizer.sanitize(buffer.toString()).chatText
+            .ifBlank { buffer.toString().trim() }
+        emit(ReActStep.FinalAnswer(clean))
     }
 
     /**
