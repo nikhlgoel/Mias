@@ -4,11 +4,13 @@ import dev.mias.core.common.MiasResult
 import dev.mias.core.common.di.IoDispatcher
 import dev.mias.core.inference.InferenceEngine
 import dev.mias.core.inference.orchestrator.AgentReliabilitySink
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -49,6 +51,8 @@ class ReActEngine @Inject constructor(
         hindsightContext: String = "",
         templateKind: ChatTemplateKind = ChatTemplateKind.PLAIN,
         maxIterations: Int = MAX_ITERATIONS,
+        /** Per-turn generation cap; larger for models that can use it. */
+        maxResponseTokens: Int = MAX_RESPONSE_TOKENS,
         /**
          * Whether the model is competent enough to drive the tool loop itself.
          * When false (weak model / low-tier device / thermal stress) we run a
@@ -72,7 +76,7 @@ class ReActEngine @Inject constructor(
                 plainSystemBlock(systemPrompt, hindsightContext),
                 userPrompt,
             )
-            streamPlainAnswer(engine, plainPrompt)
+            streamPlainAnswer(engine, plainPrompt, maxResponseTokens)
             return@flow
         }
 
@@ -114,9 +118,9 @@ class ReActEngine @Inject constructor(
 
             engine.generateStream(
                 prompt = conversationBuffer.toString(),
-                // Capped per turn so a slow on-device CPU can't grind through a
-                // 1024-token response before the user sees anything.
-                maxTokens = MAX_RESPONSE_TOKENS,
+                // Per-turn cap (model-scaled): a slow CPU shouldn't grind through
+                // a huge response before the user sees anything.
+                maxTokens = maxResponseTokens,
                 // GBNF grammar only on HIGH-tier hardware ([useGrammar]). Token-
                 // level JSON masking is slow on weak CPUs, so MID-tier agentic
                 // relies on the lenient parser + per-turn fallback instead.
@@ -211,7 +215,7 @@ class ReActEngine @Inject constructor(
             plainSystemBlock(systemPrompt, reference),
             userPrompt,
         )
-        streamPlainAnswer(engine, recoveryPrompt)
+        streamPlainAnswer(engine, recoveryPrompt, maxResponseTokens)
     }
 
     /**
@@ -243,10 +247,11 @@ class ReActEngine @Inject constructor(
     private suspend fun FlowCollector<ReActStep>.streamPlainAnswer(
         engine: InferenceEngine,
         prompt: String,
+        maxTokens: Int,
     ) {
         val buffer = StringBuilder()
         var errorResult: String? = null
-        engine.generateStream(prompt, maxTokens = MAX_RESPONSE_TOKENS, grammar = null)
+        engine.generateStream(prompt, maxTokens = maxTokens, grammar = null)
             .collect { result ->
                 when (result) {
                     is MiasResult.Success -> {
@@ -287,7 +292,15 @@ class ReActEngine @Inject constructor(
             ?: return "Tool '$resolved' is not available."
         return withContext(ioDispatcher) {
             try {
-                handler.execute(input)
+                // Time-boxed: a hung tool (dead network, stuck IO) must degrade
+                // to an observation the model can react to, not hang the turn.
+                withTimeoutOrNull(TOOL_TIMEOUT_MS) { handler.execute(input) }
+                    ?: "Tool '$resolved' timed out after ${TOOL_TIMEOUT_MS / 1000}s. " +
+                        "Answer with what you already know, or try a different tool."
+            } catch (ce: CancellationException) {
+                // User pressed Stop / turn cancelled — must propagate, never be
+                // converted into a fake observation.
+                throw ce
             } catch (e: Exception) {
                 "Tool error: ${e.message}"
             }
@@ -362,6 +375,9 @@ class ReActEngine @Inject constructor(
         // round-trips. Prevents infinite loops when a tool keeps erroring.
         const val MAX_ITERATIONS = 3
         const val MAX_TOOL_OUTPUT_LENGTH = 2000
+
+        /** Hard ceiling on one tool execution inside the agentic loop. */
+        const val TOOL_TIMEOUT_MS = 30_000L
 
         /** Per-turn generation cap. Keeps worst-case latency bounded on CPU-only devices. */
         const val MAX_RESPONSE_TOKENS = 512

@@ -5,6 +5,8 @@ import dev.mias.core.common.model.BrainState
 import dev.mias.core.common.model.CognitionState
 import dev.mias.core.common.model.Stimulus
 import dev.mias.core.inference.InferenceEngine
+import dev.mias.core.inference.InferenceError
+import dev.mias.core.inference.SamplingProfiles
 import dev.mias.core.inference.engine.GoogleAiEdgeEngine
 import dev.mias.core.inference.engine.LlamaCppEngine
 import dev.mias.core.inference.react.ChatTemplate
@@ -28,9 +30,11 @@ import dev.mias.core.security.GuardrailProcessor
 import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * The "Consciousness Router" — decides which brain fires and routes
@@ -185,6 +189,7 @@ class InferenceOrchestrator @Inject constructor(
                 userPrompt = stimulus.content,
                 hindsightContext = hindsightContext,
                 templateKind = templateKind,
+                maxResponseTokens = profile.recommendedMaxTokens,
                 allowToolCalls = mode == ExecutionMode.AGENTIC,
                 useGrammar = useGrammar,
                 reliabilitySink = reliabilitySink,
@@ -322,17 +327,35 @@ class InferenceOrchestrator @Inject constructor(
             loadedModelByEngine.remove(engine)
         }
 
-        when (val result = engine.loadModel(model.localPath)) {
-            is MiasResult.Success -> {
-                loadedModelByEngine[engine] = model.id
-                modelManager.markUsed(model.id)
-                ModelReadiness.Ready(model.card)
+        // Load with bounded retry: a transient hiccup (e.g. a momentary
+        // allocation failure right after another model unloaded) shouldn't
+        // strand the user, but a corrupt file / unsupported format won't fix
+        // itself — those (recoverable == false) fail fast without retrying.
+        var lastError = "Model load failed."
+        repeat(MODEL_LOAD_ATTEMPTS) { attempt ->
+            when (val result = engine.loadModel(model.localPath)) {
+                is MiasResult.Success -> {
+                    // Give the engine this family's tuned sampling. Runs on IO:
+                    // it's a blocking JNI call that may briefly contend on the
+                    // native llama mutex, and must never block the Main thread.
+                    withContext(Dispatchers.IO) {
+                        engine.applySamplingProfile(SamplingProfiles.forModel(model.card.name))
+                    }
+                    loadedModelByEngine[engine] = model.id
+                    modelManager.markUsed(model.id)
+                    return@withLock ModelReadiness.Ready(model.card)
+                }
+                is MiasResult.Error -> {
+                    lastError = result.message
+                    val recoverable = (result.cause as? InferenceError)?.recoverable ?: true
+                    if (!recoverable || attempt == MODEL_LOAD_ATTEMPTS - 1) {
+                        return@withLock ModelReadiness.LoadFailed(model.card.name, lastError)
+                    }
+                    kotlinx.coroutines.delay(MODEL_LOAD_BACKOFF_MS * (attempt + 1))
+                }
             }
-            is MiasResult.Error -> ModelReadiness.LoadFailed(
-                modelName = model.card.name,
-                reason = result.message,
-            )
         }
+        ModelReadiness.LoadFailed(model.card.name, lastError)
     }
 
     /**
@@ -385,6 +408,12 @@ class InferenceOrchestrator @Inject constructor(
          * default returns 0.65, so 0.7 effectively means "ignore the default".
          */
         private const val INTENT_CONFIDENCE_THRESHOLD: Float = 0.7f
+
+        /** Attempts to load a model before giving up (retries transient failures). */
+        private const val MODEL_LOAD_ATTEMPTS: Int = 2
+
+        /** Base backoff between load attempts; grows linearly per attempt. */
+        private const val MODEL_LOAD_BACKOFF_MS: Long = 250L
 
         /** Token budget for the title pass — a title is a handful of words. */
         private const val TITLE_MAX_TOKENS: Int = 24

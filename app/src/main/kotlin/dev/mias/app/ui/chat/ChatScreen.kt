@@ -516,6 +516,10 @@ private fun ChatTopBar(
                     label = activeModel?.card?.name ?: "Pick a model",
                     onClick = { pickerOpen = true },
                 )
+                state.activeModelCapability?.let { cap ->
+                    Spacer(modifier = Modifier.width(6.dp))
+                    CapabilityTag(label = cap)
+                }
             }
 
             Spacer(modifier = Modifier.weight(1f))
@@ -624,6 +628,32 @@ private fun ChatTopBar(
                 },
             )
         }
+    }
+}
+
+/**
+ * Tiny capability tag beside the model chip — tells the user at a glance what
+ * the active model can do: "Vision" (multimodal), "Pro" (tool-capable, runs
+ * the agentic loop), or "Lite" (small, deterministic grounding only).
+ */
+@Composable
+private fun CapabilityTag(label: String) {
+    val color = when (label) {
+        "Vision" -> MiasColors.Heather
+        "Pro" -> MiasColors.SuccessTone
+        else -> MiasColors.TextMuted
+    }
+    Box(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(color.copy(alpha = 0.18f))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Text(
+            text = label,
+            style = MiasTypography.LabelSmall,
+            color = color,
+        )
     }
 }
 

@@ -38,4 +38,12 @@ interface InferenceEngine {
 
     suspend fun unloadModel(): MiasResult<Unit>
     fun isModelLoaded(): Boolean
+
+    /**
+     * Apply per-model decoding parameters (temperature, top-k/p, repetition
+     * penalty). Called by the orchestrator after a model loads so each family
+     * gets sampling it was tuned for. Engines that manage sampling internally
+     * (MediaPipe/NPU) ignore it — hence the no-op default.
+     */
+    fun applySamplingProfile(profile: SamplingProfile) {}
 }

@@ -47,6 +47,7 @@ import dev.mias.core.language.StructuredIntent
 import dev.mias.core.modelhub.manager.ModelManager
 import dev.mias.core.modelhub.model.InstalledModel
 import dev.mias.core.modelhub.model.ModelRole
+import dev.mias.core.modelhub.model.capabilityProfile
 import dev.mias.core.resilience.DeviceHealthMonitor
 import dev.mias.core.ui.components.BubbleType
 import kotlinx.coroutines.CancellationException
@@ -121,6 +122,8 @@ data class ChatUiState(
     val showReActSteps: Boolean = false,
     val chatModels: List<InstalledModel> = emptyList(),
     val activeChatModelId: String? = null,
+    /** Short capability tag for the active model: "Vision" / "Pro" / "Lite". */
+    val activeModelCapability: String? = null,
     val attachedImage: Bitmap? = null,
     val hasVisionModel: Boolean = false,
     val personas: List<Persona> = Personas.ALL,
@@ -250,8 +253,18 @@ class ChatViewModel @Inject constructor(
         chatModelSelection,
     ) { snapshot, input, processing, flags, info ->
         // Rough context estimate (~4 chars/token): persona + scaffolding +
-        // everything in the conversation + the pending input, versus the model's
-        // window. Lets the user see how full the context is getting.
+        // everything in the conversation + the pending input, versus the active
+        // model's real window (Qwen 32k, Phi 128k, …).
+        val activeModel = info.chatModels.firstOrNull { it.id == info.activeChatModelId }
+            ?: info.chatModels.firstOrNull()
+        val window = activeModel?.card?.contextLength?.takeIf { it > 0 } ?: CONTEXT_WINDOW_TOKENS
+        val capability = activeModel?.card?.capabilityProfile()?.let { p ->
+            when {
+                p.supportsVision -> "Vision"
+                p.supportsToolCalls -> "Pro"
+                else -> "Lite"
+            }
+        }
         val systemChars = flags.persona.systemPrompt.length
         val convChars = snapshot.messages.sumOf { it.text.length + (it.reasoning?.length ?: 0) }
         val usedTokens = SYSTEM_SCAFFOLD_TOKENS +
@@ -268,6 +281,7 @@ class ChatViewModel @Inject constructor(
             showReActSteps = _showReActSteps.value,
             chatModels = info.chatModels,
             activeChatModelId = info.activeChatModelId,
+            activeModelCapability = capability,
             attachedImage = snapshot.attachedImage,
             hasVisionModel = info.hasVisionModel,
             personas = Personas.ALL,
@@ -275,8 +289,8 @@ class ChatViewModel @Inject constructor(
             ragActive = info.ragActive,
             forcedSkill = flags.forcedSkill,
             attachNotice = flags.attachNotice,
-            contextUsedTokens = usedTokens.coerceAtMost(CONTEXT_WINDOW_TOKENS),
-            contextWindowTokens = CONTEXT_WINDOW_TOKENS,
+            contextUsedTokens = usedTokens.coerceAtMost(window),
+            contextWindowTokens = window,
         )
     }.stateIn(
         scope = viewModelScope,

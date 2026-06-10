@@ -11,6 +11,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
+import io.ktor.http.contentLength
 import io.ktor.http.isSuccess
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -43,9 +44,12 @@ class WebFetchCapability @Inject constructor(
     )
 
     override suspend fun execute(input: Map<String, String>): MiasResult<String> {
-        val url = input["url"] ?: return MiasResult.Error("Missing required parameter: url")
+        val url = input["url"]?.trim() ?: return MiasResult.Error("Missing required parameter: url")
         val maxChars = input["max_chars"]?.toIntOrNull() ?: DEFAULT_MAX_CHARS
 
+        if (!WebSupport.isFetchableUrl(url)) {
+            return MiasResult.Error("URL must be a reachable http(s) address")
+        }
         if (!connectivity.isOnline) {
             return MiasResult.Error("No internet connection available")
         }
@@ -59,25 +63,24 @@ class WebFetchCapability @Inject constructor(
             if (!response.status.isSuccess()) {
                 throw RuntimeException("HTTP ${response.status.value}: Failed to fetch $url")
             }
+            response.contentLength()?.let { declared ->
+                if (declared > MAX_HTML_BYTES) {
+                    throw RuntimeException("Document too large to read (${declared / 1_000_000} MB)")
+                }
+            }
 
-            val body = response.bodyAsText()
-            val text = stripHtml(body)
+            // Shared extractor: same boilerplate-stripping as web_research /
+            // web_answer, with bounded processing.
+            val body = response.bodyAsText().take(MAX_HTML_CHARS)
+            val text = WebContentExtractor.extractReadableText(body)
             if (text.length > maxChars) text.take(maxChars) + "\n...[truncated]" else text
         }
     }
 
-    private fun stripHtml(html: String): String {
-        return html
-            .replace(Regex("<script[^>]*>[\\s\\S]*?</script>", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("<style[^>]*>[\\s\\S]*?</style>", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("<[^>]+>"), " ")
-            .replace(Regex("&nbsp;|&amp;|&lt;|&gt;|&quot;"), " ")
-            .replace(Regex("\\s+"), " ")
-            .trim()
-    }
-
     companion object {
         private const val DEFAULT_MAX_CHARS = 4000
+        private const val MAX_HTML_BYTES = 3_000_000L
+        private const val MAX_HTML_CHARS = 600_000
         private const val USER_AGENT = "Mias-AI/1.0 (Local Agent)"
     }
 }

@@ -24,11 +24,20 @@ static std::mutex llama_mutex;
 // instantly mid-inference.
 static std::atomic<bool> g_abort_generation{false};
 
-// Repetition-penalty sampler settings. Small on-device models otherwise fall
-// into runaway loops emitting gibberish clusters. 1.0 disables; ~1.15–1.2 is a
-// good range, applied over the last N tokens.
-static const int32_t REPEAT_LAST_N = 64;
-static const float REPEAT_PENALTY = 1.17f;
+// Per-model sampling parameters. Defaults reproduce the original hardcoded
+// sampler EXACTLY; nativeSetSampling() overrides them per loaded model so each
+// family (Qwen/Phi/Code/…) gets sampling it was tuned for. All reads/writes
+// happen under llama_mutex, so plain (non-atomic) globals are safe.
+//
+// Repetition penalty curbs the runaway gibberish loops small on-device models
+// fall into; 1.0 disables, ~1.05–1.2 is the useful range, applied over the
+// last N tokens.
+static int32_t g_repeat_last_n = 64;
+static float   g_repeat_penalty = 1.17f;
+static int32_t g_top_k = 40;
+static float   g_top_p = 0.9f;
+static float   g_temp = 0.7f;
+static uint32_t g_seed = 1234;
 
 // Chat-template stop markers. llama_vocab_is_eog only catches tokens the GGUF
 // explicitly tags as end-of-generation; many conversions leave ChatML / Phi
@@ -83,11 +92,27 @@ static llama_sampler *build_local_sampler(const llama_vocab *vocab, const char *
     // Repetition penalty first so it adjusts logits before truncation. Without
     // it, small models fall into runaway loops emitting gibberish clusters.
     llama_sampler_chain_add(chain, llama_sampler_init_penalties(
-        REPEAT_LAST_N, REPEAT_PENALTY, /*freq*/ 0.0f, /*present*/ 0.0f));
-    llama_sampler_chain_add(chain, llama_sampler_init_top_k(40));
-    llama_sampler_chain_add(chain, llama_sampler_init_top_p(0.9f, 1));
-    llama_sampler_chain_add(chain, llama_sampler_init_temp(0.7f));
-    llama_sampler_chain_add(chain, llama_sampler_init_dist(1234));
+        g_repeat_last_n, g_repeat_penalty, /*freq*/ 0.0f, /*present*/ 0.0f));
+    llama_sampler_chain_add(chain, llama_sampler_init_top_k(g_top_k));
+    llama_sampler_chain_add(chain, llama_sampler_init_top_p(g_top_p, 1));
+    llama_sampler_chain_add(chain, llama_sampler_init_temp(g_temp));
+    llama_sampler_chain_add(chain, llama_sampler_init_dist(g_seed));
+    return chain;
+}
+
+// Builds the standard (non-grammar) sampler chain from the current global
+// sampling params. Mirrors the historical load-time chain order exactly, so
+// the default params reproduce prior behaviour. Caller owns the chain.
+static llama_sampler *build_global_sampler() {
+    llama_sampler_chain_params sparams = llama_sampler_chain_default_params();
+    llama_sampler *chain = llama_sampler_chain_init(sparams);
+    if (chain == nullptr) return nullptr;
+    llama_sampler_chain_add(chain, llama_sampler_init_penalties(
+        g_repeat_last_n, g_repeat_penalty, /*freq*/ 0.0f, /*present*/ 0.0f));
+    llama_sampler_chain_add(chain, llama_sampler_init_temp(g_temp));
+    llama_sampler_chain_add(chain, llama_sampler_init_top_p(g_top_p, 1));
+    llama_sampler_chain_add(chain, llama_sampler_init_top_k(g_top_k));
+    llama_sampler_chain_add(chain, llama_sampler_init_dist(g_seed));
     return chain;
 }
 
@@ -148,15 +173,9 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeLoadModel(JNIEnv *env, 
         return JNI_FALSE;
     }
 
-    // Initialize sampler chain. Penalty first to suppress repetition loops.
-    llama_sampler_chain_params sparams = llama_sampler_chain_default_params();
-    sampler = llama_sampler_chain_init(sparams);
-    llama_sampler_chain_add(sampler, llama_sampler_init_penalties(
-        REPEAT_LAST_N, REPEAT_PENALTY, /*freq*/ 0.0f, /*present*/ 0.0f));
-    llama_sampler_chain_add(sampler, llama_sampler_init_temp(0.7f));
-    llama_sampler_chain_add(sampler, llama_sampler_init_top_p(0.9f, 1));
-    llama_sampler_chain_add(sampler, llama_sampler_init_top_k(40));
-    llama_sampler_chain_add(sampler, llama_sampler_init_dist(1234)); // Seed
+    // Initialize the sampler chain from the current global sampling params
+    // (set per-model via nativeSetSampling; defaults match the historical chain).
+    sampler = build_global_sampler();
 
     LOGI("Model loaded successfully from %s", path);
     env->ReleaseStringUTFChars(jpath, path);
@@ -399,6 +418,31 @@ Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeGenerateStream(JNIEnv *
 
     cleanup_grammar();
     env->ReleaseStringUTFChars(jprompt, prompt);
+}
+
+// Sets per-model sampling parameters and rebuilds the global (non-grammar)
+// sampler so they take effect immediately. Called by the orchestrator right
+// after a model loads. No-op-safe: if no model is loaded yet, it only stashes
+// the params (the next load picks them up via build_global_sampler).
+extern "C" JNIEXPORT void JNICALL
+Java_dev_mias_core_inference_engine_LlamaCppEngine_nativeSetSampling(
+    JNIEnv *env, jobject thiz,
+    jfloat temperature, jint top_k, jfloat top_p,
+    jfloat repeat_penalty, jint repeat_last_n, jint seed) {
+    std::lock_guard<std::mutex> lock(llama_mutex);
+    g_temp = temperature;
+    g_top_k = top_k;
+    g_top_p = top_p;
+    g_repeat_penalty = repeat_penalty;
+    g_repeat_last_n = repeat_last_n;
+    g_seed = (uint32_t) seed;
+    // Rebuild the live global sampler if a model is currently loaded so the new
+    // params apply to the next generation without needing a reload.
+    if (model != nullptr) {
+        if (sampler != nullptr) { llama_sampler_free(sampler); sampler = nullptr; }
+        sampler = build_global_sampler();
+    }
+    LOGI("Sampling updated: temp=%.2f top_k=%d top_p=%.2f rep=%.2f", temperature, top_k, top_p, repeat_penalty);
 }
 
 extern "C" JNIEXPORT void JNICALL

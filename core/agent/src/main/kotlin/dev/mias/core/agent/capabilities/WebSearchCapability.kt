@@ -4,6 +4,7 @@ import dev.mias.core.agent.AgentCapability
 import dev.mias.core.agent.ParameterType
 import dev.mias.core.agent.ToolParameter
 import dev.mias.core.common.MiasResult
+import dev.mias.core.common.cache.TtlCache
 import dev.mias.core.common.runCatchingMias
 import dev.mias.core.resilience.ConnectivityMonitor
 import io.ktor.client.HttpClient
@@ -51,12 +52,30 @@ class WebSearchCapability @Inject constructor(
     )
 
     /**
+     * Short-lived result cache. Keyed by the query alone: one network call is
+     * always parsed at full depth ([MAX_RESULTS]) and sliced per caller, so a
+     * `search(q, 2)` right after a `search(q, 6)` (e.g. a regenerate, or
+     * web_answer following web_search) costs zero extra round-trips.
+     */
+    private val resultCache = TtlCache<String, List<SearchHit>>(
+        ttlMillis = CACHE_TTL_MS,
+        maxEntries = CACHE_MAX_ENTRIES,
+    )
+
+    /**
      * Run the search and return structured hits, in rank order. Throws on a
      * transport/HTTP failure so callers can decide how to degrade. Does not
      * check connectivity — callers that need that should test it first.
+     *
+     * Results are filtered for hygiene: ad/tracking artifacts that point back
+     * at the search engine and non-fetchable URLs are dropped before ranking.
      */
     suspend fun search(query: String, limit: Int = DEFAULT_RESULTS): List<SearchHit> {
         val capped = limit.coerceIn(1, MAX_RESULTS)
+        val key = query.trim().lowercase()
+
+        resultCache.get(key)?.let { return it.take(capped) }
+
         val url = "$ENDPOINT?q=${URLEncoder.encode(query, "UTF-8")}&kl=us-en"
         val response = httpClient.get(url) {
             header(HttpHeaders.UserAgent, BROWSER_UA)
@@ -66,7 +85,13 @@ class WebSearchCapability @Inject constructor(
         if (!response.status.isSuccess()) {
             throw RuntimeException("Search failed: HTTP ${response.status.value}")
         }
-        return parseResults(response.bodyAsText(), capped)
+
+        val all = parseResults(response.bodyAsText(), MAX_RESULTS)
+            .filter { WebSupport.isFetchableUrl(it.url) && !WebSupport.isSearchArtifact(it.url) }
+        // Only cache non-empty pages: an empty parse is more often a transient
+        // block/captcha than a true "no results", and shouldn't stick for 3 min.
+        if (all.isNotEmpty()) resultCache.put(key, all)
+        return all.take(capped)
     }
 
     override suspend fun execute(input: Map<String, String>): MiasResult<String> {
@@ -138,6 +163,8 @@ class WebSearchCapability @Inject constructor(
         private const val ENDPOINT = "https://html.duckduckgo.com/html/"
         private const val DEFAULT_RESULTS = 6
         private const val MAX_RESULTS = 10
+        private const val CACHE_TTL_MS = 3 * 60 * 1000L
+        private const val CACHE_MAX_ENTRIES = 16
         private const val BROWSER_UA =
             "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) " +
                 "Chrome/120.0 Mobile Safari/537.36"
