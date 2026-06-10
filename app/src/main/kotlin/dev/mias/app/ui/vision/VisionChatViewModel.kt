@@ -11,6 +11,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.mias.core.common.MiasResult
 import dev.mias.core.common.di.IoDispatcher
 import dev.mias.core.inference.vision.MediaPipeVisionEngine
+import dev.mias.core.inference.vision.VisionModelSupport
 import dev.mias.core.modelhub.manager.ModelManager
 import dev.mias.core.modelhub.model.InstalledModel
 import dev.mias.core.modelhub.model.ModelRole
@@ -30,6 +31,8 @@ data class VisionUiState(
     val isProcessing: Boolean = false,
     val isCheckingModel: Boolean = true,
     val visionModel: InstalledModel? = null,
+    /** Name of a model assigned to Vision that is the wrong format (e.g. a GGUF). */
+    val incompatibleModelName: String? = null,
     val errorMessage: String? = null,
 ) {
     val isReady: Boolean get() = image != null && prompt.isNotBlank() && !isProcessing
@@ -54,8 +57,16 @@ class VisionChatViewModel @Inject constructor(
     fun refreshVisionModel() {
         viewModelScope.launch {
             val model = modelManager.getModelForRole(ModelRole.VISION)
+            // A model assigned to Vision is only usable if it's a .task bundle;
+            // a GGUF would fail deep in MediaPipe, so treat it as "not installed"
+            // and surface its name so we can explain why.
+            val usable = model != null && VisionModelSupport.isTaskBundle(model.localPath)
             _state.update {
-                it.copy(visionModel = model, isCheckingModel = false)
+                it.copy(
+                    visionModel = if (usable) model else null,
+                    incompatibleModelName = if (model != null && !usable) model.card.name else null,
+                    isCheckingModel = false,
+                )
             }
         }
     }

@@ -114,7 +114,10 @@ fun VisionChatScreen(
         }
 
         if (!state.isCheckingModel && !state.hasVisionModel) {
-            NoVisionModelState(onNavigateToModels = onNavigateToModels)
+            NoVisionModelState(
+                onNavigateToModels = onNavigateToModels,
+                incompatibleModelName = state.incompatibleModelName,
+            )
             return
         }
 
@@ -313,7 +316,10 @@ private fun PromptRow(
 }
 
 @Composable
-private fun NoVisionModelState(onNavigateToModels: () -> Unit) {
+private fun NoVisionModelState(
+    onNavigateToModels: () -> Unit,
+    incompatibleModelName: String? = null,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -329,16 +335,23 @@ private fun NoVisionModelState(onNavigateToModels: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "No vision model yet",
+            text = if (incompatibleModelName != null) "That model can't see" else "No vision model yet",
             style = MiasTypography.HeadlineMedium,
             color = MiasColors.TextPrimary,
             textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Install a vision-capable model in Models and assign it " +
-                "to the Vision role. Gemma 3n is a good starting point — search " +
-                "\"gemma 3n\" on Hugging Face.",
+            text = if (incompatibleModelName != null) {
+                "“$incompatibleModelName” is a text model — it can't analyze images. " +
+                    "Vision needs a MediaPipe .task bundle. In Models, switch the Hugging " +
+                    "Face filter to \"Vision (.task)\" and install Gemma 3n, then assign it " +
+                    "to the Vision role."
+            } else {
+                "Install a vision-capable model in Models and assign it " +
+                    "to the Vision role. Gemma 3n is a good starting point — search " +
+                    "\"gemma 3n\" on Hugging Face."
+            },
             style = MiasTypography.BodyMedium,
             color = MiasColors.TextSecondary,
             textAlign = TextAlign.Center,

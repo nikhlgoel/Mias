@@ -40,6 +40,7 @@ import dev.mias.core.inference.react.ResponseSanitizer
 import dev.mias.core.inference.react.ToolRegistry
 import dev.mias.core.inference.react.StreamingReActParser
 import dev.mias.core.inference.vision.MediaPipeVisionEngine
+import dev.mias.core.inference.vision.VisionModelSupport
 import dev.mias.core.language.IntentExtractor
 import dev.mias.core.language.IntentType
 import dev.mias.core.language.StructuredIntent
@@ -1059,13 +1060,23 @@ class ChatViewModel @Inject constructor(
             }
 
             val visionModel = modelManager.getModelForRole(ModelRole.VISION)
-            if (visionModel == null) {
+            val incompatible = visionModel != null &&
+                !VisionModelSupport.isTaskBundle(visionModel.localPath)
+            if (visionModel == null || incompatible) {
+                val notice = if (incompatible) {
+                    "“${visionModel!!.card.name}” is a ${visionModel.card.format} text " +
+                        "model — it can't analyze images. Vision needs a MediaPipe .task model. " +
+                        "Open Models, filter Hugging Face to \"Vision (.task)\", and install " +
+                        "Gemma 3n."
+                } else {
+                    "No vision model is installed yet. Open Models, switch the " +
+                        "Hugging Face filter to \"Vision (.task)\", and download a " +
+                        "Gemma 3n bundle. I'll be ready as soon as it's installed."
+                }
                 _messages.update {
                     it + ChatMessage(
                         id = UUID.randomUUID().toString(),
-                        text = "No vision model is installed yet. Open Models, switch the " +
-                            "Hugging Face filter to \"Vision (.task)\", and download a " +
-                            "Gemma 3n bundle. I'll be ready as soon as it's installed.",
+                        text = notice,
                         type = BubbleType.Mias,
                         timestamp = formatTime(System.currentTimeMillis()),
                     )

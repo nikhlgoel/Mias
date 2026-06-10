@@ -86,9 +86,34 @@ object CuratedModelRegistry {
             defaultRolePriority = 85,
         ),
 
-        // ── Vision-capable / multimodal placeholder ─────────────────
-        // (Curated vision entries pending verified GGUF builds. Users can
-        //  add others via HF search.)
+        // ── Vision Brain — multimodal image understanding ───────────
+        // MediaPipe vision needs a .task bundle (NOT a GGUF). This points at
+        // Google's LiteRT build of Gemma 3n. The repo is license-gated, so the
+        // user must accept the Gemma terms and supply an HF token to download.
+        // TODO(verify-on-device): confirm the exact URL/filename/size and that
+        // ModelDownloadManager lands it with a `.task` extension before release.
+        ModelCard(
+            id = "gemma-3n-e2b-it-litert",
+            name = "Gemma 3n E2B (Vision)",
+            author = "Google",
+            description = "Multimodal Gemma 3n that can understand images. MediaPipe " +
+                ".task bundle powering the on-device vision (\"See\") feature. " +
+                "Gated: accept the Gemma license and add an HF token to download.",
+            sizeBytes = 3_140_000_000L,
+            quantization = "INT4",
+            format = ModelFormat.LITERT,
+            roles = listOf(ModelRole.VISION),
+            contextLength = 4096,
+            parameterCount = "2B",
+            downloadUrl = "https://huggingface.co/google/gemma-3n-E2B-it-litert-preview/resolve/main/gemma-3n-E2B-it-int4.task",
+            sha256 = "",
+            license = "Gemma",
+            tags = listOf("gemma", "vision", "multimodal", "mediapipe", "task"),
+            minRamMb = 4096,
+            npuCompatible = true,
+            runtime = ModelRuntime.GOOGLE_AI_EDGE,
+            defaultRolePriority = 80,
+        ),
 
         // ── Creative Brain — Writing-tuned ──────────────────────────
         ModelCard(

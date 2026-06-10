@@ -56,10 +56,23 @@ class MediaPipeVisionEngine @Inject constructor(
     fun isAvailable(modelPath: String): Boolean = File(modelPath).exists()
 
     suspend fun load(modelPath: String): MiasResult<Unit> = withContext(ioDispatcher) {
-        runCatchingMias {
-            if (loadedModelPath == modelPath && llmInference != null) return@runCatchingMias
-            unload()
+        if (loadedModelPath == modelPath && llmInference != null) {
+            return@withContext MiasResult.Success(Unit)
+        }
 
+        // Pre-flight format check: refuse a non-.task model up front so the user
+        // gets a clear message instead of MediaPipe's opaque native RET_CHECK.
+        if (!File(modelPath).exists()) {
+            return@withContext MiasResult.Error(
+                "The vision model file is missing. Re-download it from Models.",
+            )
+        }
+        if (!VisionModelSupport.isTaskBundle(modelPath)) {
+            return@withContext MiasResult.Error(WRONG_FORMAT_MESSAGE)
+        }
+
+        try {
+            unload()
             val options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(modelPath)
                 .setMaxTokens(MAX_TOKENS)
@@ -68,6 +81,24 @@ class MediaPipeVisionEngine @Inject constructor(
 
             llmInference = LlmInference.createFromOptions(context, options)
             loadedModelPath = modelPath
+            MiasResult.Success(Unit)
+        } catch (e: Throwable) {
+            // Never surface the raw "%sINTERNAL: RET_CHECK … tflite" trace.
+            MiasResult.Error(friendlyLoadError(e))
+        }
+    }
+
+    /** Map MediaPipe's native failure text to something a user can act on. */
+    private fun friendlyLoadError(e: Throwable): String {
+        val raw = (e.message ?: "").lowercase()
+        return when {
+            "ret_check" in raw || "tflite" in raw || "failed to initialize" in raw ->
+                WRONG_FORMAT_MESSAGE
+            "memory" in raw || "alloc" in raw || "oom" in raw ->
+                "Not enough memory to load this vision model. Try a smaller .task " +
+                    "model, or close other apps and try again."
+            else ->
+                "Couldn't start the vision model. Please re-download it from Models."
         }
     }
 
@@ -164,5 +195,11 @@ class MediaPipeVisionEngine @Inject constructor(
         private const val DEFAULT_TEMPERATURE: Float = 0.4f
         private const val DEFAULT_TOP_K: Int = 40
         private const val DEFAULT_TOP_P: Float = 0.95f
+
+        /** Shown when a non-.task (e.g. GGUF text) model is used for vision. */
+        const val WRONG_FORMAT_MESSAGE: String =
+            "This model can't analyze images — it's a text model, not a vision one. " +
+                "Vision needs a MediaPipe .task bundle (like Gemma 3n). Open Models, " +
+                "filter Hugging Face to \"Vision (.task)\", and install one."
     }
 }
