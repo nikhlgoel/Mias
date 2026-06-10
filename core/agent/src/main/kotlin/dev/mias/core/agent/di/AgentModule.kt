@@ -11,6 +11,7 @@ import dev.mias.core.agent.capabilities.CalculatorCapability
 import dev.mias.core.agent.capabilities.ClipboardCapability
 import dev.mias.core.agent.capabilities.DateTimeCapability
 import dev.mias.core.agent.capabilities.FileSystemCapability
+import dev.mias.core.agent.capabilities.WebAnswerCapability
 import dev.mias.core.agent.capabilities.WebFetchCapability
 import dev.mias.core.agent.capabilities.WebResearchCapability
 import dev.mias.core.agent.capabilities.WebSearchCapability
@@ -48,6 +49,9 @@ abstract class AgentModule {
 
     @Binds @IntoSet
     abstract fun bindWebResearch(impl: WebResearchCapability): AgentCapability
+
+    @Binds @IntoSet
+    abstract fun bindWebAnswer(impl: WebAnswerCapability): AgentCapability
 
     @Binds @IntoSet
     abstract fun bindAppLaunch(impl: AppLaunchCapability): AgentCapability

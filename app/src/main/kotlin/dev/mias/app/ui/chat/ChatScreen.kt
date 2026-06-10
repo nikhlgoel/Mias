@@ -100,6 +100,7 @@ import dev.mias.core.ui.components.MiasInputBar
 import dev.mias.core.ui.components.MessageBubble
 import dev.mias.core.ui.components.StatusPill
 import dev.mias.core.ui.components.ThinkingDots
+import dev.mias.core.ui.components.WebCitationUi
 import dev.mias.core.ui.theme.MiasColors
 import dev.mias.core.ui.theme.MiasTypography
 import dev.mias.core.speech.SpeechViewModel
@@ -227,6 +228,14 @@ fun ChatScreen(
                                 image = message.image,
                                 reasoning = message.reasoning,
                                 sources = message.sources,
+                                webCitations = message.webCitations.map {
+                                    WebCitationUi(it.index, it.title, it.url)
+                                },
+                                webImages = message.webImages.map { it.bitmap },
+                                onCitationClick = { url -> viewModel.openUrl(url) },
+                                onWebImageClick = { i ->
+                                    viewModel.openUrl(message.webImages[i].sourceUrl)
+                                },
                                 fileName = message.fileArtifact?.fileName,
                                 fileSaved = message.fileArtifact?.saved == true,
                                 onSaveFile = { viewModel.saveFile(message.id) },

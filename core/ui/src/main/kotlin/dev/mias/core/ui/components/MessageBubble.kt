@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -78,6 +79,12 @@ fun MessageBubble(
     reasoning: String? = null,
     /** Document names this answer drew on (RAG citations). */
     sources: List<String> = emptyList(),
+    /** Web pages this answer was grounded on — rendered as tappable [n] links. */
+    webCitations: List<WebCitationUi> = emptyList(),
+    /** Lead images from cited pages (visual queries). Tap opens the source. */
+    webImages: List<Bitmap> = emptyList(),
+    onCitationClick: ((String) -> Unit)? = null,
+    onWebImageClick: ((Int) -> Unit)? = null,
     /** Filename of a generated, saveable file artifact (null = none). */
     fileName: String? = null,
     /** Whether that artifact has been written to disk yet. */
@@ -206,6 +213,64 @@ fun MessageBubble(
                             maxLines = 1,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         )
+                    }
+                }
+
+                // Lead images pulled from cited pages (visual web answers).
+                if (type == BubbleType.Mias && webImages.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        webImages.forEachIndexed { i, bmp ->
+                            Image(
+                                bitmap = bmp.asImageBitmap(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .clip(MiasShapes.Medium)
+                                    .height(116.dp)
+                                    .widthIn(max = 150.dp)
+                                    .then(
+                                        if (onWebImageClick != null) {
+                                            Modifier.clickable { onWebImageClick(i) }
+                                        } else {
+                                            Modifier
+                                        },
+                                    ),
+                            )
+                        }
+                    }
+                }
+
+                // Tappable web source citations — [1] Title … opens in browser.
+                if (type == BubbleType.Mias && webCitations.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Sources",
+                        style = MiasTypography.LabelSmall,
+                        color = MiasColors.TextMuted,
+                    )
+                    webCitations.forEach { c ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .then(
+                                    if (onCitationClick != null) {
+                                        Modifier.clickable { onCitationClick(c.url) }
+                                    } else {
+                                        Modifier
+                                    },
+                                )
+                                .padding(top = 2.dp),
+                        ) {
+                            Text(
+                                text = "[${c.index}] ${c.title}",
+                                style = MiasTypography.LabelMedium,
+                                color = MiasColors.Heather,
+                                textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
 
@@ -430,3 +495,10 @@ enum class BubbleType {
     ACTION,
     ERROR,
 }
+
+/** A tappable web citation shown under a grounded answer. */
+data class WebCitationUi(
+    val index: Int,
+    val title: String,
+    val url: String,
+)

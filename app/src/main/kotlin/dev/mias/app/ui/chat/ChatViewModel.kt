@@ -13,6 +13,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.mias.core.agent.capabilities.WebAnswerCapability
+import dev.mias.core.agent.capabilities.WebImage
+import dev.mias.core.agent.capabilities.WebSource
 import dev.mias.core.common.getOrDefault
 import dev.mias.core.common.getOrNull
 import dev.mias.core.common.model.BrainState
@@ -30,6 +33,7 @@ import dev.mias.core.data.preferences.MiasPreferences
 import dev.mias.core.data.rag.DocumentRepository
 import dev.mias.core.data.rag.RetrievedContext
 import dev.mias.core.common.MiasResult
+import dev.mias.core.inference.orchestrator.DeviceTier
 import dev.mias.core.inference.orchestrator.InferenceOrchestrator
 import dev.mias.core.inference.react.ReActStep
 import dev.mias.core.inference.react.ResponseSanitizer
@@ -42,6 +46,7 @@ import dev.mias.core.language.StructuredIntent
 import dev.mias.core.modelhub.manager.ModelManager
 import dev.mias.core.modelhub.model.InstalledModel
 import dev.mias.core.modelhub.model.ModelRole
+import dev.mias.core.resilience.DeviceHealthMonitor
 import dev.mias.core.ui.components.BubbleType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -79,6 +84,10 @@ data class ChatMessage(
     val reasoning: String? = null,
     /** Document names this answer drew on (RAG citations). */
     val sources: List<String> = emptyList(),
+    /** Web pages this answer was grounded on — tappable [n] citations. */
+    val webCitations: List<WebSource> = emptyList(),
+    /** Lead images pulled from the cited pages (visual queries only). */
+    val webImages: List<WebImage> = emptyList(),
     /**
      * A file the assistant produced from this turn. Present only for
      * file-generation intents. The file is written for real on save — the
@@ -141,6 +150,8 @@ class ChatViewModel @Inject constructor(
     private val miasPreferences: MiasPreferences,
     private val documentRepository: DocumentRepository,
     private val toolRegistry: ToolRegistry,
+    private val webAnswer: WebAnswerCapability,
+    private val deviceHealthMonitor: DeviceHealthMonitor,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -332,6 +343,62 @@ class ChatViewModel @Inject constructor(
     private fun needsFreshInfo(text: String): Boolean {
         val l = text.lowercase()
         return FRESH_INFO_KEYWORDS.any { it in l }
+    }
+
+    // ── Web grounding (search + read + cite) ────────────────────────────
+
+    private data class WebAnswerBundle(
+        val text: String,
+        val sources: List<WebSource>,
+        val images: List<WebImage>,
+    ) {
+        companion object {
+            val EMPTY = WebAnswerBundle("", emptyList(), emptyList())
+        }
+    }
+
+    /**
+     * Search + read the top results + cite. Depth adapts to the device tier
+     * AND to whether the query wants depth (a quick fact reads one source; an
+     * "explain/compare" reads up to the device ceiling). Images are pulled only
+     * for visual queries. Never throws — degrades to empty so a turn proceeds.
+     */
+    private suspend fun runWebAnswer(query: String): WebAnswerBundle {
+        val ceiling = when (DeviceTier.from(deviceHealthMonitor.health.value)) {
+            DeviceTier.LOW -> 1
+            DeviceTier.MID -> 2
+            DeviceTier.HIGH -> 3
+        }
+        val q = query.lowercase()
+        val wantsDepth = DEEP_QUERY_KEYWORDS.any { it in q }
+        val maxResults = (if (wantsDepth) ceiling else 1).coerceAtMost(ceiling)
+        val perSource = (TOTAL_WEB_CHAR_BUDGET / maxResults).coerceIn(1500, 4000)
+        val visual = VISUAL_QUERY_KEYWORDS.any { it in q }
+
+        val result = runCatching {
+            kotlinx.coroutines.withTimeoutOrNull(WEB_ANSWER_TIMEOUT_MS) {
+                webAnswer.answer(
+                    query = query,
+                    maxResults = maxResults,
+                    maxCharsPerSource = perSource,
+                    includeImages = visual,
+                )
+            }
+        }.getOrNull()
+
+        return if (result == null || !result.online || result.promptText.isBlank()) {
+            WebAnswerBundle.EMPTY
+        } else {
+            WebAnswerBundle(result.promptText, result.sources, result.images)
+        }
+    }
+
+    /** Open a cited web source / image in the browser (user-initiated tap). */
+    fun openUrl(url: String) {
+        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return
+        val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(intent) }
+            .onFailure { _attachNotice.value = "Couldn't open that link." }
     }
 
     // ── Honest file generation ──────────────────────────────────────────
@@ -571,12 +638,22 @@ class ChatViewModel @Inject constructor(
                 val turnSources = rag.sources
 
                 // Run a tool ourselves and feed the result in, rather than relying
-                // on a small model to emit the tool-call JSON. Either the user
-                // forced a skill, or the query clearly needs fresh info (news,
-                // "latest", dates…) → auto web search. Deterministic.
+                // on a small model to emit the tool-call JSON. Web queries go
+                // through web_answer (search + read top results + cite); other
+                // forced skills run directly. Deterministic.
+                val forced = _forcedSkill.value
+                val isForcedWeb = forced == "web_search" || forced == "web_answer"
+                val web = if (isForcedWeb || (forced == null && needsFreshInfo(cleanedText))) {
+                    runWebAnswer(cleanedText)
+                } else {
+                    WebAnswerBundle.EMPTY
+                }
+                val turnWebSources = web.sources
+                val turnWebImages = web.images
+
                 val skillContext = when {
-                    _forcedSkill.value != null -> runSkill(_forcedSkill.value!!, cleanedText)
-                    needsFreshInfo(cleanedText) -> runSkill("web_search", cleanedText)
+                    web.text.isNotBlank() -> web.text
+                    forced != null && !isForcedWeb -> runSkill(forced, cleanedText)
                     else -> ""
                 }
 
@@ -680,6 +757,8 @@ class ChatViewModel @Inject constructor(
                                     isStreaming = false,
                                     reasoning = thinking,
                                     sources = turnSources,
+                                    webCitations = turnWebSources,
+                                    webImages = turnWebImages,
                                     fileArtifact = artifact,
                                 )
                                 updatedList
@@ -692,6 +771,8 @@ class ChatViewModel @Inject constructor(
                                     isStreaming = false,
                                     reasoning = thinking,
                                     sources = turnSources,
+                                    webCitations = turnWebSources,
+                                    webImages = turnWebImages,
                                     fileArtifact = artifact,
                                 )
                             }
@@ -1234,6 +1315,24 @@ class ChatViewModel @Inject constructor(
             "this week", "update on", "what's happening", "whats happening",
             "stock price", "share price", "weather", "2025", "2026",
         )
+
+        /** Queries that warrant reading more sources (vs a quick fact). */
+        private val DEEP_QUERY_KEYWORDS = listOf(
+            "explain", "compare", "comparison", "detailed", "in depth", "in-depth",
+            "comprehensive", "guide", "how does", "why does", "pros and cons",
+            "difference between", "overview of", "deep dive", "analyse", "analyze",
+        )
+
+        /** Queries where a picture genuinely helps → pull a lead image. */
+        private val VISUAL_QUERY_KEYWORDS = listOf(
+            "show me", "what does", "look like", "looks like", "picture", "photo",
+            "image of", "images of", "diagram", "map of", "logo", "screenshot",
+            "appearance",
+        )
+
+        /** Total chars of web article text fed to the model across all sources. */
+        private const val TOTAL_WEB_CHAR_BUDGET = 6000
+        private const val WEB_ANSWER_TIMEOUT_MS = 20_000L
 
         /** Phrases that mean "write this to a file now" → auto-save the artifact. */
         private val EXPLICIT_EXPORT_KEYWORDS = listOf(
