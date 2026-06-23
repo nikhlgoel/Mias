@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
+import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Psychology
@@ -81,6 +82,8 @@ fun MessageBubble(
     sources: List<String> = emptyList(),
     /** Web pages this answer was grounded on — rendered as tappable [n] links. */
     webCitations: List<WebCitationUi> = emptyList(),
+    /** Facts saved to persistent memory this turn — shows a "Memory updated" chip. */
+    savedMemories: List<String> = emptyList(),
     /** Lead images from cited pages (visual queries). Tap opens the source. */
     webImages: List<Bitmap> = emptyList(),
     onCitationClick: ((String) -> Unit)? = null,
@@ -274,6 +277,12 @@ fun MessageBubble(
                     }
                 }
 
+                // "Memory updated" — facts persisted to cross-conversation memory
+                // this turn (explicit "remember this" or automatic distillation).
+                if (type == BubbleType.Mias && savedMemories.isNotEmpty()) {
+                    MemoryUpdatedChip(memories = savedMemories)
+                }
+
                 // Honest file artifact — produced content offered as a real file.
                 if (type == BubbleType.Mias && fileName != null) {
                     FileArtifactRow(
@@ -373,6 +382,59 @@ private fun ThinkingProcessBox(reasoning: String, isStreaming: Boolean) {
                 color = MiasColors.TextLo,
                 modifier = Modifier.padding(start = 18.dp, end = 10.dp, bottom = 10.dp),
             )
+        }
+    }
+}
+
+/**
+ * "Memory updated" chip — quiet confirmation that something was persisted to
+ * cross-conversation memory, with a tap-to-expand list of exactly what was
+ * saved. Honest by design: it only renders after a real store happened
+ * (duplicates and failed stores never show it).
+ */
+@Composable
+private fun MemoryUpdatedChip(memories: List<String>) {
+    var expanded by remember { mutableStateOf(false) }
+    Spacer(modifier = Modifier.height(8.dp))
+    Column(
+        modifier = Modifier
+            .clip(MiasShapes.Small)
+            .background(MiasColors.Heather.copy(alpha = 0.12f))
+            .clickable { expanded = !expanded }
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Rounded.Bookmark,
+                contentDescription = null,
+                tint = MiasColors.Heather,
+                modifier = Modifier.size(13.dp),
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "Memory updated",
+                style = MiasTypography.LabelMedium,
+                color = MiasColors.Heather,
+            )
+            if (memories.size > 1) {
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "· ${memories.size}",
+                    style = MiasTypography.LabelSmall,
+                    color = MiasColors.TextLo,
+                )
+            }
+        }
+        AnimatedVisibility(visible = expanded) {
+            Column(modifier = Modifier.padding(top = 4.dp)) {
+                memories.forEach { memory ->
+                    Text(
+                        text = "• $memory",
+                        style = MiasTypography.LabelSmall,
+                        color = MiasColors.TextLo,
+                    )
+                }
+            }
         }
     }
 }

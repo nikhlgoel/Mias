@@ -11,6 +11,8 @@ import dev.mias.core.data.db.dao.DocumentDao
 import dev.mias.core.data.db.entity.DocumentChunkEntity
 import dev.mias.core.data.db.entity.DocumentEntity
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -40,7 +42,16 @@ class DocumentRepositoryImpl @Inject constructor(
     ): MiasResult<Document> =
         withContext(ioDispatcher) {
             runCatchingMias {
-                val pieces = TextChunker.chunk(text)
+                // Bound the work up front: each chunk costs one on-device
+                // embedding pass, so a huge file would otherwise freeze ingest
+                // for many minutes. The first ~500K chars of a document carry
+                // its substance; beyond that we truncate rather than refuse.
+                val bounded = if (text.length > MAX_INGEST_CHARS) {
+                    text.take(MAX_INGEST_CHARS)
+                } else {
+                    text
+                }
+                val pieces = TextChunker.chunk(bounded)
                 if (pieces.isEmpty()) {
                     throw IllegalArgumentException("This file has no readable text to add.")
                 }
@@ -52,13 +63,31 @@ class DocumentRepositoryImpl @Inject constructor(
 
                 val docId = UUID.randomUUID().toString()
                 val now = System.currentTimeMillis()
+                var failedEmbeddings = 0
                 val chunks = pieces.mapIndexed { index, piece ->
-                    val embedding = when (val r = embeddingProvider.getEmbedding(piece)) {
-                        is MiasResult.Success -> r.data.toByteArray()
-                        is MiasResult.Error ->
-                            // First chunk failing means embeddings aren't really working —
-                            // abort cleanly rather than store an un-retrievable document.
-                            if (index == 0) throw IllegalStateException(r.message) else null
+                    // Stop promptly if the caller (e.g. a closing screen)
+                    // cancelled — don't grind through hundreds of chunks.
+                    currentCoroutineContext().ensureActive()
+
+                    // One retry per chunk: a single transient embedding failure
+                    // shouldn't leave a permanent hole in the document.
+                    var embedding: ByteArray? = null
+                    var lastError: String? = null
+                    for (attempt in 0 until EMBED_ATTEMPTS_PER_CHUNK) {
+                        when (val r = embeddingProvider.getEmbedding(piece)) {
+                            is MiasResult.Success -> {
+                                embedding = r.data.toByteArray()
+                                break
+                            }
+                            is MiasResult.Error -> lastError = r.message
+                        }
+                    }
+                    if (embedding == null) {
+                        failedEmbeddings++
+                        // First chunk failing twice means embeddings aren't
+                        // really working — abort cleanly rather than store an
+                        // un-retrievable document.
+                        if (index == 0) throw IllegalStateException(lastError ?: "Embedding failed.")
                     }
                     DocumentChunkEntity(
                         id = UUID.randomUUID().toString(),
@@ -69,11 +98,19 @@ class DocumentRepositoryImpl @Inject constructor(
                     )
                 }
 
+                // A document where most chunks have no embedding is mostly
+                // invisible to retrieval — surface that instead of storing it.
+                if (failedEmbeddings > pieces.size / 2) {
+                    throw IllegalStateException(
+                        "Embedding failed for most of this document — please try adding it again.",
+                    )
+                }
+
                 val document = DocumentEntity(
                     id = docId,
                     name = name.ifBlank { "Untitled document" },
                     addedAt = now,
-                    charCount = text.length,
+                    charCount = bounded.length,
                     chunkCount = chunks.size,
                     conversationId = conversationId,
                 )
@@ -106,32 +143,53 @@ class DocumentRepositoryImpl @Inject constructor(
                 val inScopeDocIds = docs.values
                     .filter { it.conversationId == null || it.conversationId == conversationId }
                     .map { it.id }
-                    .toSet()
                 if (inScopeDocIds.isEmpty()) return@runCatching RetrievedContext.EMPTY
 
-                val chunks = dao.getAllChunks().filter { it.documentId in inScopeDocIds }
+                // Load only the in-scope chunks — not every BLOB in the store.
+                val chunks = dao.getChunksForDocuments(inScopeDocIds)
                 if (chunks.isEmpty()) return@runCatching RetrievedContext.EMPTY
 
                 val scored = chunks.mapNotNull { chunk ->
                     val vec = chunk.embedding?.toFloatArray() ?: return@mapNotNull null
                     if (vec.size != queryVec.size) return@mapNotNull null
-                    chunk to vec.cosineSimilarity(queryVec)
+                    ScoredChunk(chunk, vec, vec.cosineSimilarity(queryVec))
                 }
 
-                val top = scored
-                    .sortedByDescending { it.second }
-                    .take(topK)
-                    .filter { it.second >= MIN_RELEVANCE }
+                // Greedy selection with near-duplicate suppression: overlapping
+                // chunks from the same document region score almost identically
+                // and would otherwise crowd out genuinely distinct passages.
+                // A candidate too similar to an already-selected chunk is
+                // skipped, so the topK slots carry diverse evidence.
+                val ranked = scored
+                    .filter { it.score >= MIN_RELEVANCE }
+                    .sortedByDescending { it.score }
+                val top = mutableListOf<ScoredChunk>()
+                for (candidate in ranked) {
+                    if (top.size >= topK) break
+                    val isNearDuplicate = top.any {
+                        it.vector.cosineSimilarity(candidate.vector) >= DUPLICATE_SIMILARITY
+                    }
+                    if (!isNearDuplicate) top.add(candidate)
+                }
 
                 if (top.isEmpty()) return@runCatching RetrievedContext.EMPTY
 
+                // Attribute each passage to its document so the model can say
+                // *where* a fact came from, not just that it came from "docs".
                 val promptText = buildString {
                     appendLine("## From your documents")
-                    top.forEach { (chunk, _) -> appendLine("- ${chunk.text.trim()}") }
+                    top.forEach { sc ->
+                        val docName = docs[sc.chunk.documentId]?.name
+                        if (docName != null) {
+                            appendLine("- [$docName] ${sc.chunk.text.trim()}")
+                        } else {
+                            appendLine("- ${sc.chunk.text.trim()}")
+                        }
+                    }
                 }.trim()
 
                 val sources = top
-                    .mapNotNull { (chunk, _) -> docs[chunk.documentId]?.name }
+                    .mapNotNull { sc -> docs[sc.chunk.documentId]?.name }
                     .distinct()
 
                 RetrievedContext(promptText = promptText, sources = sources)
@@ -149,8 +207,24 @@ class DocumentRepositoryImpl @Inject constructor(
         conversationId = conversationId,
     )
 
+    /** A chunk with its decoded embedding and query similarity, for selection. */
+    private class ScoredChunk(
+        val chunk: DocumentChunkEntity,
+        val vector: FloatArray,
+        val score: Float,
+    )
+
     companion object {
         /** Minimum cosine score for a chunk to be considered relevant enough to inject. */
         private const val MIN_RELEVANCE = 0.25f
+
+        /** Chunks at least this similar to one already selected are redundant. */
+        private const val DUPLICATE_SIMILARITY = 0.93f
+
+        /** Ingest length bound — substance over bulk; ~600 chunks' worth. */
+        private const val MAX_INGEST_CHARS = 500_000
+
+        /** Embedding tries per chunk (1 retry for transient failures). */
+        private const val EMBED_ATTEMPTS_PER_CHUNK = 2
     }
 }

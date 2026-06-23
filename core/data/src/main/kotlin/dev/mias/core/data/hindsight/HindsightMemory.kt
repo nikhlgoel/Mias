@@ -152,6 +152,61 @@ class HindsightMemory @Inject constructor(
         }
     }
 
+    /**
+     * Persist one distilled user memory ("User's name is Nikhil", "User is
+     * building an Android app called Mias") so future fresh conversations can
+     * recall it.
+     *
+     * Stored as a mental model: that table feeds the "What I Know About You"
+     * section of [HindsightContext.toPromptString], which the chat pipeline
+     * already injects every turn — so recall needs no extra wiring.
+     *
+     * Dedup: a memory whose embedding is near-identical (≥ [DEDUP_SIMILARITY_THRESHOLD])
+     * to an existing one is skipped — telling Mias your name twice must not
+     * create two entries. Returns true when a new memory was stored.
+     */
+    suspend fun storeUserMemory(
+        content: String,
+        confidence: Float = DEFAULT_MEMORY_CONFIDENCE,
+    ): MiasResult<Boolean> = withContext(ioDispatcher) {
+        runCatchingMias {
+            val trimmed = content.trim()
+            if (trimmed.isBlank()) return@runCatchingMias false
+
+            val embedding = when (val r = embeddingProvider.getEmbedding(trimmed)) {
+                is MiasResult.Success -> r.data
+                // No embedding model → store anyway (text recall still finds it);
+                // dedup falls back to exact text matching below.
+                is MiasResult.Error -> null
+            }
+
+            val existing = dao.getAllMentalModels()
+            val duplicate = existing.any { model ->
+                val sameText = model.content.equals(trimmed, ignoreCase = true)
+                val sameMeaning = embedding != null &&
+                    model.embedding?.toFloatArray()
+                        ?.takeIf { it.size == embedding.size }
+                        ?.cosineSimilarity(embedding)
+                        ?.let { it >= DEDUP_SIMILARITY_THRESHOLD } == true
+                sameText || sameMeaning
+            }
+            if (duplicate) return@runCatchingMias false
+
+            dao.upsertMentalModel(
+                MentalModelEntity(
+                    id = UUID.randomUUID().toString(),
+                    content = trimmed,
+                    observationIds = "",
+                    strength = confidence,
+                    createdAt = System.currentTimeMillis(),
+                    updatedAt = System.currentTimeMillis(),
+                    embedding = embedding?.toByteArray(),
+                ),
+            )
+            true
+        }
+    }
+
     suspend fun storeMentalModel(
         content: String,
         strength: Float,
@@ -184,6 +239,9 @@ class HindsightMemory @Inject constructor(
     companion object {
         /** Cosine similarity threshold above which a new fact is considered a duplicate. */
         private const val DEDUP_SIMILARITY_THRESHOLD = 0.92f
+
+        /** Default confidence for distilled user memories. */
+        private const val DEFAULT_MEMORY_CONFIDENCE = 0.8f
     }
 }
 

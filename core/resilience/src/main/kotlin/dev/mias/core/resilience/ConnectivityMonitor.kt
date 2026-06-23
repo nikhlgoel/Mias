@@ -38,7 +38,14 @@ class ConnectivityMonitor @Inject constructor(
     private val _state = MutableStateFlow(currentState())
     val state: StateFlow<ConnectivityState> = _state.asStateFlow()
 
-    val isOnline: Boolean get() = _state.value.isConnected
+    /**
+     * Live connectivity check. Queries the system directly rather than the
+     * cached [state]: the cache is only refreshed while someone collects
+     * [observe] (the network callback registers inside it), so relying on it
+     * here would freeze `isOnline` at its boot-time value for callers — every
+     * web capability — when nothing is observing.
+     */
+    val isOnline: Boolean get() = currentState().isConnected
 
     /** Observe connectivity changes as a Flow. */
     fun observe(): Flow<ConnectivityState> = callbackFlow {

@@ -44,7 +44,12 @@ onnxruntime = "1.22.0"
 mediapipe = "0.10.29"
 
 # --- Testing ---
-junit5 = "5.12.2"
+junit5 = "5.13.1"
+# JUnit Platform version paired with the Jupiter (junit5) version above. The
+# launcher MUST be on the test runtime classpath at this exact platform version:
+# Gradle otherwise injects its own (older) launcher, which fails discovery with
+# "OutputDirectoryProvider not available" and runs zero tests.
+junit5-platform = "1.13.1"
 junit5-android = "1.13.1.0"
 mockk = "1.14.2"
 turbine = "1.2.1"
@@ -129,6 +134,7 @@ mediapipe-tasks-vision = { group = "com.google.mediapipe", name = "tasks-vision"
 junit5-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit5" }
 junit5-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine", version.ref = "junit5" }
 junit5-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit5" }
+junit5-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junit5-platform" }
 junit5-android-core = { group = "de.mannodermaus.junit5", name = "android-test-core", version.ref = "junit5-android" }
 junit5-android-runner = { group = "de.mannodermaus.junit5", name = "android-test-runner", version.ref = "junit5-android" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }

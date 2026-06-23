@@ -33,6 +33,7 @@ import dev.mias.core.data.preferences.MiasPreferences
 import dev.mias.core.data.rag.DocumentRepository
 import dev.mias.core.data.rag.RetrievedContext
 import dev.mias.core.common.MiasResult
+import dev.mias.core.common.memory.MemoryDistiller
 import dev.mias.core.inference.orchestrator.DeviceTier
 import dev.mias.core.inference.orchestrator.InferenceOrchestrator
 import dev.mias.core.inference.react.ReActStep
@@ -88,6 +89,8 @@ data class ChatMessage(
     val sources: List<String> = emptyList(),
     /** Web pages this answer was grounded on — tappable [n] citations. */
     val webCitations: List<WebSource> = emptyList(),
+    /** Facts saved to persistent memory during this turn ("Memory updated" chip). */
+    val savedMemories: List<String> = emptyList(),
     /** Lead images pulled from the cited pages (visual queries only). */
     val webImages: List<WebImage> = emptyList(),
     /**
@@ -175,6 +178,13 @@ class ChatViewModel @Inject constructor(
      */
     private val _generatedTitle = MutableStateFlow<String?>(null)
     private var titleJob: Job? = null
+
+    /**
+     * Background memory-distillation pass for the latest exchange. Like
+     * [titleJob], it generates under the orchestrator's lock, so a new send
+     * must cancel-and-join it before generating.
+     */
+    private var memoryJob: Job? = null
 
     /** The active persona (system-prompt preset). Persisted via DataStore. */
     private val _selectedPersona = MutableStateFlow(Personas.DEFAULT)
@@ -611,7 +621,12 @@ class ChatViewModel @Inject constructor(
 
         val pendingTitleJob = titleJob
         titleJob = null
+        val pendingMemoryJob = memoryJob
+        memoryJob = null
         inferenceJob = viewModelScope.launch {
+            // Background title/memory passes from the previous turn may still
+            // hold the native context — stop and await them before generating.
+            pendingMemoryJob?.cancelAndJoin()
             // A background title pass from the previous turn may still hold the
             // native context. Stop and await it before we generate, so the two
             // never collide on the single non-reentrant engine.
@@ -672,7 +687,37 @@ class ChatViewModel @Inject constructor(
                     else -> ""
                 }
 
-                val retrievalContext = listOf(skillContext, ragContext, hindsightContext)
+                // Explicit "remember this" — deterministic, saved BEFORE the
+                // model replies, so the reply can acknowledge it honestly and
+                // the bubble carries a "Memory updated" chip. A bare command
+                // ("save this to memory") refers to the previous reply.
+                var explicitMemory: String? = null
+                var memoryContext = ""
+                MemoryDistiller.extractExplicitMemory(cleanedText)?.let { inline ->
+                    val content = inline.ifBlank {
+                        _messages.value.lastOrNull {
+                            it.type == BubbleType.Mias && it.text.isNotBlank()
+                        }?.text?.take(MemoryDistiller.EXPLICIT_MAX_CHARS).orEmpty()
+                    }
+                    if (content.isNotBlank()) {
+                        val stored = hindsightMemory.storeUserMemory(content, confidence = 1f)
+                        val storedNew = (stored as? MiasResult.Success)?.data == true
+                        if (storedNew) {
+                            explicitMemory = content
+                            _attachNotice.value = "Saved to memory"
+                        } else if (stored is MiasResult.Success) {
+                            // Near-duplicate of something already remembered.
+                            _attachNotice.value = "Already in memory"
+                        }
+                        memoryContext =
+                            "## Memory update\nThe app just saved this to persistent " +
+                                "memory: \"$content\". Briefly confirm to the user that " +
+                                "you'll remember it."
+                    }
+                }
+                val turnSavedMemories = listOfNotNull(explicitMemory)
+
+                val retrievalContext = listOf(memoryContext, skillContext, ragContext, hindsightContext)
                     .filter { it.isNotBlank() }
                     .joinToString("\n\n")
 
@@ -774,6 +819,7 @@ class ChatViewModel @Inject constructor(
                                     sources = turnSources,
                                     webCitations = turnWebSources,
                                     webImages = turnWebImages,
+                                    savedMemories = turnSavedMemories,
                                     fileArtifact = artifact,
                                 )
                                 updatedList
@@ -788,6 +834,7 @@ class ChatViewModel @Inject constructor(
                                     sources = turnSources,
                                     webCitations = turnWebSources,
                                     webImages = turnWebImages,
+                                    savedMemories = turnSavedMemories,
                                     fileArtifact = artifact,
                                 )
                             }
@@ -887,6 +934,14 @@ class ChatViewModel @Inject constructor(
 
                 // First completed exchange — kick off a one-shot title pass.
                 maybeGenerateTitle(userText = cleanedText, assistantText = finalResponse)
+
+                // Cross-conversation memory: if the user shared something
+                // durable about themselves (or the conversation has grown long
+                // enough for a periodic sweep), distill and remember it. Skipped
+                // when an explicit "remember this" already saved this turn.
+                if (explicitMemory == null) {
+                    maybeDistillMemories(userText = cleanedText, assistantText = finalResponse)
+                }
             } catch (ce: CancellationException) {
                 // Stop button / new send cancelled this turn — re-throw so the
                 // engine's awaitClose aborts native generation. Never swallow.
@@ -932,6 +987,65 @@ class ChatViewModel @Inject constructor(
      * [saveConversation]. Held in [titleJob] so a new send can cancel it
      * before touching the shared native context.
      */
+    /**
+     * Persistent-memory write path (ChatGPT/Claude-style): after a completed
+     * exchange, distill durable facts about the user and store them.
+     *
+     * Two triggers:
+     *  - a cheap personal-signal heuristic on this turn's text (so ordinary
+     *    Q&A doesn't pay an extra model pass), or
+     *  - a periodic sweep every [LONG_CONVERSATION_DISTILL_EVERY] user turns —
+     *    long conversations accumulate context worth keeping even when no
+     *    single message tripped the gate; the sweep distills over a digest of
+     *    the recent user messages.
+     *
+     * The distillation runs in the background under the orchestrator's
+     * generation lock (cancelled by the next send if still pending). When
+     * something was actually stored, the latest assistant bubble gets a
+     * "Memory updated" chip. Recall is automatic — stored memories surface
+     * through the Hindsight context already injected into every turn.
+     */
+    private fun maybeDistillMemories(userText: String, assistantText: String) {
+        if (userText.isBlank() || assistantText.isBlank()) return
+        val userTurns = _messages.value.count { it.type == BubbleType.USER }
+        val periodicSweep = userTurns > 0 && userTurns % LONG_CONVERSATION_DISTILL_EVERY == 0
+        if (!MemoryDistiller.containsPersonalSignal(userText) && !periodicSweep) return
+        if (memoryJob?.isActive == true) return
+
+        // For the periodic sweep, look back across recent user messages, not
+        // just the latest — the durable detail may be a few turns up.
+        val distillInput = if (periodicSweep) {
+            _messages.value
+                .filter { it.type == BubbleType.USER }
+                .takeLast(RECENT_TURNS_IN_SWEEP)
+                .joinToString("\n") { it.text }
+        } else {
+            userText
+        }
+        val targetMessageId = _messages.value.lastOrNull { it.type == BubbleType.Mias }?.id
+
+        memoryJob = viewModelScope.launch {
+            runCatching {
+                val stored = orchestrator.distillMemories(distillInput, assistantText)
+                    .filter { memory ->
+                        (hindsightMemory.storeUserMemory(memory) as? MiasResult.Success)?.data == true
+                    }
+                // Surface what was remembered on the bubble, like the explicit path.
+                if (stored.isNotEmpty() && targetMessageId != null) {
+                    _messages.update { list ->
+                        list.map {
+                            if (it.id == targetMessageId) {
+                                it.copy(savedMemories = it.savedMemories + stored)
+                            } else {
+                                it
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private fun maybeGenerateTitle(userText: String, assistantText: String) {
         if (_generatedTitle.value != null) return
         if (userText.isBlank() || assistantText.isBlank()) return
@@ -1054,7 +1168,10 @@ class ChatViewModel @Inject constructor(
 
         val pendingTitleJob = titleJob
         titleJob = null
+        val pendingMemoryJob = memoryJob
+        memoryJob = null
         inferenceJob = viewModelScope.launch {
+            pendingMemoryJob?.cancelAndJoin()
             pendingTitleJob?.cancelAndJoin()
 
             // Persist the bitmap off the main thread, then record the path on
@@ -1354,6 +1471,12 @@ class ChatViewModel @Inject constructor(
             "image of", "images of", "diagram", "map of", "logo", "screenshot",
             "appearance",
         )
+
+        /** Distill memories every N user turns even without a personal signal. */
+        private const val LONG_CONVERSATION_DISTILL_EVERY = 8
+
+        /** How many recent user messages the periodic sweep digests. */
+        private const val RECENT_TURNS_IN_SWEEP = 4
 
         /** Total chars of web article text fed to the model across all sources. */
         private const val TOTAL_WEB_CHAR_BUDGET = 6000

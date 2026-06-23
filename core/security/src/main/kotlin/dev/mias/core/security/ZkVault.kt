@@ -1,4 +1,11 @@
-﻿package dev.mias.core.security
+﻿// Jetpack Security Crypto (androidx.security:security-crypto) is deprecated by Google
+// with no drop-in replacement. Migrating off it (e.g. to Tink directly) means
+// re-encrypting the existing on-device vault, so it's tracked as a separate migration
+// rather than done here. Suppress the deprecation file-wide until then — behavior is
+// unchanged and the StrongBox-backed AES-256-GCM scheme is still what we want.
+@file:Suppress("DEPRECATION")
+
+package dev.mias.core.security
 
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences

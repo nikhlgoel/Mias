@@ -69,15 +69,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.mias.core.modelhub.model.InstalledModel
 import dev.mias.core.ui.theme.MiasShapes
 import android.Manifest
+import android.content.ClipData
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -117,7 +118,7 @@ fun ChatScreen(
     val transcription by speechViewModel.transcription.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
     val haptics = LocalHapticFeedback.current
     val shareContext = LocalContext.current
 
@@ -142,10 +143,12 @@ fun ChatScreen(
         }
     }
 
-    val copyMessage: (String) -> Unit = remember(clipboard, haptics) {
+    val copyMessage: (String) -> Unit = remember(clipboard, haptics, scope) {
         { text ->
             if (text.isNotBlank()) {
-                clipboard.setText(AnnotatedString(text))
+                scope.launch {
+                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Mias message", text)))
+                }
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             }
         }
@@ -232,6 +235,7 @@ fun ChatScreen(
                                     WebCitationUi(it.index, it.title, it.url)
                                 },
                                 webImages = message.webImages.map { it.bitmap },
+                                savedMemories = message.savedMemories,
                                 onCitationClick = { url -> viewModel.openUrl(url) },
                                 onWebImageClick = { i ->
                                     viewModel.openUrl(message.webImages[i].sourceUrl)

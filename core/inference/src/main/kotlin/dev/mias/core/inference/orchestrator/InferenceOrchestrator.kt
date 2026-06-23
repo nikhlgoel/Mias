@@ -1,6 +1,7 @@
 ﻿package dev.mias.core.inference.orchestrator
 
 import dev.mias.core.common.MiasResult
+import dev.mias.core.common.memory.MemoryDistiller
 import dev.mias.core.common.model.BrainState
 import dev.mias.core.common.model.CognitionState
 import dev.mias.core.common.model.Stimulus
@@ -254,6 +255,33 @@ class InferenceOrchestrator @Inject constructor(
         }
     }
 
+    /**
+     * Distill durable user memories from a completed exchange — the write side
+     * of cross-conversation memory (recall is Hindsight's existing pipeline).
+     *
+     * Same contract as [summarizeTitle]: reuses whichever engine is already
+     * warm, single short unconstrained completion, no ReAct/guardrails, never
+     * touches the public brain/cognition state, and generates under
+     * [generationMutex] so it can never collide with a foreground send.
+     * Returns an empty list when no model is warm or nothing was extracted —
+     * the caller just skips storage.
+     */
+    suspend fun distillMemories(userText: String, assistantText: String): List<String> {
+        val engine = loadedModelByEngine.keys.firstOrNull { it.isModelLoaded() } ?: return emptyList()
+        val prompt = MemoryDistiller.buildPrompt(userText, assistantText)
+
+        return generationMutex.withLock {
+            val buffer = StringBuilder()
+            // Streamed so collector cancellation aborts the native loop promptly
+            // and frees the lock for a waiting send.
+            engine.generateStream(prompt, maxTokens = MEMORY_MAX_TOKENS, grammar = null)
+                .collect { result ->
+                    if (result is MiasResult.Success) buffer.append(result.data)
+                }
+            MemoryDistiller.parse(buffer.toString())
+        }
+    }
+
     // internal (not private) so engine-routing can be unit-tested directly
     // rather than through fragile reflection on a suspend function.
     internal suspend fun selectEngine(tawsAction: TawsAction, stimulus: Stimulus): Pair<InferenceEngine, BrainState> =
@@ -417,6 +445,9 @@ class InferenceOrchestrator @Inject constructor(
 
         /** Token budget for the title pass — a title is a handful of words. */
         private const val TITLE_MAX_TOKENS: Int = 24
+
+        /** Token budget for memory distillation — up to 3 short sentences. */
+        private const val MEMORY_MAX_TOKENS: Int = 96
 
         /** Cap on how much of each turn we feed the title prompt. */
         private const val TITLE_INPUT_CHAR_CAP: Int = 500

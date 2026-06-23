@@ -1,5 +1,6 @@
-﻿package dev.mias.core.resilience
+package dev.mias.core.resilience
 
+import dev.mias.core.common.MiasResult
 import dev.mias.core.common.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -15,9 +16,20 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Priority-based persistent operation queue.
- * Survives app restarts by coordinating with CheckpointManager.
- * Used for download resumption, failed action retry, etc.
+ * In-memory priority queue for deferrable operations (network uploads, retry
+ * of failed actions, …).
+ *
+ * Semantics:
+ *  - Operations marked [QueuedOperation.requiresNetwork] wait while offline and
+ *    are **drained automatically when connectivity returns** (the queue
+ *    observes [ConnectivityMonitor]).
+ *  - Each operation runs through [RetryExecutor] with its own [RetryConfig];
+ *    the final outcome (success or exhausted retries) is delivered to the
+ *    enqueuer's `onResult` callback — never silently dropped.
+ *  - [Priority] orders *dispatch* (CRITICAL first); ready operations execute
+ *    concurrently, so it does not guarantee completion order.
+ *  - The queue is in-memory only: operations do not survive a process restart.
+ *    Callers needing durability must persist their own state and re-enqueue.
  */
 @Singleton
 class OperationQueue @Inject constructor(
@@ -32,18 +44,35 @@ class OperationQueue @Inject constructor(
     private val _queueSize = MutableStateFlow(0)
     val queueSize: StateFlow<Int> = _queueSize.asStateFlow()
 
+    init {
+        // Without this, an operation enqueued while offline would sit in
+        // `pending` forever — nothing else re-triggers processing when the
+        // network comes back.
+        scope.launch {
+            connectivityMonitor.observe().collect { state ->
+                if (state.isConnected) processQueue()
+            }
+        }
+    }
+
     /**
-     * Enqueue an operation. It will run when conditions are met (connectivity, priority, etc.).
+     * Enqueue an operation. It runs as soon as its conditions are met
+     * (connectivity for network ops; immediately otherwise).
+     *
+     * @param onResult invoked exactly once with the terminal outcome — Success
+     *   after the block completes, or Error once retries are exhausted.
+     * @return an id usable with [cancel] while the operation is still pending.
      */
     suspend fun enqueue(
         tag: String,
         priority: Priority = Priority.NORMAL,
         requiresNetwork: Boolean = false,
         retryConfig: RetryConfig = RetryConfig(),
+        onResult: (MiasResult<Unit>) -> Unit = {},
         block: suspend () -> Unit,
     ): String {
         val id = UUID.randomUUID().toString()
-        val op = QueuedOperation(id, tag, priority, requiresNetwork, retryConfig, block)
+        val op = QueuedOperation(id, tag, priority, requiresNetwork, retryConfig, onResult, block)
 
         mutex.withLock {
             pending.add(op)
@@ -55,7 +84,7 @@ class OperationQueue @Inject constructor(
         return id
     }
 
-    /** Cancel a queued operation by ID. */
+    /** Cancel a queued operation by ID. No-op if it already started. */
     suspend fun cancel(id: String) {
         mutex.withLock {
             pending.removeAll { it.id == id }
@@ -63,7 +92,7 @@ class OperationQueue @Inject constructor(
         }
     }
 
-    /** Process eligible operations. */
+    /** Dispatch every operation whose conditions are currently met. */
     private fun processQueue() {
         scope.launch {
             val ops = mutex.withLock {
@@ -77,12 +106,20 @@ class OperationQueue @Inject constructor(
 
             for (op in ops) {
                 scope.launch {
-                    retryExecutor.withRetry(op.retryConfig) {
+                    val result = retryExecutor.withRetry(op.retryConfig) {
                         op.block()
                     }
+                    // Surface the terminal outcome; a queue that swallows
+                    // failures teaches callers to distrust it.
+                    runCatching { op.onResult(result.unit()) }
                 }
             }
         }
+    }
+
+    private fun <T> MiasResult<T>.unit(): MiasResult<Unit> = when (this) {
+        is MiasResult.Success -> MiasResult.Success(Unit)
+        is MiasResult.Error -> this
     }
 }
 
@@ -94,11 +131,12 @@ enum class Priority {
     BACKGROUND,
 }
 
-private data class QueuedOperation(
+private class QueuedOperation(
     val id: String,
     val tag: String,
     val priority: Priority,
     val requiresNetwork: Boolean,
     val retryConfig: RetryConfig,
+    val onResult: (MiasResult<Unit>) -> Unit,
     val block: suspend () -> Unit,
 )

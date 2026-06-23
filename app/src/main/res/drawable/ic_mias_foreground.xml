@@ -1,54 +1,150 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Mias adaptive icon — foreground layer (teal neural orb) -->
-<!-- Matches SplashScreen Canvas aesthetic: concentric rings, hex grid, center dot -->
+<!-- Mias adaptive icon — foreground: an upward sword.
+     Sharp, faceted steel with a cyan energy core — precision and readiness,
+     in the app's navy+cyan identity.
+
+     Construction notes:
+     - Critical geometry stays inside the adaptive-icon safe zone (the 66dp
+       circle: x,y within ~21..87) so round masks never crop the tip or pommel.
+     - The blade is two facets meeting at a center ridge (lit left / shadowed
+       right) with a bright razor-edge stroke — this is what reads "sharp" at
+       launcher sizes, not detail density.
+     - A faint cyan halo echoes the in-app orb, keeping brand continuity. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Outer glow ring 3 -->
+    <!-- ── Halo: two faint cyan rings behind the sword ── -->
     <path
-        android:pathData="M54,54m-46,0a46,46 0,1 1,92 0a46,46 0,1 1,-92 0"
+        android:pathData="M54,54m-36,0a36,36 0,1 1,72 0a36,36 0,1 1,-72 0"
         android:fillColor="#00000000"
-        android:strokeColor="#0AFFFFFF"
+        android:strokeColor="#1400E5FF"
+        android:strokeWidth="1"/>
+    <path
+        android:pathData="M54,54m-29,0a29,29 0,1 1,58 0a29,29 0,1 1,-58 0"
+        android:fillColor="#00000000"
+        android:strokeColor="#0D00E5FF"
         android:strokeWidth="0.8"/>
 
-    <!-- Outer glow ring 2 -->
+    <!-- ── Blade ── -->
+    <!-- Left facet: catches the light. -->
+    <path android:pathData="M54,22 L49.5,32 L49.5,63 L54,63 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="51.7" android:startY="22"
+                android:endX="51.7" android:endY="63"
+                android:startColor="#F4F7FC"
+                android:endColor="#C3CFE2" />
+        </aapt:attr>
+    </path>
+    <!-- Right facet: in shadow — the two tones make the ridge read as 3D. -->
+    <path android:pathData="M54,22 L58.5,32 L58.5,63 L54,63 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="56.3" android:startY="22"
+                android:endX="56.3" android:endY="63"
+                android:startColor="#93A3BC"
+                android:endColor="#5C6B86" />
+        </aapt:attr>
+    </path>
+    <!-- Center ridge highlight. -->
     <path
-        android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0"
+        android:pathData="M54,23.5 L54,62"
         android:fillColor="#00000000"
-        android:strokeColor="#1400FFFF"
-        android:strokeWidth="0.8"/>
-
-    <!-- Iris ring -->
+        android:strokeColor="#8CFFFFFF"
+        android:strokeWidth="0.45"/>
+    <!-- Razor edge, lit side. -->
     <path
-        android:pathData="M54,54m-32,0a32,32 0,1 1,64 0a32,32 0,1 1,-64 0"
+        android:pathData="M54,22 L49.5,32 L49.5,63"
         android:fillColor="#00000000"
-        android:strokeColor="#8000FFFF"
-        android:strokeWidth="1.2"/>
-
-    <!-- Hex grid lines (6 spokes from center to iris) -->
-    <path android:pathData="M54,54 L54,22" android:strokeColor="#4D00FFFF" android:strokeWidth="0.7" android:fillColor="#00000000"/>
-    <path android:pathData="M54,54 L81.7,38" android:strokeColor="#4D00FFFF" android:strokeWidth="0.7" android:fillColor="#00000000"/>
-    <path android:pathData="M54,54 L81.7,70" android:strokeColor="#4D00FFFF" android:strokeWidth="0.7" android:fillColor="#00000000"/>
-    <path android:pathData="M54,54 L54,86" android:strokeColor="#4D00FFFF" android:strokeWidth="0.7" android:fillColor="#00000000"/>
-    <path android:pathData="M54,54 L26.3,70" android:strokeColor="#4D00FFFF" android:strokeWidth="0.7" android:fillColor="#00000000"/>
-    <path android:pathData="M54,54 L26.3,38" android:strokeColor="#4D00FFFF" android:strokeWidth="0.7" android:fillColor="#00000000"/>
-
-    <!-- Pupil (teal gradient approximated as solid + inner dark) -->
+        android:strokeColor="#C9FFFFFF"
+        android:strokeWidth="0.7"
+        android:strokeLineJoin="miter"/>
+    <!-- Energy edge, shadow side: a cyan rim light. -->
     <path
-        android:pathData="M54,54m-16,0a16,16 0,1 1,32 0a16,16 0,1 1,-32 0"
-        android:fillColor="#0066AA"/>
+        android:pathData="M54,22 L58.5,32 L58.5,63"
+        android:fillColor="#00000000"
+        android:strokeColor="#6600E5FF"
+        android:strokeWidth="0.7"
+        android:strokeLineJoin="miter"/>
+    <!-- Tip gleam. -->
+    <path android:pathData="M54,21.4m-2.2,0a2.2,2.2 0,1 1,4.4 0a2.2,2.2 0,1 1,-4.4 0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="54" android:centerY="21.4"
+                android:gradientRadius="2.2"
+                android:startColor="#A6E6FFFF"
+                android:endColor="#0000E5FF" />
+        </aapt:attr>
+    </path>
 
-    <!-- Inner dark overlay -->
+    <!-- ── Crossguard: swept, angular wings ── -->
+    <path android:pathData="M37,63 L71,63 L66.5,69 L57.5,66.5 L50.5,66.5 L41.5,69 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="54" android:startY="63"
+                android:endX="54" android:endY="69"
+                android:startColor="#54647F"
+                android:endColor="#2A3550" />
+        </aapt:attr>
+    </path>
+    <!-- Guard top edge highlight. -->
     <path
-        android:pathData="M54,54m-10,0a10,10 0,1 1,20 0a10,10 0,1 1,-20 0"
-        android:fillColor="#0A0A1A"/>
+        android:pathData="M37,63 L71,63"
+        android:fillColor="#00000000"
+        android:strokeColor="#73FFFFFF"
+        android:strokeWidth="0.5"/>
 
-    <!-- Center dot -->
+    <!-- ── Energy gem at the heart of the guard ── -->
+    <path android:pathData="M54,60.9 L57.3,64.6 L54,68.3 L50.7,64.6 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="54" android:startY="60.9"
+                android:endX="54" android:endY="68.3"
+                android:startColor="#7CF6FF"
+                android:endColor="#00A9C9" />
+        </aapt:attr>
+    </path>
+    <!-- Gem sparkle. -->
     <path
-        android:pathData="M54,54m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0"
-        android:fillColor="#00FFFF"/>
+        android:pathData="M54,62.5 L55.5,64.6 L54,66.7 L52.5,64.6 Z"
+        android:fillColor="#B3FFFFFF"/>
 
+    <!-- ── Grip: dark, subtly tapered, cyan wrap bands ── -->
+    <path android:pathData="M51.4,69 L56.6,69 L56.2,82 L51.8,82 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="54" android:startY="69"
+                android:endX="54" android:endY="82"
+                android:startColor="#222C42"
+                android:endColor="#131A2B" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M51.6,72 L56.4,73.2" android:strokeColor="#4D00E5FF" android:strokeWidth="0.8" android:fillColor="#00000000"/>
+    <path android:pathData="M51.7,75.4 L56.3,76.6" android:strokeColor="#4D00E5FF" android:strokeWidth="0.8" android:fillColor="#00000000"/>
+    <path android:pathData="M51.8,78.8 L56.2,80" android:strokeColor="#4D00E5FF" android:strokeWidth="0.8" android:fillColor="#00000000"/>
+
+    <!-- ── Pommel ── -->
+    <path android:pathData="M54,84.4m-2.8,0a2.8,2.8 0,1 1,5.6 0a2.8,2.8 0,1 1,-5.6 0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="54" android:startY="81.6"
+                android:endX="54" android:endY="87.2"
+                android:startColor="#AEBDD2"
+                android:endColor="#67768F" />
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M54,84.4m-1.1,0a1.1,1.1 0,1 1,2.2 0a1.1,1.1 0,1 1,-2.2 0"
+        android:fillColor="#00E5FF"/>
 </vector>

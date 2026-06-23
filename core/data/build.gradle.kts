@@ -21,6 +21,12 @@ android {
     kotlinOptions {
         jvmTarget = "21"
     }
+
+    // Run unit tests on the JUnit Platform. Without this the test task uses the
+    // JUnit4 runner, discovers zero JUnit5 tests, and passes vacuously.
+    testOptions {
+        unitTests.all { it.useJUnitPlatform() }
+    }
 }
 
 dependencies {
@@ -41,6 +47,7 @@ dependencies {
 
     testImplementation(libs.junit5.api)
     testRuntimeOnly(libs.junit5.engine)
+    testRuntimeOnly(libs.junit5.platform.launcher)
     testImplementation(libs.mockk)
     testImplementation(libs.truth)
     testImplementation(libs.coroutines.test)

@@ -27,6 +27,7 @@ class ModelCapabilityTest {
         downloadUrl = "https://example.com/m.gguf",
         sha256 = "",
         license = "apache-2.0",
+        runtime = runtime,
     )
 
     @Nested

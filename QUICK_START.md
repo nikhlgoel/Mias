@@ -72,8 +72,10 @@ app/src/main/kotlin/dev/mias/app/permissions/
 ### UI Components
 ```
 core/ui/src/main/kotlin/dev/mias/core/ui/components/
-├── SpeechButton.kt (NEW)            (Pulsing mic button with animations)
-└── SpeechFAB.kt (NEW)               (Floating action button variant)
+├── MiasInputBar.kt                  (Chat input row with mic + send)
+├── MessageBubble.kt                 (Chat bubbles + memory chip)
+├── AnimatedOrb.kt                   (Cognition-state orb)
+└── StatusPill.kt                    (Model/status indicator)
 ```
 
 ### Documentation
@@ -221,7 +223,7 @@ core/model-hub/     - Multi-brain model router (GEMMA, MobileLLM, Qwen3)
 core/agent/         - Device-action agents (file, web, calc, etc.)
 core/soul/          - LoRA personality blending
 core/thermal/       - Thermal-aware model downswitching
-core/ui/            - Shared UI components (SpeechButton, FAB)
+core/ui/            - Shared UI components (input bar, bubbles, orb)
 app/                - Main app, permissions, UI screens
 ```
 

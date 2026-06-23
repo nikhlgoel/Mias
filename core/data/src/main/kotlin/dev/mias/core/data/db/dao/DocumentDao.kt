@@ -34,6 +34,15 @@ interface DocumentDao {
     @Query("SELECT * FROM document_chunks")
     suspend fun getAllChunks(): List<DocumentChunkEntity>
 
+    /**
+     * Chunks belonging to the given documents only. Loads just the in-scope
+     * embedding BLOBs instead of every chunk in the store — the difference
+     * between reading a few hundred KB and several MB once many documents
+     * accumulate.
+     */
+    @Query("SELECT * FROM document_chunks WHERE documentId IN (:documentIds)")
+    suspend fun getChunksForDocuments(documentIds: List<String>): List<DocumentChunkEntity>
+
     @Transaction
     suspend fun insertDocumentWithChunks(
         document: DocumentEntity,
