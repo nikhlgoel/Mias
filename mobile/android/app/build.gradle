@@ -1,0 +1,122 @@
+/*
+ * Mias React Native app (Android) — built inside the single root Gradle build
+ * (see /settings.gradle.kts). The legacy Kotlin :app stays installable until the
+ * RN cutover (strangler-fig). JS/TS lives at /mobile; package.json is two dirs up.
+ */
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+
+import java.util.Properties
+
+// Reuse the repo's single sources of truth for signing + version.
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+def versionPropsFile = rootProject.file("version.properties")
+def versionProps = new Properties()
+if (versionPropsFile.exists()) {
+    versionPropsFile.withInputStream { versionProps.load(it) }
+}
+def appVersionCode = ((versionProps['VERSION_CODE'] ?: '1') as String).toInteger()
+def appVersionName = (versionProps['VERSION_NAME'] ?: '1.0.0') as String
+
+react {
+    // MUST be explicit in the single-root build: the plugin's default `root` is
+    // rootProject.dir("../") (= repo-root's parent here), not this module's ../../.
+    // Pin everything at /mobile where package.json + node_modules live.
+    root = file("$rootDir/mobile")
+    reactNativeDir = file("$rootDir/mobile/node_modules/react-native")
+    codegenDir = file("$rootDir/mobile/node_modules/@react-native/codegen")
+    cliFile = file("$rootDir/mobile/node_modules/react-native/cli.js")
+    autolinkLibrariesWithApp()
+}
+
+def enableProguardInReleaseBuilds = false
+def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+
+android {
+    // Pinned explicitly (the template's rootProject.ext is gone in the root build).
+    // NDK 27.0.12077973 is the AGP 8.12 default already installed + used by the
+    // llama.cpp JNI build, so no extra NDK download.
+    ndkVersion "27.0.12077973"
+    buildToolsVersion "36.0.0"
+    compileSdk 36
+
+    namespace "dev.mias.mobile"
+    defaultConfig {
+        applicationId "io.mias.app"
+        minSdkVersion 30
+        targetSdkVersion 36
+        versionCode appVersionCode
+        versionName appVersionName
+
+        // arm64-only — matches :app and the llama.cpp JNI; strips RN's
+        // x86/x86_64/armeabi-v7a binaries (and honours reactNativeArchitectures).
+        ndk {
+            abiFilters "arm64-v8a"
+        }
+    }
+
+    // 16 KB page-size compliance: uncompressed JNI libs so the loader honours the
+    // alignment RN's prebuilt libs (and our CMake flag) set. Mirrors :app.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
+
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                enableV1Signing false
+                enableV2Signing true
+                enableV3Signing true
+            }
+        }
+    }
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+            // Install side-by-side with the legacy io.mias.app during the strangler
+            // period; the RN app takes over io.mias.app at cutover.
+            applicationIdSuffix ".rn"
+        }
+        release {
+            signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
+            minifyEnabled enableProguardInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+    }
+
+    // JVM target is left to RN's java-version-alignment (JDK 17, applied because
+    // :mobile is not in the first-party opt-out list in /build.gradle.kts). RN
+    // keeps Java + Kotlin consistent here; R1 reaches the JVM-21 :core via a
+    // dedicated bridge library (no cross-target inlining from this module).
+}
+
+dependencies {
+    // RN version is set by the React Native Gradle Plugin.
+    implementation("com.facebook.react:react-android")
+    if (hermesEnabled.toBoolean()) {
+        implementation("com.facebook.react:hermes-android")
+    } else {
+        implementation jscFlavor
+    }
+
+    // Cold-start biometric gate (R0, standalone — no Hilt/:core yet; those arrive
+    // in R1 with the first native module). Version from the shared catalog.
+    implementation libs.biometric
+}
