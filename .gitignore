@@ -2,24 +2,23 @@
 # === Build outputs ===
 *.iml
 .gradle/
+.gradle-cache/
 .kotlin/
 build/
 core/**/build/
 app/build/
+mobile/android/build/
+mobile/android/.cxx/
+mobile/ios/build/
 local.properties
 temp/
-.vscode/
+
 # === IDE / Editor / Agent configs ===
 .idea/
 *.iws
 *.ipr
 .continue/
 .vscode/
-
-# === OS ===
-.DS_Store
-Thumbs.db
-desktop.ini
 
 # === Kotlin/Java ===
 *.class
@@ -72,10 +71,19 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
 
 # === Environment ===
 .env
 .env.local
+
+# === Lock files (keep these tracked) ===
+# Uncomment if you want to track lock files:
+# Podfile.lock
+# Gemfile.lock
 
 # === Signing (NEVER push keystores) ===
 *.jks
@@ -91,6 +99,24 @@ docs/PRD.docx
 # === Node/npm (if used) ===
 node_modules/
 package-lock.json
+
+# === React Native / Metro ===
+.metro-cache/
+.metro-cache-key
+metro.log
+ios/Pods/
+ios/Pods.lock
+
+# === iOS specific ===
+*.xcworkspace/xcuserdata/
+*.xcworkspace/xcshareddata/
+DerivedData/
+xcuserdata/
+
+# === OS ===
+.DS_Store
+Thumbs.db
+desktop.ini
 
 # === Misc ===
 *.log
