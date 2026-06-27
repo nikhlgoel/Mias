@@ -117,6 +117,7 @@ dependencies {
     }
 
     // Cold-start biometric gate (R0, standalone — no Hilt/:core yet; those arrive
-    // in R1 with the first native module). Version from the shared catalog.
+    // in R1 with the first native module). Versions from the shared catalog.
     implementation libs.biometric
+    implementation libs.appcompat
 }
