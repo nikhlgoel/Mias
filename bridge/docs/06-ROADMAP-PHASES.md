@@ -99,7 +99,7 @@ Production polish.
 - **Build:** relay rate-limiting/abuse controls, code brute-force lockout, key
   rotation, observability (no-content metrics), self-host relay docker image +
   docs, privacy-copy update for the one new allowlisted host.
-- **Exit tests:** security review (reuse `/security-review`); load test the relay;
+- **Exit tests:** security review; load test the relay;
   documented self-host path reproducible from scratch.
 
 ## (Later) P7 — Mias-native IDE

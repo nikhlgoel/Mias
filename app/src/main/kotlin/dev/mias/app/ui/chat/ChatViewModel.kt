@@ -988,7 +988,7 @@ class ChatViewModel @Inject constructor(
      * before touching the shared native context.
      */
     /**
-     * Persistent-memory write path (ChatGPT/Claude-style): after a completed
+     * Persistent-memory write path (assistant-memory style): after a completed
      * exchange, distill durable facts about the user and store them.
      *
      * Two triggers:

@@ -67,7 +67,7 @@ A first-class skill system on the PC, mirroring how capable assistants ship skil
 
 ## 4. Instructions, context & personas
 
-- **Project instructions:** a repo file (e.g., `.mias/instructions.md`, CLAUDE.md-
+- **Project instructions:** a repo file (e.g., `.mias/instructions.md`, repo-instructions-
   style) the session server loads as system context; plus a **global** instruction
   set. Editable from phone or extension.
 - **Project context indexing:** the PC builds a code/doc index (RAG) so answers are

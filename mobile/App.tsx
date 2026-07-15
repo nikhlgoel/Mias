@@ -9,6 +9,7 @@
 import React from 'react';
 import { StatusBar, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { BRIDGE_PROTOCOL_VERSION, MCP_PROTOCOL_VERSION } from '@mias/bridge-protocol';
 
 function App(): React.JSX.Element {
   const isDark = useColorScheme() === 'dark';
@@ -22,7 +23,7 @@ function App(): React.JSX.Element {
       <View style={[styles.container, { backgroundColor: bg }]}>
         <Text style={[styles.title, { color: fg }]}>Mias</Text>
         <Text style={[styles.subtitle, { color: fg }]}>
-          React Native shell · R0 scaffold
+          {`Bridge protocol v${BRIDGE_PROTOCOL_VERSION} · MCP ${MCP_PROTOCOL_VERSION}`}
         </Text>
       </View>
     </SafeAreaProvider>

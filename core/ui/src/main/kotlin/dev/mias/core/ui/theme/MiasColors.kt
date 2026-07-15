@@ -8,7 +8,7 @@ import androidx.compose.ui.graphics.Color
  * "A quiet evening, not a black void." Surfaces are a five-tone ladder of
  * warm brown-charcoal (hue ~55°, very low chroma). The single accent is
  * Heather — a dusty mauve that reads intimate and clearly its own (not a
- * Claude amber clone). Success and error stay palette-aware (muted, never
+ * warm amber accent). Success and error stay palette-aware (muted, never
  * raw RGB green/red).
  *
  * Source of truth: `Color System v1.html` design handoff. Heather and the

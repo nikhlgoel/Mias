@@ -2,7 +2,7 @@ package dev.mias.core.common.memory
 
 /**
  * Pure helpers for the persistent-memory pipeline ("remember the user across
- * conversations", in the style of ChatGPT/Claude memory).
+ * conversations", persistent assistant-memory style).
  *
  * Every chat turn is stateless — the model never replays history. What persists
  * is a small set of *distilled* facts about the user (name, preferences,

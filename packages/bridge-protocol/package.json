@@ -1,0 +1,16 @@
+{
+  "name": "@mias/bridge-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mias Bridge wire protocol: frames, per-stream seq/ack cursors, BridgeTransport, MCP client. Shared by the mobile app and the PC extension.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "^7.0.2"
+  }
+}

@@ -126,7 +126,7 @@ desktop.ini
 *.bak
 *~
 
-# === Claude Code local settings ===
+# === Local editor/agent settings ===
 .claude/
 
 # === Local project tracking ===

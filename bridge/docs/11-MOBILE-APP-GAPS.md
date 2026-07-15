@@ -2,7 +2,7 @@
 
 A scan of the **current Kotlin Android app** against the end-to-end Bridge flow.
 What exists, what's missing/buggy, and how to add it — **built in React Native
-during the migration** (don't add throwaway Kotlin first; see `docs/RN_MIGRATION_PROMPT.md`).
+during the migration** (don't add throwaway Kotlin first; see `docs/PLATFORM_MASTER_PLAN.md`).
 Each gap notes the existing code to reuse.
 
 ## A. What already exists (reuse, don't rebuild)

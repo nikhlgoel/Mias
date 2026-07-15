@@ -154,7 +154,7 @@ fun MessageBubble(
                     )
                     .animateContentSize(),
             ) {
-                // Claude-style collapsible "Thinking Process" box at the top
+                // Collapsible "Thinking Process" box at the top
                 // of assistant bubbles whenever reasoning was produced.
                 if (type == BubbleType.Mias && !reasoning.isNullOrBlank()) {
                     ThinkingProcessBox(reasoning = reasoning, isStreaming = isStreaming)
@@ -309,7 +309,7 @@ fun MessageBubble(
 }
 
 /**
- * Collapsible "Thinking Process" panel, Claude-style: a dark, semi-transparent
+ * Collapsible "Thinking Process" panel: a dark, semi-transparent
  * card with a 2dp accent left border, a brain-icon header with a rotating
  * chevron, and the reasoning text revealed when expanded. Auto-expands while
  * the answer is still streaming, then the user can fold it away.

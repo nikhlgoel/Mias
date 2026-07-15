@@ -1,7 +1,7 @@
 # Mias — React Native app (`/mobile`)
 
 The React Native (TypeScript, New Architecture) shell of Mias, being built up
-during the Kotlin→RN migration (see `docs/RN_MIGRATION_PROMPT.md` and the phased
+during the Kotlin→RN migration (see `docs/PLATFORM_MASTER_PLAN.md` and the staged
 plan R0–R7). The heavy native logic stays in the Kotlin `core/*` Gradle libraries
 and is **wrapped**, not rewritten — this folder owns only the UI layer and thin
 TS view-state.

@@ -14,7 +14,7 @@ import javax.inject.Singleton
 
 /**
  * Native Text-To-Speech engine.
- * Supports streaming playback and instantaneous interruptions (useful for Gemini-Live style interactions).
+ * Supports streaming playback and instantaneous interruptions (useful for live-voice style interactions).
  */
 @Singleton
 class TtsEngine @Inject constructor(
