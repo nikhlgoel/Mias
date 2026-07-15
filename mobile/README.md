@@ -1,97 +1,63 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Mias — React Native app (`/mobile`)
 
-# Getting Started
+The React Native (TypeScript, New Architecture) shell of Mias, being built up
+during the Kotlin→RN migration (see `docs/RN_MIGRATION_PROMPT.md` and the phased
+plan R0–R7). The heavy native logic stays in the Kotlin `core/*` Gradle libraries
+and is **wrapped**, not rewritten — this folder owns only the UI layer and thin
+TS view-state.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## How this builds (differs from a stock RN app)
 
-## Step 1: Start Metro
-
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
-
-To start the Metro dev server, run the following command from the root of your React Native project:
-
-```sh
-# Using npm
-npm start
-
-# OR using Yarn
-yarn start
-```
-
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
+There is **no standalone Android build here**. The Android module
+(`android/app`) is folded into the repo's **single root Gradle build** as
+`:mobile`, next to the legacy `:app` and the `:core:*` libraries
+(see `/settings.gradle.kts`). The stock `android/settings.gradle`,
+`android/build.gradle`, and Gradle wrapper were intentionally removed.
 
 ```sh
-# Using npm
-npm run android
+# 1) JS deps (first time / after package.json changes)
+cd mobile && npm install
 
-# OR using Yarn
-yarn android
+# 2) Build the APK — from the REPO ROOT, not from /mobile
+./gradlew :mobile:assembleDebug
+#    → mobile/android/app/build/outputs/apk/debug/mobile-debug.apk
+
+# Run on a device/emulator with live JS (Metro):
+cd mobile && npm start        # Metro dev server
+# install the APK, launch — debug builds load JS from Metro
 ```
 
-### iOS
+- Debug builds install as **`io.mias.app.rn`** so they sit side-by-side with the
+  legacy Kotlin app (`io.mias.app`) until the R6 cutover.
+- **arm64-v8a only**, 16 KB page alignment, signing/version come from the repo's
+  `keystore.properties` / `version.properties` — all inherited from the root build.
+- JVM targets: RN modules build at 17; the first-party `:app`/`:core:*` stay at 21
+  (see the alignment notes in `/build.gradle.kts` and `/gradle.properties`).
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+## Cold-start biometric gate
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+`BiometricGateActivity` is the launcher: a strong (Class 3) biometric prompt runs
+**before** the React root (`MainActivity`, `exported=false`) mounts. It is
+standalone `androidx.biometric` for now; R1/R2 replace it with the `:core`
+SecurityModule backed by a `CryptoObject`-bound Keystore key.
+
+## Privacy invariants (do not violate)
+
+- No analytics, crash reporters, or cloud AI SDKs — ever.
+- Outbound network stays on the host allowlist (HuggingFace + GitHub CDNs).
+- No secrets in JS-accessible storage (never AsyncStorage) — secrets stay in the
+  native `ZkVault` / Keystore behind typed native modules.
+
+## iOS
+
+`ios/` is the untouched template shell, kept for the later iOS phase (R7 plans
+per-module iOS implementations). It still carries template naming
+(`MiasMobile`) — renamed when iOS work starts. Don't build it on Windows.
+
+## Tests
 
 ```sh
-bundle install
+cd mobile
+npx tsc --noEmit   # typecheck
+npm test           # jest
 ```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
-```
-
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
-
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
