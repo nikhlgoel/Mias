@@ -6,6 +6,10 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+// Hilt DI + KSP — the native modules obtain :core singletons (orchestrator,
+// repositories) through Hilt EntryPoints on the Application.
+apply plugin: "com.google.devtools.ksp"
+apply plugin: "com.google.dagger.hilt.android"
 
 import java.util.Properties
 
@@ -101,10 +105,8 @@ android {
         }
     }
 
-    // JVM target is left to RN's java-version-alignment (JDK 17, applied because
-    // :mobile is not in the first-party opt-out list in /build.gradle.kts). RN
-    // keeps Java + Kotlin consistent here; R1 reaches the JVM-21 :core via a
-    // dedicated bridge library (no cross-target inlining from this module).
+    // JVM target: aligned to 21 by /build.gradle.kts (matches :app/:core:* so
+    // this module can depend on the core libraries directly).
 }
 
 dependencies {
@@ -116,8 +118,17 @@ dependencies {
         implementation jscFlavor
     }
 
-    // Cold-start biometric gate (R0, standalone — no Hilt/:core yet; those arrive
-    // in R1 with the first native module). Versions from the shared catalog.
+    // Cold-start biometric gate. Versions from the shared catalog.
     implementation libs.biometric
     implementation libs.appcompat
+
+    // Wrapped core libraries (stage S2: inference). The native modules expose
+    // these to TS behind typed event/method surfaces.
+    implementation project(':core:common')
+    implementation project(':core:inference')
+
+    // Hilt — EntryPoint access to the :core singleton graph.
+    implementation libs.hilt.android
+    ksp libs.hilt.compiler
+    implementation libs.kotlinx.coroutines.android
 }

@@ -1,0 +1,16 @@
+{
+  "name": "@mias/domain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mias shared domain logic: ReAct stream parsing, response sanitation, chat session assembly. Platform-free TypeScript used by the mobile app and the PC extension.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "^7.0.2"
+  }
+}
