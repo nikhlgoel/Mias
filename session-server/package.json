@@ -1,0 +1,23 @@
+{
+  "name": "@mias/session-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mias Bridge session server — the PC side. Dials out to the relay, terminates E2EE, proxies prompts to the local MCP inference worker (desktop/server.py), and streams tokens back with resumable seq/ack delivery.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "bin": { "mias-session-server": "./src/bin.ts" },
+  "scripts": {
+    "start": "node src/bin.ts",
+    "test": "node --test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "@mias/bridge-protocol": "file:../packages/bridge-protocol"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@types/ws": "^8.5.12",
+    "typescript": "^7.0.2"
+  }
+}

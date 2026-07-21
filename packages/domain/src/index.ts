@@ -278,6 +278,98 @@ export function trimRepetition(text: string): string {
   return out.length > 0 ? out : 'I got stuck repeating myself there — could you rephrase that?';
 }
 
+// ── Personas (port of core/common model/Persona.kt) ─────────────────────────
+//
+// Device-local named system prompts; switching one only changes the prompt on
+// the next turn, never the model.
+
+export interface Persona {
+  id: string;
+  name: string;
+  tagline: string;
+  systemPrompt: string;
+}
+
+export const PERSONAS: Persona[] = [
+  {
+    id: 'default',
+    name: 'Mias',
+    tagline: 'Warm, balanced everyday assistant',
+    systemPrompt:
+      "You are Mias, a personal assistant that runs entirely on the user's device.\n" +
+      'Speak with a calm, supportive, and professional tone — like a trusted\n' +
+      'colleague who listens carefully and replies with care.\n' +
+      'Think before answering. Keep replies concise by default; expand only when\n' +
+      "the user asks for depth. When you don't know or can't do something, say so\n" +
+      'plainly.',
+  },
+  {
+    id: 'coder',
+    name: 'Engineer',
+    tagline: 'Precise, code-first answers',
+    systemPrompt:
+      'You are Mias in engineering mode. Give precise, technically correct answers.\n' +
+      'Prefer working code with minimal prose; use fenced code blocks and name the\n' +
+      'language. State assumptions briefly, call out edge cases and pitfalls, and\n' +
+      'never invent APIs — if unsure, say so.',
+  },
+  {
+    id: 'tutor',
+    name: 'Tutor',
+    tagline: 'Patient, step-by-step explanations',
+    systemPrompt:
+      'You are Mias in tutor mode. Explain clearly and patiently, building from\n' +
+      'first principles. Break things into small steps, use a simple example, and\n' +
+      'check understanding with a short question at the end. Avoid jargon unless you\n' +
+      'define it.',
+  },
+  {
+    id: 'brainstorm',
+    name: 'Brainstorm',
+    tagline: 'Lots of fast, varied ideas',
+    systemPrompt:
+      'You are Mias in brainstorm mode. Generate many varied ideas quickly. Favor a\n' +
+      "short, numbered list over long paragraphs, span different angles, and don't\n" +
+      'self-censor early — quantity first, then a one-line note on the most promising.',
+  },
+  {
+    id: 'concise',
+    name: 'Concise',
+    tagline: 'Short, direct, no filler',
+    systemPrompt:
+      'You are Mias in concise mode. Answer in as few words as possible while staying\n' +
+      'correct. No preamble, no filler, no restating the question. Use a short list\n' +
+      'only when it genuinely helps.',
+  },
+];
+
+/** Resolve by id, falling back to the default persona for unknown/blank ids. */
+export function personaById(id: string | null | undefined): Persona {
+  return PERSONAS.find(p => p.id === id) ?? PERSONAS[0]!;
+}
+
+// ── Turn context composition (port of the ChatViewModel join) ───────────────
+
+export interface TurnContextParts {
+  memory?: string;
+  skill?: string;
+  rag?: string;
+  hindsight?: string;
+}
+
+/** Join non-blank context blocks in the canonical order (memory, skill, rag, hindsight). */
+export function composeRetrievalContext(parts: TurnContextParts): string {
+  return [parts.memory, parts.skill, parts.rag, parts.hindsight]
+    .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+    .join('\n\n');
+}
+
+/** Title fallback exactly like the Kotlin app: first user text, 40 chars. */
+export function deriveConversationTitle(messages: ChatMessage[]): string {
+  const firstUser = messages.find(m => m.role === 'user');
+  return firstUser ? firstUser.text.slice(0, 40) : 'New Conversation';
+}
+
 // ── Chat session (streaming assembly) ───────────────────────────────────────
 //
 // The platform-free heart of a chat turn: consumes inference step events
@@ -352,6 +444,30 @@ export class ChatSession {
 
   setShowReActSteps(show: boolean): void {
     this.showReActSteps = show;
+  }
+
+  /** Seed the session with persisted messages (loading a conversation). */
+  loadMessages(messages: ChatMessage[]): void {
+    this.messages = [...messages];
+    this.turnActive = false;
+    this.streamingId = null;
+    this.notify();
+  }
+
+  /**
+   * Regenerate support: drop the last user message and everything after it,
+   * returning that user text for a fresh send. Null while processing or when
+   * no user turn exists. (Mirrors the Kotlin regenerate(): keep everything
+   * before the last user turn; replay that prompt through the full pipeline.)
+   */
+  rollbackLastTurn(): string | null {
+    if (this.turnActive) return null;
+    const idx = this.messages.map(m => m.role).lastIndexOf('user');
+    if (idx < 0) return null;
+    const userText = this.messages[idx]!.text;
+    this.messages = this.messages.slice(0, idx);
+    this.notify();
+    return userText;
   }
 
   /** Begin a turn: appends the user message and arms the streaming assembly. */

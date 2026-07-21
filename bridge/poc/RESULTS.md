@@ -1,5 +1,21 @@
 # Connectivity PoC — Method & Results (v3, fourth-pass)
 
+> **Graduated to production (stage S5).** This Python PoC has served its purpose;
+> the architecture it validated is now production TypeScript:
+> - the relay → `/relay` (`@mias/relay`) — same zero-knowledge forwarder, plus
+>   slot-token reclaim (07-S30), room TTL + rate limits, labeled channels;
+> - the PC host → `/session-server` (`@mias/session-server`) — dials the relay,
+>   terminates E2EE, proxies to the MCP worker, streams tokens;
+> - the E2EE → `@mias/bridge-protocol` `SecureChannel` (real X25519 forward
+>   secrecy + counter-nonce AES-256-GCM + channel binding + key confirmation);
+>   the balanced-PAKE swap for the code-KDF is the one remaining crypto hardening.
+>
+> The `/session-server` integration test reproduces the PoC's headline results
+> against the production code: pairing over the relay, **relay reads 0 frames**
+> (zero-knowledge), a streamed offload turn, wrong-code burn, and
+> unauthenticated-reclaim rejection. The Python PoC below is kept as the original
+> reference.
+
 `relay_poc.py` is a 3-party simulation that validates the architecture (02) and
 the security/reliability corrections (07) before any production code. Independent
 **relay**, **PC host**, and **mobile** endpoints, **end-to-end encrypted**, with

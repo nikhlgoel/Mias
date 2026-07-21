@@ -67,14 +67,17 @@ class InferenceBridgeModule(
     /**
      * Start a streamed turn. Resolves the promise immediately after launch
      * (acknowledgement); all output arrives as `step` events for [requestId].
+     * [retrievalContext] carries the composed Hindsight/RAG/skill context the
+     * TS layer assembled (see DataBridgeModule.getTurnContext).
      */
     @ReactMethod
-    fun send(requestId: String, prompt: String, systemPrompt: String, promise: Promise) {
+    fun send(requestId: String, prompt: String, systemPrompt: String, retrievalContext: String, promise: Promise) {
         val job = scope.launch {
             try {
                 orchestrator.process(
                     stimulus = Stimulus(type = StimulusType.USER_MESSAGE, content = prompt),
                     systemPrompt = systemPrompt.ifBlank { InferenceOrchestrator.DEFAULT_SYSTEM_PROMPT },
+                    hindsightContext = retrievalContext,
                 ).collect { step -> emitStep(requestId, step) }
                 emit(requestId, "done") {}
             } catch (t: Throwable) {

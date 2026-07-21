@@ -1,7 +1,9 @@
 # Mias Platform Master Plan — one TypeScript/React-Native codebase, every target
 
 **Status:** Active · supersedes the earlier RN migration prompt (removed) and the
-R0–R7 phase list. Stage S0 is complete; stages run S0→S8.
+R0–R7 phase list. Stages run S0→S8; **S0–S5 complete** (S5 = the PC-extension
+Bridge P1: relay + session server + SecureChannel graduated from the PoC to
+production TS, with the VS Code extension scaffold). Next: S6.
 
 ## 1. Goal
 
@@ -95,10 +97,17 @@ tests run on Node's built-in runner.
   pairing + E2EE per `bridge/docs/03–04`; phone connects over the internet
   (rendezvous relay), streams a real offload turn. The PoC (`bridge/poc`)
   graduates to production code here.
-- **S6 Data + background.** Cross-platform storage decision (migrate Room →
-  TS-owned SQLite, or keep native behind `DataModule` — decided with real
-  migration tests, no destructive fallbacks); evolution/self-learning job logic
-  in TS with native scheduling.
+- **S6 Data + background.** **Storage decision: keep native Room behind
+  `DataModule`** — the conversation/RAG/Hindsight schema is deeply tied to Room +
+  the on-device embedding engine, so a TS-owned SQLite rewrite would re-implement
+  the schema and risk data loss for zero user-visible gain (the data is on-device
+  native either way). iOS gets its own persistence impl behind the same
+  `DataModule` interface (S8). **No destructive fallback:** the conversations DB's
+  unconditional `fallbackToDestructiveMigration(dropAllTables=true)` — the S0
+  data-loss landmine — is removed; migrations 1→5 cover every shipped version and
+  a missing future migration now fails loudly instead of wiping data. Evolution /
+  self-learning is exposed via a native module (run-now + status + background
+  scheduling). Also lands the deferred **Vision** screen.
 - **S7 Cutover.** Legacy `app/` Compose UI deleted; RN app takes `io.mias.app`;
   `core/*` reduced to the native-adapter set; single product.
 - **S8 Apple + desktop.** Swift implementations (llama.cpp Metal, Keychain,

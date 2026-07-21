@@ -122,10 +122,17 @@ dependencies {
     implementation libs.biometric
     implementation libs.appcompat
 
-    // Wrapped core libraries (stage S2: inference). The native modules expose
-    // these to TS behind typed event/method surfaces.
+    // Wrapped core libraries (S2: inference; S3: data/prefs/security; S4:
+    // model-hub/speech/thermal). The native modules expose these to TS behind
+    // typed event/method surfaces.
     implementation project(':core:common')
     implementation project(':core:inference')
+    implementation project(':core:data')
+    implementation project(':core:security')
+    implementation project(':core:model-hub')
+    implementation project(':core:speech')
+    implementation project(':core:thermal')
+    implementation project(':core:evolution')
 
     // Hilt — EntryPoint access to the :core singleton graph.
     implementation libs.hilt.android

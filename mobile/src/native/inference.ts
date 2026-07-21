@@ -13,7 +13,7 @@ const EVENT_NAME = 'MiasInference.step';
 
 interface NativeInferenceModule {
   warmUp(): Promise<void>;
-  send(requestId: string, prompt: string, systemPrompt: string): Promise<void>;
+  send(requestId: string, prompt: string, systemPrompt: string, retrievalContext: string): Promise<void>;
   stop(requestId: string): void;
   addListener(eventName: string): void;
   removeListeners(count: number): void;
@@ -60,11 +60,13 @@ export const localInference = {
   /**
    * Start a streamed on-device turn. Steps for this request are forwarded to
    * `onStep` until final/error/done. Returns a stop function.
+   * `retrievalContext` is the composed Hindsight/RAG/skill context block.
    */
   send(
     requestId: string,
     prompt: string,
     systemPrompt: string,
+    retrievalContext: string,
     onStep: (step: InferenceStep) => void,
   ): () => void {
     const em = getEmitter();
@@ -80,7 +82,7 @@ export const localInference = {
         sub.remove();
       }
     });
-    nativeModule.send(requestId, prompt, systemPrompt).catch((err: unknown) => {
+    nativeModule.send(requestId, prompt, systemPrompt, retrievalContext).catch((err: unknown) => {
       onStep({ kind: 'error', text: err instanceof Error ? err.message : String(err) });
       sub.remove();
     });

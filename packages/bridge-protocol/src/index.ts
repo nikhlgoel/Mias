@@ -7,6 +7,9 @@
  * speak exactly this code. Zero runtime dependencies.
  */
 
+export * from './crypto.ts';
+export * from './peer.ts';
+
 // ── Versions ────────────────────────────────────────────────────────────────
 
 /** Bridge envelope version, negotiated in ctrl:hello (bridge/docs/04 section 7). */

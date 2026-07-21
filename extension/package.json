@@ -1,0 +1,42 @@
+{
+  "name": "mias-bridge",
+  "displayName": "Mias Bridge",
+  "description": "Host a Mias session server from your editor: pair your phone with a code/QR and offload/control on-device AI from anywhere, end-to-end encrypted.",
+  "version": "0.1.0",
+  "private": true,
+  "publisher": "mias",
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Other"],
+  "main": "./out/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      { "command": "mias.startSession", "title": "Mias: Start Bridge Session" },
+      { "command": "mias.stopSession", "title": "Mias: Stop Bridge Session" }
+    ],
+    "configuration": {
+      "title": "Mias Bridge",
+      "properties": {
+        "mias.relayUrl": {
+          "type": "string",
+          "default": "wss://relay.mias.local",
+          "description": "Rendezvous relay the session server dials out to (self-hostable; zero-knowledge)."
+        },
+        "mias.workerUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8401/rpc",
+          "description": "Local MCP inference worker (desktop/server.py). Must be bound to 127.0.0.1."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^7.0.2"
+  }
+}

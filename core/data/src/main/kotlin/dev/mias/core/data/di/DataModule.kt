@@ -28,7 +28,11 @@ object DataModule {
                 MiasDatabase.MIGRATION_3_4,
                 MiasDatabase.MIGRATION_4_5,
             )
-            .fallbackToDestructiveMigration(dropAllTables = true)
+            // No destructive fallback: real migrations 1→5 cover every shipped
+            // version, and a fresh install is created at the current schema
+            // directly. Any future schema bump MUST add its migration — a missing
+            // one fails loudly at open (caught in dev) instead of silently wiping
+            // the user's conversations (fixes the S0 data-loss landmine, PRD gate 8).
             .build()
 
     @Provides
