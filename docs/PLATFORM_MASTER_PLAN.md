@@ -1,9 +1,12 @@
 # Mias Platform Master Plan — one TypeScript/React-Native codebase, every target
 
 **Status:** Active · supersedes the earlier RN migration prompt (removed) and the
-R0–R7 phase list. Stages run S0→S8; **S0–S5 complete** (S5 = the PC-extension
-Bridge P1: relay + session server + SecureChannel graduated from the PoC to
-production TS, with the VS Code extension scaffold). Next: S6.
+R0–R7 phase list. Stages run S0→S8; **S0–S7 complete, S8 readiness established**.
+The React Native app is now THE app: it owns `io.mias.app`, the legacy Compose
+`app/` and the UI-/legacy-only `core:ui` + `core:network` modules are deleted, and
+`core/*` is the native-adapter set wrapped behind typed modules. **S8** (iOS +
+desktop) is scoped and documented in `docs/IOS_AND_DESKTOP.md` — the full iOS
+build + Swift adapters need a macOS/Xcode environment.
 
 ## 1. Goal
 
@@ -108,12 +111,22 @@ tests run on Node's built-in runner.
   a missing future migration now fails loudly instead of wiping data. Evolution /
   self-learning is exposed via a native module (run-now + status + background
   scheduling). Also lands the deferred **Vision** screen.
-- **S7 Cutover.** Legacy `app/` Compose UI deleted; RN app takes `io.mias.app`;
-  `core/*` reduced to the native-adapter set; single product.
-- **S8 Apple + desktop.** Swift implementations (llama.cpp Metal, Keychain,
-  FaceID, AVSpeech); iOS app ships from the same codebase. Evaluate
-  `react-native-windows`/`macos` shells reusing the packages for desktop apps
-  beyond the VS Code extension.
+- **S7 Cutover. ✅** Legacy `app/` Compose UI deleted; the RN app (Gradle `:app`,
+  at `mobile/android/app`) takes `io.mias.app`; app-startup wiring (ReAct tool
+  registration, HF-token sync, model warmup, WorkManager factory) relocated into
+  the RN `MainApplication`; the shared Ktor `HttpClient` provider relocated from
+  the deleted `core:network`; `core/*` reduced to the native-adapter set.
+- **S8 Apple + desktop. ◧ readiness done; full impl needs macOS.** Proven: the
+  platform-free TS core (`@mias/bridge-protocol` + `@mias/domain`, 51 Node tests)
+  is the portable foundation, and every native-module TS wrapper guards on
+  `isAvailable`, so the iOS app builds/runs today with native features degrading
+  gracefully. Delivered: `docs/IOS_AND_DESKTOP.md` (per-module Swift plan, build
+  path, graceful-degradation proof) + a reference Swift module
+  (`mobile/ios/MiasModules/MiasSecurity` — Keychain + FaceID) + a desktop
+  assessment (keep the VS Code extension as the PC surface; RN-windows/macos for a
+  standalone desktop app if prioritized). Remaining: the Swift adapters
+  (llama.cpp Metal, CryptoKit, SFSpeech, GRDB, …) + the iOS build — all require a
+  macOS/Xcode environment, so unbuildable/unverifiable here.
 
 ## 6. Invariants (hold at every stage)
 

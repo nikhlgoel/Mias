@@ -24,7 +24,7 @@ plugins {
 //  - :react-native-* (autolinked node_modules libs) → JVM 17, RN's own baseline.
 subprojects {
     val target = when {
-        path == ":mobile" -> JavaVersion.VERSION_21
+        path == ":app" -> JavaVersion.VERSION_21 // the RN app module (mobile/android/app)
         path.startsWith(":react-native-") -> JavaVersion.VERSION_17
         else -> null
     }

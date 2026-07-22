@@ -94,9 +94,8 @@ android {
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
-            // Install side-by-side with the legacy io.mias.app during the strangler
-            // period; the RN app takes over io.mias.app at cutover.
-            applicationIdSuffix ".rn"
+            // S7 cutover: the RN app is now THE app — installs as io.mias.app
+            // (the .rn side-by-side suffix is gone with the legacy Compose app).
         }
         release {
             signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
@@ -105,8 +104,16 @@ android {
         }
     }
 
-    // JVM target: aligned to 21 by /build.gradle.kts (matches :app/:core:* so
-    // this module can depend on the core libraries directly).
+    // JVM target 21 — matches :core:* so this module depends on the core
+    // libraries directly. Set explicitly (not just via /build.gradle.kts) so the
+    // Java + Kotlin targets stay consistent regardless of RN plugin ordering.
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+    kotlinOptions {
+        jvmTarget = "21"
+    }
 }
 
 dependencies {
@@ -133,9 +140,25 @@ dependencies {
     implementation project(':core:speech')
     implementation project(':core:thermal')
     implementation project(':core:evolution')
+    // Agent capabilities (multibound) — registered into the ReAct tool registry
+    // at startup by ToolBootstrapper (S7 cutover).
+    implementation project(':core:agent')
 
-    // Hilt — EntryPoint access to the :core singleton graph.
+    // Hilt — EntryPoint access to the :core singleton graph + app injection.
     implementation libs.hilt.android
     ksp libs.hilt.compiler
     implementation libs.kotlinx.coroutines.android
+
+    // WorkManager + Hilt-Work — background self-learning (EvolutionWorker).
+    implementation libs.work.runtime.ktx
+    implementation libs.hilt.work
+    ksp libs.hilt.work.compiler
+
+    // Ktor HttpClient — the shared client (web/HF lookups) provided into the Hilt
+    // graph by NetworkModule (relocated from the deleted core:network at S7).
+    implementation libs.ktor.client.core
+    implementation libs.ktor.client.cio
+    implementation libs.ktor.client.content.negotiation
+    implementation libs.ktor.serialization.kotlinx.json
+    implementation libs.kotlinx.serialization.json
 }

@@ -40,15 +40,12 @@ dependencyResolutionManagement {
 
 rootProject.name = "Mias"
 
-include(":app")
 include(":core:common")
 include(":core:data")
 include(":core:inference")
-include(":core:network")
 include(":core:thermal")
 include(":core:soul")
 include(":core:security")
-include(":core:ui")
 include(":core:model-hub")
 include(":core:agent")
 include(":core:evolution")
@@ -56,8 +53,9 @@ include(":core:resilience")
 include(":core:speech")
 include(":core:language")
 
-// The React Native app (Android). JS/TS lives at /mobile; the Android module is
-// /mobile/android/app, built here in the one root Gradle build alongside :app and
-// :core:*. Legacy :app stays installable until the RN cutover (strangler-fig).
-include(":mobile")
-project(":mobile").projectDir = file("mobile/android/app")
+// The React Native app is now THE app (S7 cutover). JS/TS lives at /mobile; the
+// Android module is /mobile/android/app, built here in the one root Gradle build
+// alongside :core:*. Named `:app` because RN's rootproject plugin expects the app
+// module at that path.
+include(":app")
+project(":app").projectDir = file("mobile/android/app")
