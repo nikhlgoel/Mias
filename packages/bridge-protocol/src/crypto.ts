@@ -10,13 +10,10 @@
  *   - Explicit key confirmation; a mismatch BURNS the pairing (07-S3).
  *   - AEAD with counter nonces per (key, direction) — never random GCM over a
  *     long stream (07-S6).
- *
- * ONE flagged crypto TODO (bridge/docs/03 section 6, poc/RESULTS): the pairing
- * code currently contributes via HKDF (`CodeKdfPake`). The production hardening
- * is a balanced PAKE (CPace / SPAKE2) so a short code never yields an
- * offline-crackable value — swapped in behind the `Pake` interface without
- * touching the rest of the channel. Hand-rolling CPace is unsafe, so it is left
- * as a vetted-library drop-in rather than improvised here.
+ *   - A real **balanced PAKE** (CpacePake, cpace.ts) over the audited @noble
+ *     ristretto255, so a short pairing code never yields an offline-crackable
+ *     value (07-S2) — one online guess only. Mixed with the ephemeral ECDH
+ *     above. `CodeKdfPake` remains as a non-PAKE fallback for tests.
  */
 
 // ── Pluggable crypto primitives (Node now; RN native later) ─────────────────
@@ -42,25 +39,37 @@ export interface CryptoProvider {
   aesGcmOpen(key: Uint8Array, nonce: Uint8Array, ciphertext: Uint8Array, aad?: Uint8Array): Uint8Array;
 }
 
-// ── Pairing-code contribution (PAKE seam) ───────────────────────────────────
+// ── Pairing-code PAKE seam ──────────────────────────────────────────────────
+//
+// A balanced PAKE exchanges one public share each way (piggybacked on HELLO, so
+// no extra round-trip) and then derives secret material bound to the transcript.
+// The real implementation is `CpacePake` (cpace.ts); `CodeKdfPake` is a plain
+// HKDF fallback that ignores the peer share (kept for tests / non-PAKE paths).
 
 export interface Pake {
-  /** Secret contribution derived from the pairing code, bound to the transcript. */
-  codeMaterial(code: string, transcript: Uint8Array): Uint8Array;
+  /** This side's public share, sent in HELLO. Empty for a non-PAKE fallback. */
+  publicShare(): Uint8Array;
+  /** Secret material after seeing the peer's share, bound to the transcript. */
+  codeMaterial(peerShare: Uint8Array, transcript: Uint8Array): Uint8Array;
 }
 
 /**
- * Stand-in: HKDF(code, salt=transcript). Behaviorally correct for the channel
- * but NOT zero-knowledge against an online code guess — replace with CPace/SPAKE2
- * (07-S2). Kept isolated so the swap is one class.
+ * Non-PAKE fallback: HKDF(code, salt=transcript). NOT zero-knowledge against an
+ * online guess — use `CpacePake` in production. Kept for tests and any flow that
+ * deliberately opts out of the PAKE.
  */
 export class CodeKdfPake implements Pake {
   private readonly crypto: CryptoProvider;
-  constructor(crypto: CryptoProvider) {
+  private readonly code: string;
+  constructor(crypto: CryptoProvider, code: string) {
     this.crypto = crypto;
+    this.code = code;
   }
-  codeMaterial(code: string, transcript: Uint8Array): Uint8Array {
-    return this.crypto.hkdf(utf8(code), transcript, utf8('mias-pake-v1'), 32);
+  publicShare(): Uint8Array {
+    return new Uint8Array(0);
+  }
+  codeMaterial(_peerShare: Uint8Array, transcript: Uint8Array): Uint8Array {
+    return this.crypto.hkdf(utf8(this.code), transcript, utf8('mias-pake-v1'), 32);
   }
 }
 
@@ -68,9 +77,10 @@ export class CodeKdfPake implements Pake {
 
 export type ChannelRole = 'host' | 'client';
 
-/** First handshake message: ephemeral pubkey (relay-facing is only rendezvous_id). */
+/** First handshake message: ephemeral pubkey + PAKE public share (both public). */
 export interface HelloMsg {
   eph: string; // base64 ephemeral X25519 public key
+  pake: string; // base64 PAKE public share (CPace Y); "" for the KDF fallback
   versions: number[]; // bridge protocol versions offered
 }
 
@@ -116,7 +126,8 @@ export class SecureChannel {
     this.crypto = crypto;
     this.role = role;
     this.ctx = ctx;
-    this.pake = pake ?? new CodeKdfPake(crypto);
+    // Default is the plain-KDF fallback; BridgePeer injects the real CpacePake.
+    this.pake = pake ?? new CodeKdfPake(crypto, ctx.code);
     this.versions = versions;
     this.eph = crypto.x25519Generate();
     // Directions are fixed by role so both sides agree which key encrypts which way.
@@ -124,9 +135,9 @@ export class SecureChannel {
     this.recvDir = role === 'host' ? DIR_CLIENT_TO_HOST : DIR_HOST_TO_CLIENT;
   }
 
-  /** The hello to send to the peer. */
+  /** The hello to send to the peer (ephemeral pubkey + PAKE public share). */
   hello(): HelloMsg {
-    return { eph: b64(this.eph.publicKey), versions: this.versions };
+    return { eph: b64(this.eph.publicKey), pake: b64(this.pake.publicShare()), versions: this.versions };
   }
 
   /**
@@ -150,7 +161,9 @@ export class SecureChannel {
       utf8(String(version)),
     );
 
-    const codeMat = this.pake.codeMaterial(this.ctx.code, transcript);
+    // Mix the ephemeral ECDH (forward secrecy) with the PAKE material (which the
+    // peer's public share + our secret produce, bound to the transcript).
+    const codeMat = this.pake.codeMaterial(unb64(peer.pake), transcript);
     const ikm = concat(shared, codeMat);
     const salt = utf8(this.ctx.rendezvousId);
 

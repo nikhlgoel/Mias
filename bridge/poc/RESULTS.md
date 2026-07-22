@@ -7,8 +7,12 @@
 > - the PC host → `/session-server` (`@mias/session-server`) — dials the relay,
 >   terminates E2EE, proxies to the MCP worker, streams tokens;
 > - the E2EE → `@mias/bridge-protocol` `SecureChannel` (real X25519 forward
->   secrecy + counter-nonce AES-256-GCM + channel binding + key confirmation);
->   the balanced-PAKE swap for the code-KDF is the one remaining crypto hardening.
+>   secrecy + counter-nonce AES-256-GCM + channel binding + key confirmation +
+>   a **real balanced PAKE — CPace over audited @noble ristretto255**, replacing
+>   the code-KDF stand-in so a short code is offline-uncrackable);
+> - the phone-side crypto → `nobleCryptoProvider` (pure-JS @noble), so the phone
+>   runs this exact protocol with no native crypto module — a node↔noble interop
+>   test proves an RN client pairs with a Node PC.
 >
 > The `/session-server` integration test reproduces the PoC's headline results
 > against the production code: pairing over the relay, **relay reads 0 frames**

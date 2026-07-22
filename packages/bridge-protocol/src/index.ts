@@ -9,6 +9,8 @@
 
 export * from './crypto.ts';
 export * from './peer.ts';
+export { nobleCryptoProvider } from './noble-crypto.ts';
+export { CpacePake } from './cpace.ts';
 
 // ── Versions ────────────────────────────────────────────────────────────────
 

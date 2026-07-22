@@ -20,6 +20,7 @@ import {
   type Pake,
   utf8,
 } from './crypto.ts';
+import { CpacePake } from './cpace.ts';
 import {
   FrameReceiver,
   FrameSender,
@@ -65,7 +66,11 @@ export class BridgePeer {
     opts: BridgePeerOptions = {},
   ) {
     this.transport = transport;
-    this.channel = new SecureChannel(crypto, role, ctx, opts.pake, opts.versions);
+    // Default to the real CPace PAKE, bound to the stable shared session id
+    // (rendezvous_id ‖ relay origin — both ends derive it identically).
+    const sid = utf8(`${ctx.rendezvousId}|${ctx.relayOrigin}`);
+    const pake = opts.pake ?? new CpacePake(crypto, ctx.code, sid);
+    this.channel = new SecureChannel(crypto, role, ctx, pake, opts.versions);
     this.transport.onMessage(data => this.onMessage(data));
     this.transport.onClose(() => {
       if (!this.established) this.establishedReject?.(new Error('closed before handshake'));

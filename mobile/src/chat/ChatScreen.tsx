@@ -32,9 +32,10 @@ import { localInference } from '../native/inference';
 import { dataStore, toChatMessages } from '../native/data';
 import { prefsStore } from '../native/prefs';
 import { speech } from '../native/speech';
+import { BridgeChatClient, parsePairingLink } from '../native/bridgeClient';
 import { darkTheme, lightTheme, type Theme } from '../theme';
 
-type Backend = 'local' | 'lan';
+type Backend = 'local' | 'lan' | 'bridge';
 
 let requestCounter = 0;
 const nextRequestId = () => `req-${++requestCounter}-${Date.now().toString(36)}`;
@@ -56,6 +57,9 @@ export function ChatScreen(): React.JSX.Element {
   const [lanHost, setLanHost] = useState('');
   const [lanPort, setLanPort] = useState('8401');
   const [lanToken, setLanToken] = useState('');
+  const [bridgeLink, setBridgeLink] = useState('');
+  const [bridgeStatus, setBridgeStatus] = useState<string | null>(null);
+  const bridgeRef = useRef<BridgeChatClient | null>(null);
   const [listening, setListening] = useState(false);
   const stopRef = useRef<(() => void) | null>(null);
   const stopVoiceRef = useRef<(() => void) | null>(null);
@@ -138,6 +142,40 @@ export function ChatScreen(): React.JSX.Element {
           void persistTurn();
         };
         session.onRunaway = () => stopRef.current?.();
+      } else if (backend === 'bridge') {
+        stopRef.current = () => {
+          session.stop();
+          endTurn();
+        };
+        try {
+          // Pair with the PC once (from the extension's pairing link), reuse it.
+          if (bridgeRef.current?.isConnected !== true) {
+            const info = parsePairingLink(bridgeLink);
+            if (info == null) {
+              session.feed({ kind: 'error', text: 'Paste the pairing link from your PC (Mias: Start Bridge Session).' });
+              endTurn();
+              return;
+            }
+            setBridgeStatus('Pairing with your PC…');
+            const client = new BridgeChatClient();
+            await client.connect(info);
+            bridgeRef.current = client;
+            setBridgeStatus('Paired — end-to-end encrypted.');
+          }
+          await new Promise<void>((resolve) => {
+            bridgeRef.current!.send(text, {
+              onDelta: chunk => session.feed({ kind: 'token', text: chunk }),
+              onDone: () => { session.feed({ kind: 'done' }); resolve(); },
+              onError: msg => { session.feed({ kind: 'error', text: msg }); resolve(); },
+            });
+          });
+        } catch (err) {
+          session.feed({ kind: 'error', text: err instanceof Error ? err.message : 'Bridge session failed.' });
+          bridgeRef.current = null;
+        } finally {
+          endTurn();
+          void persistTurn();
+        }
       } else {
         const host = lanHost.trim();
         if (host.length === 0) {
@@ -169,7 +207,7 @@ export function ChatScreen(): React.JSX.Element {
         }
       }
     },
-    [backend, endTurn, lanHost, lanPort, lanToken, personaId, persistTurn, session],
+    [backend, bridgeLink, endTurn, lanHost, lanPort, lanToken, personaId, persistTurn, session],
   );
 
   const onSend = useCallback(() => {
@@ -246,7 +284,7 @@ export function ChatScreen(): React.JSX.Element {
         </Pressable>
         <View style={styles.headerRight}>
           <View style={[styles.toggle, { borderColor: t.border }]}>
-            {(['local', 'lan'] as const).map(b => (
+            {(['local', 'lan', 'bridge'] as const).map(b => (
               <Pressable
                 key={b}
                 style={[styles.toggleItem, backend === b && { backgroundColor: t.bgRaised }]}
@@ -256,8 +294,8 @@ export function ChatScreen(): React.JSX.Element {
                 }}
                 accessibilityRole="button"
               >
-                <Text style={{ color: backend === b ? t.accent : t.textMuted, fontSize: 12 }}>
-                  {b === 'local' ? 'On-device' : 'Desktop'}
+                <Text style={{ color: backend === b ? t.accent : t.textMuted, fontSize: 11 }}>
+                  {b === 'local' ? 'On-device' : b === 'lan' ? 'LAN' : 'Remote'}
                 </Text>
               </Pressable>
             ))}
@@ -325,6 +363,24 @@ export function ChatScreen(): React.JSX.Element {
           >
             <Text style={styles.sendLabel}>✓</Text>
           </Pressable>
+        </View>
+      )}
+
+      {/* Remote PC over the internet — paste the pairing link from the extension. */}
+      {backend === 'bridge' && (
+        <View style={[styles.lanRow, { borderColor: t.border, flexDirection: 'column', alignItems: 'stretch' }]}>
+          <TextInput
+            style={[styles.lanInput, { color: t.text, borderColor: t.border, backgroundColor: t.bgRaised }]}
+            placeholder="Paste pairing link (Mias: Start Bridge Session on your PC)"
+            placeholderTextColor={t.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={bridgeLink}
+            onChangeText={setBridgeLink}
+          />
+          {bridgeStatus != null && (
+            <Text style={{ color: t.textMuted, fontSize: 11, marginTop: 6 }}>{bridgeStatus}</Text>
+          )}
         </View>
       )}
 
