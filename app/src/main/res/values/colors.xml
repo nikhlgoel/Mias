@@ -1,6 +1,0 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Window background color — matches MiasColors.Background (#080D1A) -->
-    <!-- This prevents the white flash before Compose renders -->
-    <color name="window_background">#080D1A</color>
-</resources>
